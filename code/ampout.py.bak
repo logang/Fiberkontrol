@@ -1,0 +1,64 @@
+import serial
+import re
+import time
+import numpy as np
+import pylab as pl
+
+savepath = '../../../../../Data/20101118_polly_fiber'
+
+rate = 115200
+inpin = 0
+ser = serial.Serial('/dev/tty.usbmodem411',rate)
+
+def receiving(ser,T=None):
+    if T is None:
+        T = 50000
+    buffer = ''
+    signal = []
+    i=0
+    out = []
+    fill = 0
+
+    while i < T:
+        buffer = buffer + ser.read(ser.inWaiting())
+        i += 1
+
+    if '\n' in buffer:
+        lines = buffer.split('\n') 
+        for j in range(len(lines)):
+            o = re.findall(r"\d+",lines[j])
+            if o:
+                out.append(int(o[0]))
+            else:
+                out.append(fill)
+
+    return out
+
+def plot_out(out):
+    pl.plot(out)
+
+def plot_rt():
+    #interactive mode on
+    pylab.ion()
+    timefig = pylab.figure(1)
+    timesub = pylab.subplot(111)
+    dt = 0.001
+    t = pylab.arange(0.0, 5.0, dt)
+    h = np.array(receiving(ser))
+    lines = pylab.plot(t,h)
+    for i in range(5000):
+        t = t + dt
+    h = 
+    lines[0].set_data(t,h)
+    timesub.set_xlim((t[0],t[-1]))
+    pylab.draw()
+    time.sleep(1.0)
+
+def main():
+    out = np.array(receiving(ser))
+    plot_out(out)
+    np.savez(savepath+'/out',out)
+    #np.savez(savepath+'/out',out)
+
+if __name__=='__main__':
+    main()
