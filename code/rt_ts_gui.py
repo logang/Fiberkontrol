@@ -30,7 +30,7 @@ class FiberPlot( HasTraits ):
     load_data     = Button()
     save_data     = Button()
     save_plot     = Button()
-    T             = Range( 0., 1e10 ) # Do we need a stop time? Stop button instead?
+    T             = Range( 0, 1000000 ) # Do we need a stop time? Stop button instead?
     dt            = Int( 20 ) # in ms; what does this do to accuracy
     band_low      = Range( 0., 1024 )
     band_high     = Range( 0., 1024 )
@@ -80,6 +80,7 @@ class FiberPlot( HasTraits ):
 #        self.T          = 1000000
 
         if self.plot_type is "record":
+            self.buffer    = ''
             self.rate      = 115200
             self.recording = False
             try:
@@ -93,11 +94,11 @@ class FiberPlot( HasTraits ):
     def listen( self ):
 
         if self.recording is True:
-            try:
-                hnew = np.array( self.receiving() )
-            except:
-                hnew = 0. #self._ydata[-1] 
-                print "missed a serial read"
+#            try:
+            hnew = np.array( self.receiving() )
+            #except:
+            #    hnew = 0. #self._ydata[-1] 
+            #    print "missed a serial read listening"
 
         output  = np.append( self.plotdata.get_data("y"), hnew )
         print self.plotdata.get_data("y"), hnew, output
@@ -108,36 +109,33 @@ class FiberPlot( HasTraits ):
         return output
 
     def receiving( self, dt = None ):
-        buffer, i, out, fill = '', 0, [], 0
+
+        buffer = self.buffer
+        out    = []
 
         if dt is not None:
             self.dt = dt
 
-        timediff = 0.
-        starttime = time.time()
-        while timediff < self.dt:
-            try:
-                buffer   = buffer + self.ser.read( self.ser.inWaiting() )
-                now      = time.time()
-                timediff = 1000 * (now - starttime)
-                print timediff, self.dt
-                1/0
-            except:
-                print "missed a serial read"
+#        try:
+        time.sleep( self.dt /1000 )
+        buffer   = buffer + self.ser.read( self.ser.inWaiting() )
 
         if '\n' in buffer:
             lines = buffer.split( '\n' ) 
+            
+            if lines[-2]: 
+                full_lines = lines[:-1] 
+                 
+                for i in range( len( full_lines ) ):
+                    o = re.findall( r"\d+", lines[i] )
+                    if o:
+                        out.append( int( o[0] ) )
 
-            for j in range( len(lines) ):
-                o = re.findall( r"\d+", lines[j] )
-                if o:
-                    out.append( int( o[0] ) )
-                else:
-                    if len( self.plotdata.get_data("y") ) == 0:
-                        out.append( 0. )
-                    else:
-                        out.append( 0. ) # self._ydata[-1] )                        
-                    
+            self.buffer = lines[1]
+
+#        except:
+#            print "missed a serial read receiving"
+
         return out
 
     def plot_out( self ):
@@ -166,8 +164,8 @@ class FiberPlot( HasTraits ):
             if self.recording is True:
                 self.output = self.listen
                 print self.output
-                self.plotdata.set_data( "y",  self.output ) 
-                self.plotdata.set_data( "x", range( len( self.plotdata.get_data("y")  ) ) )
+#                self.plotdata.set_data( "y",  self.output ) 
+#                self.plotdata.set_data( "x", range( len( self.plotdata.get_data("y")  ) ) )
                 print self.plotdata.get_data("y")
 
                 counter += 1
@@ -250,4 +248,4 @@ if __name__ == "__main__":
     F = FiberPlot()
     F.recording = True
     F.listen
-    #F.configure_traits()
+    F.configure_traits()

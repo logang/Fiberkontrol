@@ -18,32 +18,38 @@ void setup()
 {
   // initialize serial communication with computer:
   Serial.begin(115200);                   
-  // initialize all the readings to 0: 
-  for (int thisReading = 0; thisReading < numReadings; thisReading++)
-    readings[thisReading] = 0;    
 }
 
-void loop() {
+void loop() 
+{
   // get start time:
-  starttime = millis()  
-  while( millis() - starttime < timeblock ) {
+  starttime = millis();  
+  while( millis() - starttime < blocktime ) 
+  {
     // read from pin
     reading = analogRead(inputPin);
     // add to block total
     total = total + reading;    
     // augment count
-    count += 1
+    count += 1;
     // keep track of zeros
-    if (reading == 0) {
+    if (reading == 0) 
+    {
      zeros += 1;
     }                       
     // calculate the average:
-    if (zeros < count) {
-        average = total / ( numReadings - zeros );    
-    } else {
+    if (zeros < count) 
+    {
+        average = total / ( count - zeros );    
+    } else 
+    {
         average = 0;
-        zeros   = 0;
     }
   // send it to the computer (as ASCII digits) 
-  Serial.println(average, DEC);               
+  Serial.println(average, DEC);
+  // reset variables
+  zeros = 0;
+  count = 0;
+  total = 0;  
+  }
 }
