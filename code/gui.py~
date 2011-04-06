@@ -1,4 +1,5 @@
 # Major imports
+import os
 import numpy as np
 import serial
 import re
@@ -56,61 +57,23 @@ class FiberViewer( HasTraits ):
                                width            = 800,
                                height           = 380,
                                show_label       = False),
-                HGroup( spring, Item( "record"), spring ),
-                HGroup( spring, 
-                        Item( "stop", show_label = False),
-                        Item( "load_data" ),
-                        Item( "save_data" ),
-                        Item( "save_plot" ),
+                HGroup( spring,
+                        Item( "record",    show_label = False), 
+                        Item( "stop",      show_label = False ),
+                        Item( "load_data", show_label = False ),
+                        Item( "save_data", show_label = False ),
+                        Item( "save_plot", show_label = False ),
                         spring ),
                 resizable = True,
                 buttons   = ["OK"],
                 width = 800, height = 500)
 
     def __init__( self ):
+        self.recording = False
+        self.stopped   = False
+        self.saveit    = False
         self._ydata = np.zeros( 1000 )
         self._xdata = np.zeros( 1000 )        
-
-    def _record_fired( self ):
-        self.recording = True
-        print "record fired"
-
-class FiberController( HasTraits ):
-    
-    # A reference to the plot viewer object
-    viewer = Instance( FiberViewer )
-    
-    # Some parameters controlling the data collected
-
-    analog_in_pin = Int( 0 )
-#    T             = Int( 0 ) 
-    dt            = Int( 20 ) # in ms; what does this do to accuracy
-    window        = Int( 1000 )
-
-    # The max number of data points to accumulate and show in the plot
-    max_num_points = window
-    
-    # The number of data points we have received
-    num_ticks = Int(0)
-    
-    view = View(Group('analog_in_pin',
-                      'dt',
-                      'window',
-                      orientation="vertical"),
-                      buttons=["OK", "Cancel"])
-    
-    def __init__(self, **kwtraits):
-        super( FiberController, self ).__init__( **kwtraits )
-
-        self.buffer    = ''
-        self.rate      = 115200
-        self.recording = False
-        try:
-            self.ser = serial.Serial( '/dev/tty.usbmodem641', self.rate )
-            print "serial initialized"
-        except:
-            self.ser = serial.Serial( '/dev/tty.usbserial-A600emRx', self.rate )                
-            print "serial initialized"
 
     def save( self, path = None, name = None ):
         if path is not None:
@@ -124,17 +87,61 @@ class FiberController( HasTraits ):
             self.savepath = path
         self.loaded = np.load( self.savepath + '/out.npz' )['arr_0']
 
-    def _get_current_data( self ):
+    def _record_fired( self ):
+        self.recording = True
+        print "record fired"
 
-        if self.recording is True:
-            hnew = np.array( self.receiving() )
+    def _stop_fired( self ):
+        self.recording = False
+        self.stopped   = True
+        print "stop fired"
 
-            #except:
-            #    hnew = 0. #self._ydata[-1] 
-            #    print "missed a serial read listening"
+    def _save_data_fired( self ):
+        self.saveit = True
 
-            self._ydata = np.append( self._ydata, hnew )
-            self._xdata = range( len( self._ydata ) )
+#------------------------------------------------------------------------------
+
+class FiberController( HasTraits ):
+    
+    # A reference to the plot viewer object
+    viewer = Instance( FiberViewer )
+    
+    # Some parameters controlling the data collected
+
+    analog_in_pin = Int( 0 )
+#    T             = Int( 0 ) 
+    dt            = Int( 20 ) # in ms; what does this do to accuracy
+    window        = Int( 1000 )
+    savepath      = os.path.abspath('.')
+
+    # The max number of data points to accumulate and show in the plot
+    max_num_points = window
+    
+    # The number of data points we have received
+    num_ticks = Int(0)
+    
+    view = View(Group( 'analog_in_pin',
+                       'dt',
+                       'window',
+                       'savepath',
+                       orientation="vertical"),
+                       buttons=["OK", "Cancel"] )
+    
+    def __init__(self, **kwtraits):
+        super( FiberController, self ).__init__( **kwtraits )
+
+        self.buffer    = ''
+        self.rate      = 115200
+        try:
+            self.ser = serial.Serial( '/dev/tty.usbmodem641', self.rate )
+            print "serial initialized"
+        except:
+            self.ser = serial.Serial( '/dev/tty.usbserial-A600emRx', self.rate )                
+            print "serial initialized"
+
+        self.recording_it = 0
+        self.data         = []
+        self.alldata      = {}
 
     def receiving( self, dt = None ):
 
@@ -157,25 +164,22 @@ class FiberController( HasTraits ):
                     if o:
                         out.append( int( o[0] ) )
 
-            self.buffer = lines[1]
+            self.buffer  = lines[1]
             out = np.median( out[~(out == 0)] )
-
         return out
 
     def timer_tick(self, *args):
         """ Callback function that should get called based on a wx timer
-        tick.  This will generate a new datapoint and set it on
+        tick.  This gets  a new datapoint from serial and adds it to
         the _ydata array of our viewer object.
         """
-        if self.recording is True:
-            # Generate a new number and increment the tick count
+        if self.viewer.recording is True:
+            #---Generate a new number and increment the tick count 
             new_val = self.receiving()
-            print "new_val:", new_val
             self.num_ticks += 1
         
-            # grab the existing data, truncate it, and append the new point.
+            #---Grab the existing data, truncate it, and append the new point.
             cur_data  = self.viewer._ydata
-            print "cur_data:", cur_data
             if len( cur_data ) > self.max_num_points + 2: 
                 new_data  = np.hstack(( cur_data[ -self.max_num_points+1:], [new_val] ))
             else:
@@ -183,19 +187,36 @@ class FiberController( HasTraits ):
                 new_data  = np.hstack(( cur_data, new_val ))            
             new_index = np.arange(self.num_ticks - len(new_data) + 1, self.num_ticks+0.01)
         
+            self.data.append( new_val )
+            print len( self.data )
+
             self.viewer._xdata = new_index
             self.viewer._ydata = new_data
+
+        elif self.viewer.recording is False and self.viewer.stopped is True:
+            #---Add data epoch to a list 
+            self.alldata[ self.recording_it ] = self.data
+            self.recording_it += 1
+            self.data = []
+            self.stopped = False
+
+        elif self.viewer.recording is False and self.viewer.saveit is True:
+            #---Listen to FiberViewer and save if save_data button fires
+            print self.alldata
+            np.savez( os.path.join( self.savepath, 'test' ), x = self.alldata ) 
+            self.viewer.saveit = False
+
         return
             
 #-----------wxApp used when this file is run from the command line------------#
 
-class MyApp( wx.PySimpleApp ):
+class FiberRead( wx.PySimpleApp, HasTraits ):
+    
+#    recording = Bool( False )
     
     def OnInit( self, *args, **kw ):
         viewer     = FiberViewer()
         controller = FiberController( viewer = viewer )
-        
-#        record = viewer.record
 
         # Pop up the windows for the two objects
         viewer.edit_traits()
@@ -211,7 +232,7 @@ class MyApp( wx.PySimpleApp ):
         self.timer = wx.Timer( self, timerId )
         
         # Register a callback with the timer event
-        self.Bind( wx.EVT_TIMER, controller.timer_tick, id=timerId )
+        self.Bind( wx.EVT_TIMER, controller.timer_tick, id = timerId )
 
         # Start up the timer!  We have to tell it how many milliseconds
         # to wait between timer events.  For now we will hardcode it
@@ -221,7 +242,7 @@ class MyApp( wx.PySimpleApp ):
 
 # This is called when this invoked from the command line.
 if __name__ == "__main__":
-    app = MyApp()
-    app.MainLoop()    
+    fr = FiberRead()
+    fr.MainLoop()    
 
 # EOF
