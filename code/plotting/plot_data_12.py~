@@ -145,7 +145,7 @@ class PlotLine():
 #--Plot normalized side-by-side
         figNorm = plt.figure(3)
         plt.hold(True)
-        title = "Normalized, " str(self.dateOfTest)
+        title = "Normalized, " + str(self.dateOfTest)
         plt.suptitle(title)
         
         self.side_by_side_line(figNorm)
@@ -194,11 +194,26 @@ class PlotLine():
         plt.suptitle(title)
         plt.hold(True)
         
-        self.plotFlatHist = self.plot_hist(figFlatHist, self.mouseLabel, self.ynormFlat, (0.9, 1.1))
+        self.plotFlatHist = self.plot_hist(figFlatHist, self.mouseLabel, self.ynormFlat, (0.95, 1.05))
         
         plt.figure(firstFigureNumber + self.theme)
         plt.hold(False)
 
+#---Plot mean vs variance
+        firstFigureNumber = 5 + 2*size(self.numInThemesSoFar)
+
+        plt.figure(firstFigureNumber + self.theme)
+        mean = np.mean(self.y)
+        variance = np.std(self.y)**2
+
+        plt.hold(True)
+        plt.plot(mean, variance, 'o')
+        plt.hold(False)
+
+        plt.figure(100)
+        plt.hold(True)
+        self.meanVar = plt.plot(mean, variance, 'o')
+        plt.hold(False)
 
     def side_by_side_line(self, fig):
         ax = fig.add_axes([0.1, (1.0/self.totalToPlot)*self.numPlottedSoFar, 0.85, 1.0/self.totalToPlot])
@@ -271,7 +286,7 @@ class PlotLine():
 
         plotHist = ax.hist(yData, bins=1000, range = plotRange, histtype='bar')
 
-        plt.xticks((0.9,0.95,1,1.05))
+        plt.xticks((0.95,1,1.05))
         ax.yaxis.set_major_locator(MaxNLocator(3))
 
         ax.set_ylabel(mouseLabel, **self.yprops)
@@ -298,6 +313,7 @@ if __name__=="__main__":
 
         fullRangePlots = []
         restrictedRangePlots = []
+        meanVarPlots = []
         plotLabels = []
         
         numFiles = size(files)
@@ -319,9 +335,9 @@ if __name__=="__main__":
 
             if file == '#':
                 break
-            fullDirectory = '/Users/kellyz/Documents/Code/python/Fiberkontrol/code/' + directory + '/'
+            fullDirectory = '/Users/kellyz/Documents/Data/Fiberkontrol/' + directory + '/'
 
-            filename = '/Users/kellyz/Documents/Code/python/Fiberkontrol/code/' + directory + '/' + file
+            filename = '/Users/kellyz/Documents/Data/Fiberkontrol/' + directory + '/' + file
             
 
             print file
@@ -338,7 +354,7 @@ if __name__=="__main__":
             fullRangePlots.append(plot.plotFullRange)
             restrictedRangePlots.append(plot.plotRestrictedRange)
             plotLabels.append(plot.labels[plot.mouseNumber[:-3]]+'\n(' + plot.mouseNumber[:-3]+ ')') # + '\n init: ' +str(plot.y[plot.coords[1][0]]))
-            
+            meanVarPlots.append(plot.meanVar)
             
      
     print plotLabels
@@ -346,6 +362,8 @@ if __name__=="__main__":
     plt.figlegend(fullRangePlots, plotLabels, 'upper right')
     plt.figure(2)
     plt.figlegend(restrictedRangePlots, plotLabels, 'upper right')
+    plt.figure(100)
+    plt.figlegend(meanVarPlots, plotLabels, 'upper right')
     
 #    coords = ginput(3, timeout=0)
             

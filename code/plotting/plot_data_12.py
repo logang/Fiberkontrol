@@ -306,7 +306,7 @@ if __name__=="__main__":
 
     counter = 1
 
-    for fileList in os.walk('/Users/kellyz/Documents/Code/python/Fiberkontrol/code/' + directory):
+    for fileList in os.walk('/Users/kellyz/Documents/Data/Fiberkontrol/' + directory):
 
 
         files = fileList[2]
@@ -335,9 +335,9 @@ if __name__=="__main__":
 
             if file == '#':
                 break
-            fullDirectory = '/Users/kellyz/Documents/Code/python/Fiberkontrol/code/' + directory + '/'
+            fullDirectory = '/Users/kellyz/Documents/Data/Fiberkontrol/' + directory + '/'
 
-            filename = '/Users/kellyz/Documents/Code/python/Fiberkontrol/code/' + directory + '/' + file
+            filename = '/Users/kellyz/Documents/Data/Fiberkontrol/' + directory + '/' + file
             
 
             print file
