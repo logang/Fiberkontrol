@@ -1,0 +1,32 @@
+import numpy as np
+import os
+
+from enthought.chaco.api import ArrayPlotData, Plot
+from enthought.enable.component_editor import ComponentEditor
+
+from enthought.traits.api import HasTraits, Instance
+from enthought.traits.ui.api import View, Item
+
+
+a = np.load('/Users/kellyz/Documents/Code/python/Fiberkontrol/code/20110624-controls.npz')['x']
+
+data = a.tolist()[0][2]
+
+class MyPlot(HasTraits):
+    plot = Instance(Plot)
+    traits_view = View(Item('plot', editor = ComponentEditor(), show_label = False), 
+                       width = 500, height = 500, resizable = True, 
+                       title = "My line plot")
+    
+def _init_(self, x, y, *args, **kw):
+    super(MyPlot, self)._init_(*args, **kw)
+    plotdata = ArrayPlotData(x=x, y=y)
+    plot = Plot(plotdata)
+    plot.plot(("x", "y"), type = "line", color = "blue")
+    plot.title = "Fluorescence signal"
+    self.plot = plot
+
+
+x = range(len(data))
+lineplot = MyPlot(x, a)
+lineplot.configure_traits()

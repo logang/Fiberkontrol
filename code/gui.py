@@ -64,7 +64,7 @@ class FiberViewer( HasTraits ):
                         spring ),
                 resizable = True,
                 buttons   = ["OK"],
-                width = 800, height = 500)
+                width = 1000, height = 500)
 
     def __init__( self ):
         self.recording = False
@@ -127,7 +127,8 @@ class FiberController( HasTraits ):
                        'savepath',
                        'filename',
                        orientation="vertical"),
-                       buttons=["OK", "Cancel"] )
+                buttons=["OK", "Cancel"],
+                width = 500, height = 400 )
     
     def __init__(self, **kwtraits):
         super( FiberController, self ).__init__( **kwtraits )
@@ -138,7 +139,7 @@ class FiberController( HasTraits ):
             self.ser = serial.Serial( '/dev/tty.usbmodem641', self.rate )
             print "serial initialized"
         except:
-            self.ser = serial.Serial( '/dev/tty.usbserial-A600emRx', self.rate )                
+            self.ser = serial.Serial( '/dev/tty.usbserial-A600eu7L', self.rate )                
             print "serial initialized"
 
         self.recording_it = 0

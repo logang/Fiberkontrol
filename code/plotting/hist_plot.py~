@@ -1,0 +1,26 @@
+import matplotlib.pyplot as plt
+import numpy as np
+import os
+import sys
+
+file = sys.argv[1]
+
+filename = '/Users/kellyz/Documents/Code/python/Fiberkontrol/code/' + file
+
+print filename
+
+a = np.load(filename)['x']
+
+dataA = a.tolist()[0][2]
+if dataA.count([]) > 0:
+    dataA.remove([])
+
+length = int(len(dataA))
+
+#just a test to see if histogram works
+trial = data[75000:10500]
+
+histogram = plt.hist(trial, bins=10, range=None, normed=False, cumulative=False, 
+                     bottom=None, histtype='bar', align='mid',
+                     orientation='vertical', rwidth=None, log=False, **kwargs)
+plt.show()

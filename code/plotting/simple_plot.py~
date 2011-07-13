@@ -1,0 +1,7 @@
+from pylab import *
+import numpy as np
+import os
+import sys
+
+for sys in sys.argv:
+    print arg
