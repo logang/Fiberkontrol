@@ -64,7 +64,7 @@ class FiberViewer( HasTraits ):
                         spring ),
                 resizable = True,
                 buttons   = ["OK"],
-                width = 800, height = 500)
+                width = 1000, height = 500)
 
     def __init__( self ):
         self.recording = False
@@ -127,7 +127,8 @@ class FiberController( HasTraits ):
                        'savepath',
                        'filename',
                        orientation="vertical"),
-                       buttons=["OK", "Cancel"] )
+                buttons=["OK", "Cancel"],
+                width = 500, height = 400 )
     
     def __init__(self, **kwtraits):
         super( FiberController, self ).__init__( **kwtraits )

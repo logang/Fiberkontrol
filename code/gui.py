@@ -1,11 +1,8 @@
+#! /usr/bin/env python
+
 # Major imports
-import os
+import os, serial, re, time, random, wx
 import numpy as np
-import serial
-import re
-import time
-import random
-import wx
 
 # Enthought imports
 from enthought.traits.api \
@@ -13,7 +10,6 @@ from enthought.traits.api \
     Bool, Callable, Float, Instance, Trait
 from enthought.traits.ui.api import Item, View, Group, HGroup, spring, Handler
 from enthought.pyface.timer.api import Timer
-
 
 # Chaco imports
 from enthought.chaco.api import ArrayPlotData, Plot

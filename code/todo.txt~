@@ -1,0 +1,13 @@
+#----------------------------------------------------------------------------#
+# Basic Inputs and Outputs
+#----------------------------------------------------------------------------#
+-- radio buttons to choose analog and digital ins
+-- same for outs
+-- specify start ttl in
+-- write ins and outs to numpy array (is this too slow?)
+-- 
+-- 
+
+#----------------------------------------------------------------------------#
+# State machine for conditional stuff
+#----------------------------------------------------------------------------#
