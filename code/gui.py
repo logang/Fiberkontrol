@@ -17,7 +17,7 @@ from enthought.enable.component_editor import ComponentEditor
 from enthought.chaco.chaco_plot_editor import ChacoPlotEditor, \
                                                 ChacoPlotItem
 
-#------------------------------------------------------------------------------
+#------------------------------------------------------------------------------#
 
 class FiberViewer( HasTraits ):
     """ This class contains the data arrays that will be updated
@@ -95,7 +95,7 @@ class FiberViewer( HasTraits ):
     def _save_data_fired( self ):
         self.saveit = True
 
-#------------------------------------------------------------------------------
+#------------------------------------------------------------------------------#
 
 class FiberController( HasTraits ):
     
@@ -108,7 +108,8 @@ class FiberController( HasTraits ):
 #    T             = Int( 0 ) 
     dt            = Int( 20 ) # in ms; what does this do to accuracy
     window        = Int( 1000 ) 
-    savepath      = os.path.abspath('.')
+    #savepath      = os.path.abspath('.')
+    savepath = '/Users/kellyz/Documents/Data/Fiberkontrol/'
     filename      = 'test'
 
     # The max number of data points to accumulate and show in the plot
@@ -205,6 +206,8 @@ class FiberController( HasTraits ):
             #---Listen to FiberViewer and save if save_data button fires
             print self.alldata
             np.savez( os.path.join( self.savepath, self.filename ), x = self.alldata ) 
+            self.viewer.saveit = False
+            self.ser.close()
             self.viewer.saveit = False
 
         return

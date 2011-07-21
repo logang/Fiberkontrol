@@ -6,7 +6,7 @@ import sys
 
 file = sys.argv[1]
 
-filename = '/Users/kellyz/Documents/Code/python/Fiberkontrol/code/' + file
+filename = '/Users/kellyz/Documents/Data/Fiberkontrol/' + file
 
 print filename
 
