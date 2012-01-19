@@ -109,8 +109,8 @@ class FiberController( HasTraits ):
     dt            = Int( 10 ) # in ms; what does this do to accuracy
     window        = Int( 1000 ) 
     #savepath      = os.path.abspath('.')
-    savepath = '/Users/kellyz/Documents/Data/Fiberkontrol/20120108'
-    filename      = '20120108-'
+    savepath = '/Users/kellyz/Documents/Data/Fiberkontrol/20120113'
+    filename      = '20120113-'
     time_until_stim = 10.0
     time_of_stim = 10.0
     time_between_stim = 0.0
@@ -143,8 +143,10 @@ class FiberController( HasTraits ):
         self.buffer    = ''
         self.rate      = 115200
         try:
-#Un comment this for the duemilanove
+#Uncomment this for the duemilanove
 #            self.ser = serial.Serial( '/dev/tty.usbmodem641', self.rate )
+
+#This is for the arduino uno
             self.ser = serial.Serial( '/dev/tty.usbmodem411', self.rate )
             print "serial initialized"
         except:
@@ -189,8 +191,42 @@ class FiberController( HasTraits ):
         self.periodPlan = [0, 9, 0, 10, 0, 11, 0,
                            11, 0, 10, 0, 9, 0]
 
+        self.periodPlan = [0, 100, 0, 100, 0, 100, 0,
+                           100, 0, 100, 0, 100, 0, 100, 0,
+                           100, 0, 100, 0, 100, 0, 100, 0,
+                           100, 0, 100, 0, 100, 0, 100, 0,
+                           100, 0, 100, 0, 100, 0, 100, 0]
+
         self.periodPlan = [0, 900, 0, 900, 0, 900, 0,
-                           900, 0, 900, 0, 900, 0]
+                           900, 0, 900, 0, 900, 0, 900, 0,
+                           900, 0, 900, 0, 900, 0, 900, 0,
+                           900, 0, 900, 0, 900, 0, 900, 0,
+                           900, 0, 900, 0, 900, 0, 900, 0,
+                           900, 0, 900, 0, 900, 0, 900, 0]
+
+        self.periodPlan = [0, 50, 0, 50, 0, 50, 0, 50,
+                           0, 50, 0, 50, 0, 50, 0, 50,
+                           0, 50, 0, 50, 0, 50, 0, 50,
+                           0, 50, 0, 50, 0, 50, 0, 50]
+
+
+        self.periodPlan = [0, 900, 0, 10, 0, 500, 0, 30,
+                           0, 100, 0, 50, 0, 75, 0, 10,
+                           0, 500, 0, 100, 0, 20, 0, 900,
+                           0, 25, 0, 25, 0, 25, 0, 25,
+                           0, 25, 0, 25, 0, 25, 0, 25,
+                           0, 25, 0, 25, 0, 25, 0, 25]
+        f = 50
+
+        self.periodPlan = [0, f, 0, f, 0, f, 0, f,
+                           0, f, 0, f, 0, f, 0, f,
+                           0, f, 0, f, 0, f, 0, f,
+                           0, f, 0, f, 0, f, 0, f,
+                           0, f, 0, f, 0, f, 0, f,
+                           0, f, 0, f, 0, f, 0, f]
+
+
+
 
     def receiving( self, dt = None ):
         """ 
@@ -205,14 +241,14 @@ class FiberController( HasTraits ):
         
         time.sleep(self.dt/1000)
 
-        print 'numWaiting', self.ser.inWaiting()
+#        print 'numWaiting', self.ser.inWaiting()
         buffer = buffer + self.ser.read( self.ser.inWaiting() )
 
 
         if '\n' in buffer:
             lines = buffer.split( '\n' ) 
             
-            print 'lines', lines
+ #           print 'lines', lines
             if lines[-2]: 
                 full_lines = lines[:-1] 
                  
@@ -223,9 +259,9 @@ class FiberController( HasTraits ):
 
             self.buffer  = lines[1]
             out = np.median( out[~(out == 0)] )
-        print 'buffer', buffer
-        print 'size', len(buffer)
-        print 'out',out
+#        print 'buffer', buffer
+#        print 'size', len(buffer)
+#        print 'out',out
         return out
 
 # going through all chunks __|--|__|--|__|--|__
@@ -289,7 +325,7 @@ class FiberController( HasTraits ):
         if self.viewer.recording is True:           
             #---Generate a new number and increment the tick count 
             new_val = self.receiving()
-            print 'new_val', new_val
+
 
             if self.num_ticks == 0:
                 print "Init!"
