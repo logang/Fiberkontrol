@@ -89,6 +89,13 @@ class FiberModel( HasTraits ):
 
             self.num_analog_channels = self.analog_in_0 + self.analog_in_1 + self.analog_in_2 + self.analog_in_3
 
+            #setup streaming
+            print "configuring U6 stream"
+            self.labjack.streamConfig(  NumChannels = 4, ChannelNumbers = [ 0, 1, 2, 3 ], 
+                                        ChannelOptions = [ 0, 0, 0, 0 ], SettlingFactor = 1, 
+                                        ResolutionIndex = 1, ScanInterval =  6000, SamplesPerPacket = 25)
+
+
 
             # setup frequency control
 
@@ -111,7 +118,7 @@ class FiberModel( HasTraits ):
             self.start_time = time.time()
             self.shutterChunkTime = 5 #in seconds
 
-            self.shutterPlan = [10, 0, 3, 0, 5, 0, 7, 0] #in Hz
+            self.shutterPlan = [30, 0, 10, 0, 0.5, 0, 1, 0, 50] #in Hz
 
 
             # set recording to be true
@@ -123,22 +130,39 @@ class FiberModel( HasTraits ):
     def _get_current_data( self ):
         """ If currently recording, query labjack for current analog input registers """
         if self.recording is True:
-            current = self.labjack.readRegister( self.AIN0_REGISTER, numReg = self.num_analog_channels*2 )
+#            current = self.labjack.readRegister( self.AIN0_REGISTER, numReg = self.num_analog_channels*2 )
 #            current0 = self.labjack.readRegister( self.AIN0_REGISTER )
 #            current1 = self.labjack.readRegister( self.AIN1_REGISTER )
 
-#            print 'curr0,',current[0]
-#            print 'curr1', current[1]
-#            print current1
+            rgen = self.labjack.streamData()
+            rdata = rgen.next()
+            dataCount0 = 0
+            dataCount1 = 0
+            dataCount2 = 0
+            dataCount3 = 0
+            if rdata is not None:
+                for v in rdata['AIN0']:
+                    self._ydata = np.append( self._ydata, v )
+                    self._tdata = np.append( self._tdata, time.time() - self.start_time)
+                    dataCount0 += 1
+                for v in rdata['AIN1']:
+                    self._i1data = np.append( self._i1data, v )
+                    dataCount1 += 1
+                for v in rdata['AIN2']:
+                    self._i2data = np.append( self._i2data, v )
+                    dataCount2 += 1
+                for v in rdata['AIN3']:
+                    self._i3data = np.append( self._i3data, v )
+                    dataCount3 += 1
 
+        
+            print 'dataCounts', dataCount0, ';', dataCount1, ';', dataCount2, ';', dataCount3
 
-            self._ydata = np.append( self._ydata, current[0])
-            self._i1data = np.append( self._i1data, current[1] )
 #            self._i2data = np.append( self._i2data, current[2] )
 #            self._i3data = np.append( self._i3data, current[3] )
 
-            self._xdata = range( 0, len( self._ydata ))
-            self._tdata = np.append( self._tdata, time.time() - self.start_time)
+#            self._xdata = range( 0, len( self._ydata ))
+ 
 #            print 'time', self._tdata
 
 #            self._ydata = self._ydata
@@ -265,9 +289,10 @@ class FiberView( HasTraits ):
         self.timer = Timer(self.model.dt, self.time_update) # update every 1 ms
 
     def run( self ):
-#        for i in range( 100 ):
         self.model.start_time = time.time()
-#        while(True):
+        
+        self.model.labjack.streamStart()
+
         self._plot_update()
         self.model._get_current_data()
 
