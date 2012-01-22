@@ -40,8 +40,8 @@ class FiberModel( HasTraits ):
     analog_in_2   = Int( 0 ) 
     analog_in_3   = Int( 0 ) 
 
-    savepath = '/Users/kellyz/Documents/Data/Fiberkontrol/20120118/'
-    filename = '20120118-'
+    savepath = '/Users/kellyz/Documents/Data/Fiberkontrol/20120120/'
+    filename = '20120120-'
 
     view = View(Group( 'savepath',
                        'filename',
@@ -57,6 +57,14 @@ class FiberModel( HasTraits ):
     _i3data = Array() #input 3 data
     _tdata  = Array() #time data
     _sdata  = Array() #shutter data
+
+    _ydata  = np.zeros(500000)
+    _i1data = np.zeros(500000) #input 1 data
+    _i2data = np.zeros(500000) #input 2 data
+    _i3data = np.zeros(500000) #input 3 data
+    _tdata  = np.zeros(500000) #time data
+    _sdata  = np.zeros(500000) #shutter data
+    master_index = 0
 
 
     def __init__(self, **kwtraits):
@@ -91,11 +99,11 @@ class FiberModel( HasTraits ):
 
             #setup streaming
             print "configuring U6 stream"
-            self.labjack.streamConfig(  NumChannels = 4, ChannelNumbers = [ 0, 1, 2, 3 ], 
-                                        ChannelOptions = [ 0, 0, 0, 0 ], SettlingFactor = 1, 
+            self.labjack.streamConfig(  NumChannels = 2, ChannelNumbers = [ 0, 1,], 
+                                        ChannelOptions = [ 0, 0, ], SettlingFactor = 1, 
                                         ResolutionIndex = 1, ScanInterval =  6000, SamplesPerPacket = 25)
 
-
+            self.prev_time = 0
 
             # setup frequency control
 
@@ -116,9 +124,21 @@ class FiberModel( HasTraits ):
 
             #---Shutter plan settings ------------
             self.start_time = time.time()
-            self.shutterChunkTime = 5 #in seconds
+            self.shutterChunkTime = 10 #in seconds
 
-            self.shutterPlan = [30, 0, 10, 0, 0.5, 0, 1, 0, 50] #in Hz
+            self.shutterPlan = [0, 30, 0, 10, 0, 0.5, 0, 5, 0, 50,
+                                0, 20, 0, 1, 0, 30, 0, 5, 0, 10, 
+                                0, 0.5, 0, 20, 0, 1, 0] #in Hz
+
+            freq = 10 #in Hz
+            if(True):
+                self.shutterPlan = [0, freq, 0, freq, 0, freq, 0, freq, 0,
+                                    freq, 0, freq, 0, freq, 0, freq, 0, freq,
+                                    0, freq, 0, freq, 0, freq, 0, freq, 0, freq,
+                                    0, freq, 0, freq, 0, freq, 0, freq, 0, freq,
+                                    0, freq, 0, freq, 0, freq, 0, freq, 0, freq,
+                                    0, freq, 0, freq, 0, freq, 0, freq, 0, freq,
+                                    0, freq, 0, freq, 0, freq, 0, freq, 0, freq]
 
 
             # set recording to be true
@@ -136,27 +156,58 @@ class FiberModel( HasTraits ):
 
             rgen = self.labjack.streamData()
             rdata = rgen.next()
-            dataCount0 = 0
-            dataCount1 = 0
-            dataCount2 = 0
-            dataCount3 = 0
+            dataCount0 = 1
+            dataCount1 = 1
+            dataCount2 = 1
+            dataCount3 = 1
+
+            self.curr_time = time.time() - self.start_time
+            
             if rdata is not None:
+                last_v = 0 
                 for v in rdata['AIN0']:
-                    self._ydata = np.append( self._ydata, v )
-                    self._tdata = np.append( self._tdata, time.time() - self.start_time)
+                    
+                    if v < 10.1:
+                        numData = len(rdata['AIN0'])
+                        timeChunk = dataCount0*(self.curr_time - self.prev_time)/numData
+#                        self._ydata = np.append( self._ydata, v )
+                        self._ydata[self.master_index + dataCount0 -1] = v
+                        last_v = v
+                    else: #to account for weird blips where it saturates for one time step
+#                        self._ydata = np.append( self._ydata, last_v )
+                        self._ydata[self.master_index + dataCount0 -1] = last_v
+
+                    self._tdata[self.master_index + dataCount0 -1] = self.prev_time + timeChunk
+                    self._sdata[self.master_index + dataCount0 -1] = self.actual_freq
+#                    self._tdata = np.append( self._tdata, 
+ #                                            self.prev_time + timeChunk)
+#                    self._sdata = np.append( self._sdata, self.actual_freq)
+                        
                     dataCount0 += 1
+
+                    print 'master_index', self.master_index
+
+###CHECKKK THISSSSS!!!!!!!
                 for v in rdata['AIN1']:
-                    self._i1data = np.append( self._i1data, v )
+#                    self._i1data = np.append( self._i1data, v )
+                    self._i1data[self.master_index + dataCount1 -1] = v
                     dataCount1 += 1
-                for v in rdata['AIN2']:
-                    self._i2data = np.append( self._i2data, v )
-                    dataCount2 += 1
-                for v in rdata['AIN3']:
-                    self._i3data = np.append( self._i3data, v )
-                    dataCount3 += 1
+#                for v in rdata['AIN2']:
+#                    self._i2data[self.master_index+dataCount2 -1] = v
+ #                   self._i2data = np.append( self._i2data, v )
+  #                 dataCount2 += 1
+   #             for v in rdata['AIN3']:
+#                    self._i3data[self.master_index+dataCount3 -1] = v 
+   #                self._i3data = np.append( self._i3data, v )
+     #               dataCount3 += 1
 
         
-            print 'dataCounts', dataCount0, ';', dataCount1, ';', dataCount2, ';', dataCount3
+            if dataCount1 != dataCount0:
+                print "ERRRRORRRRRRRR, DATACOUNTS ARE NOT THE SAME"
+
+            self.prev_time = self.curr_time
+
+#            print 'dataCounts', dataCount0, ';', dataCount1, ';', dataCount2, ';', dataCount3
 
 #            self._i2data = np.append( self._i2data, current[2] )
 #            self._i3data = np.append( self._i3data, current[3] )
@@ -168,30 +219,33 @@ class FiberModel( HasTraits ):
 #            self._ydata = self._ydata
 #            self._i1data = self._i1data
 
+            self.master_index += dataCount0 - 1
+
     def _set_frequency( self ):
         """ Set the frequency of the shutter, according to a pretedermined plan """
-        self.labjack
+#        self.labjack
         
-        print 'frequency'
+#        print 'frequency'
         
         currTime = time.time() - self.start_time
         index = int(currTime/self.shutterChunkTime)
-        print 'index', index
+#        print 'index', index
 
         desired_freq = self.shutterPlan[index] #in Hz
-        print 'desired_freq', desired_freq
+#        print 'desired_freq', desired_freq
 
         pin = 2 #FI02
         pulsewidth = 50 #PWM %
 
         if (desired_freq == 0):
             pulsewidth = 0
-            self._sdata = np.append( self._sdata, 0)            
+            self.actual_freq = 0
+ #           self._sdata = np.append( self._sdata, 0)            
         else:
             divisor = int(self.TIME_CLOCK_BASE/(self.FREQUENCY_CONVERSION_CONSTANT*desired_freq))
             self.labjack.writeRegister(7002, divisor) #set the divisor
-            actual_freq = self.TIME_CLOCK_BASE/(self.FREQUENCY_CONVERSION_CONSTANT*float(divisor))
-            self._sdata = np.append( self._sdata, actual_freq)
+            self.actual_freq = self.TIME_CLOCK_BASE/(self.FREQUENCY_CONVERSION_CONSTANT*float(divisor))
+#            self._sdata = np.append( self._sdata, actual_freq)
 
         self.labjack.writeRegister(7200, self.PWM_CONSTANT - (self.PWM_CONSTANT*pulsewidth/100)) #set the duty cycle
 
@@ -207,6 +261,7 @@ class FiberModel( HasTraits ):
         pl.plot( self.out )
 
     def save( self, path = None, name = None ):
+
         if path is not None:
             self.savepath = path
         if name is not None:
@@ -229,8 +284,10 @@ class FiberModel( HasTraits ):
         np.savez( full_save_path_i3, self._i3data )
 
 
-
+        self.labjack.streamStop()
         self.labjack.close()
+
+
 
     def load( self, path = None, name = None ):
         if path is not None:
@@ -277,8 +334,8 @@ class FiberView( HasTraits ):
     def __init__(self, **kwtraits):
         super( FiberView, self ).__init__( **kwtraits )
 
-#        self.plot_data = ArrayPlotData( x = self.model._tdata, y = self.model._ydata )
-        self.plot_data = ArrayPlotData( x = self.model._tdata, y = self.model._i1data )
+        self.plot_data = ArrayPlotData( x = self.model._tdata, y = self.model._ydata )
+#        self.plot_data = ArrayPlotData( x = self.model._tdata, y = self.model._i1data )
         
 
         self.plot = Plot( self.plot_data )
@@ -290,6 +347,7 @@ class FiberView( HasTraits ):
 
     def run( self ):
         self.model.start_time = time.time()
+        self.model.prev_time = 0
         
         self.model.labjack.streamStart()
 
@@ -302,20 +360,24 @@ class FiberView( HasTraits ):
             time1 = time.time()-self.model.start_time
             self.model._set_frequency()
             time2 = time.time()-self.model.start_time
-            print 'set_freq:', time2-time1
+#            print 'set_freq:', time2-time1
             self.model._get_current_data()     
             time3 = time.time()-self.model.start_time
-            print 'get_current_data', time3-time2
+ #           print 'get_current_data', time3-time2
             self._plot_update()
             time4 = time.time()-self.model.start_time
-            print 'plot_update', time4-time3
+  #          print 'plot_update', time4-time3
 
     def _plot_update( self ):
 
-#        self.plot_data.set_data( "y", self.model._ydata ) 
-        self.plot_data.set_data( "y", self.model._i1data ) 
-        self.plot_data.set_data( "x", self.model._tdata )
-        self.plot = Plot( self.plot_data )
+        if len(self.model._ydata) > 10000:
+            self.plot_data.set_data("y", self.model._ydata[-10000:])
+            self.plot_data.set_data( "x", self.model._tdata[-10000:] )
+        else:        
+            self.plot_data.set_data( "y", self.model._ydata ) 
+        #        self.plot_data.set_data( "y", self.model._i1data ) 
+            self.plot_data.set_data( "x", self.model._tdata )
+            self.plot = Plot( self.plot_data )
         self.plot.plot(("x", "y"), type="line", color="green")[0]
         self.plot.request_redraw()
 
