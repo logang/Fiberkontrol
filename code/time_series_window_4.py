@@ -37,8 +37,8 @@ class FiberModel( HasTraits ):
     dt            = Int( 1 ) # in ms; what does this do to accuracy
     analog_in_0   = Int( 1 ) 
     analog_in_1   = Int( 1 ) 
-    analog_in_2   = Int( 0 ) 
-    analog_in_3   = Int( 0 ) 
+    analog_in_2   = Int( 1 ) 
+    analog_in_3   = Int( 1 ) 
 
     savepath = '/Users/kellyz/Documents/Data/Fiberkontrol/20120121/'
     filename = '20120121-test'
@@ -58,12 +58,12 @@ class FiberModel( HasTraits ):
     _tdata  = Array() #time data
     _sdata  = Array() #shutter data
 
-    _ydata  = np.zeros(200000)
-    _i1data = np.zeros(200000) #input 1 data
-    _i2data = np.zeros(200000) #input 2 data
-    _i3data = np.zeros(200000) #input 3 data
-    _tdata  = np.zeros(200000) #time data
-    _sdata  = np.zeros(200000) #shutter data
+    _ydata  = np.zeros(300000)
+    _i1data = np.zeros(300000) #input 1 data
+    _i2data = np.zeros(300000) #input 2 data
+    _i3data = np.zeros(300000) #input 3 data
+    _tdata  = np.zeros(300000) #time data
+    _sdata  = np.zeros(300000) #shutter data
     master_index = 0
 
 
