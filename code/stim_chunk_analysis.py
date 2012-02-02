@@ -4,244 +4,92 @@ import sys
 
 import matplotlib.pyplot as plt
 
-import data_classes as dc
-import unpack_data
+import read_data as rd
 
 
 
+def CalculateMedianPulse(chunk_list):
+    medianPulse = []
 
-def ConvertSecondsToDataPoints(seconds, t):
-    t0 = t[0]
-
-    for i in range(len(t)):
-        elapsedTime = t[i] - t0
-
-        if elapsedTime >= seconds:
-            return i
-
-
-def FindNextOnIndex(currentIndex, s):
-    if currentIndex >= len(s):
-        return -1
-    else:
-        while s[currentIndex] == 0:
-            currentIndex += 1
-            if currentIndex >= len(s):
-                return -1
-
-    return currentIndex
-
-
-#Split a time series into pulses __|--|__ with tOff seconds before and after, and tOn se\
-#conds in the middle 
-def SplitTrialIntoChunks(trial):
-    print "SplitTrial", trial
-    tOff = 10     # Set these according to the dataset
-    tOn = 10
-
-    nOff = ConvertSecondsToDataPoints(tOff, trial.all_time_data)
-    nOn  = ConvertSecondsToDataPoints(tOn, trial.all_time_data)
-
-    currentIndex = 0
-
-    while True:
-        onIndex = FindNextOnIndex(currentIndex, trial.all_shutter_data)
-        if onIndex == -1:
-            break
-
-        pulseStart = onIndex - nOff
-        pulseEnd = onIndex + nOn + nOff
-        if(pulseEnd >= len(trial.all_y_data)):
-            pulseEnd = len(trial.all_y_data)
-
-        # Make a StimChunk
-
-        chunk = dc.StimChunk()
-        print "Trial to append to", trial
-        print "Len(trial.list_of_StimChunks append", len(trial.list_of_StimChunks)
-        trial.list_of_StimChunks.append(chunk)
-
-        if (len(trial.intensity_list) > trial.chunk_counter + 1):
-            chunk.intensity  = trial.intensity_list[trial.chunk_counter]
-        else:
-            chunk.intensity  = trial.intensity_list[0]
-
-        print "trial.intensity", trial.intensity_list
-
-        if (len(trial.frequency_list) > trial.chunk_counter + 1):
-            chunk.frequency = trial.frequency_list[trial.chunk_counter]
-        else:
-            chunk.frequency = trial.frequency_list[0]
-
-        chunk.start_time        = trial.all_time_data[pulseStart]
-        chunk.start_stim_time   = trial.all_time_data[onIndex]
-        chunk.end_time          = trial.all_time_data[pulseEnd]
-        chunk.position_in_trial = trial.chunk_counter
+    for i in range(len(chunk_list[0].chunk_data)):
+        valuesAtTimePoint = []
         
-        ### ------ CHANGE THE TAG depending on the trial type ('stim', 'sugar', 'juvenile')
-        chunk.tag          = 'stim'
-        chunk.mouse_name   = trial.mouse_name
-        chunk.trial_number = trial.trial_number
-        chunk.day_of_trial = trial.day_of_trial
+        for j in range(len(chunk_list)):
+            
+            if i < len(chunk_list[j].chunk_data):
+                valuesAtTimePoint.append(chunk_list[j].chunk_data[i])
 
+        medianPulse.append(np.median(valuesAtTimePoint))
 
-        chunk.chunk_data  = trial.all_y_data[pulseStart:pulseEnd]
-        chunk.before_data = trial.all_y_data[pulseStart:onIndex - 1]
-        chunk.during_data = trial.all_y_data[onIndex:onIndex + nOn]
-        chunk.after_data  = trial.all_y_data[onIndex + nOn: pulseEnd]
+    return medianPulse
         
-
-        chunk.chunk_shutter_data = trial.all_shutter_data[pulseStart:pulseEnd]
-        chunk.chunk_time_data    = trial.all_time_data[pulseStart:pulseEnd]
-        chunk.chunk_input1_data  = trial.all_input1_data[pulseStart:pulseEnd]
-        chunk.chunk_input2_data  = trial.all_input2_data[pulseStart:pulseEnd]
-        chunk.chunk_input3_data  = trial.all_input3_data[pulseStart:pulseEnd]
-
-        if (chunk.position_in_trial > 1):
-            chunk.prev_chunk = trial.list_of_StimChunks[chunk.position_in_trial - 1]
-        chunk.trial = trial
-
-        currentIndex = pulseEnd
-        trial.chunk_counter += 1
-
-    print "len(trial.list_of_StimChunks)", len(trial.list_of_StimChunks)
-        
+                                         
 
 
 
 
-def ReadFileList(f, filenames, frequency_strings, intensity_strings):
-    i = 0
-    for line in f:
-        if i%4 == 0:
-            filenames.append(line[:-1])
-        elif i%4 == 1:
-            intensity_strings.append(line[:-1])
-        elif i%4 == 2:
-            frequency_strings.append(line[:-1])
-        else:
-            if (line[:-1] != '#'):
-                print 'file format error'
-        i += 1
+if __name__=="__main__":    
+#    list_of_files = sys.argv[1]
+    list_of_files = '/Users/kellyz/Documents/Data/Fiberkontrol/Test_Trials.txt'
+    allData = rd.ReadData(list_of_files)
 
-    print 'frequency_strings', frequency_strings
-    print 'intensity_strings', intensity_strings
+    MAX_FREQ = 1000  #Fill this list with the index = frequency*10
+    frequency_chunk_list = []
+    for i in range(MAX_FREQ):
+        frequency_chunk_list.append([])
 
-
-def ReadData(list_of_files):
-    f = open(list_of_files, 'r')
-
-    filenames = []
-    frequency_strings = []
-    intensity_strings = []
-    ReadFileList(f, filenames, frequency_strings, intensity_strings)
-    
-    all = dc.AllData()  # instantiate AllData class
-
-    # Fill the data classes
-
-    trialCounter = 0
-    for file in filenames:
-       all.list_of_trial_names.append(file[9:])
-
-       directory = '/Users/kellyz/Documents/Data/Fiberkontrol/'
-       dataFilename = directory + file + '.npz'
-       sFilename = directory + file + '_s.npz'
-       tFilename = directory + file + '_t.npz'
-       i1Filename = directory + file + '_i1.npz'
-       i2Filename = directory + file + '_i2.npz'
-       i3Filename = directory + file + '_i3.npz'
-
-       try:
-            d = np.load(dataFilename)['x']
-            s = np.load(sFilename)['x']
-            t = np.load(tFilename)['x']
-
-            d = unpack_data.unpackArduino(d)
-            s = unpack_data.unpackArduino(s)
-            t = unpack_data.unpackArduino(t)
-            i1 = []
-            i2 = []
-            i3 = []
-
-       except:
-            d = np.load(dataFilename)['arr_0']
-            s = np.load(sFilename)['arr_0']
-            t = np.load(tFilename)['arr_0']
-            i1 = np.load(i1Filename)['arr_0']
-            i2 = np.load(i2Filename)['arr_0']
-            i3 = np.load(i3Filename)['arr_0']
-
-            d  = unpack_data.unpackLabjack(d)
-            s  = unpack_data.unpackLabjack(s)
-            t  = unpack_data.unpackLabjack(t)
-            i1 = unpack_data.unpackLabjack(i1)
-            i2 = unpack_data.unpackLabjack(i2)
-            i3 = unpack_data.unpackLabjack(i3)
-
-           
-       # Flatten data
-
-       dFlat = []
-       fitCurves = []
-       unpack_data.FlattenData(dFlat, d, t, fitCurves)
-       dUnFlat = d
-       d = dFlat[0]
-
-
-       # Initialize a new TrialData instance
-
-       trial = dc.TrialData() 
-       all.list_of_TrialDatas.append(trial)
-       print all.list_of_TrialDatas
-       
-       trial.all_y_data = d
-       trial.all_unflat_y_data = dUnFlat
-       trial.all_shutter_data = s
-       trial.all_time_data = t
-       trial.all_input1_data = i1
-       trial.all_input2_data = i2
-       trial.all_input3_data = i3
-       trial.frequency_list = unpack_data.ConvertStringToFloatList(
-           frequency_strings[trialCounter])
-       trial.intensity_list = unpack_data.ConvertStringToIntList(
-           intensity_strings[trialCounter])
-       trial.mouse_name = file[-7:-3]
-       trial.trial_number = file[-2:]
-       trial.day_of_trial = file[-16:-8]
-       trial.file_name = file
-
-       trial.list_of_StimChunks = []
-
-       SplitTrialIntoChunks(trial)
-       trialCounter += 1
-       print "trialCounter", trialCounter
-
-
-#    print all.list_of_trial_names
-#    print all.list_of_TrialDatas
-
-    return all
-
-if __name__=="__main__":
-
-    list_of_files = sys.argv[1]
-    allData = ReadData(list_of_files)
-
-    print allData.list_of_trial_names
-    
-    print "     "
+    MAX_INTENSITY = 10
+    intensity_chunk_list = []
+    for i in range(MAX_INTENSITY):
+        intensity_chunk_list.append([])
 
     for trial in allData.list_of_TrialDatas:
         print "TRIAL"
-        print trial.file_name
-        print trial.frequency_list
-        print trial.intensity_list
+        fig = plt.figure()
+        print "len(time)", len(trial.all_time_data)
+        print "len(y)", len(trial.all_y_data)
+        print "len(s)", len(trial.all_shutter_data)
+        print "len(i1)", len(trial.all_input1_data)
 
-        print trial.list_of_StimChunks
+#        plt.plot(trial.all_time_data, trial.all_y_data)
+#        plt.plot(trial.all_time_data, trial.all_unflat_y_data)
 
+
+        
         for chunk in trial.list_of_StimChunks:
-            
-#            print chunk.mouse_name
-            print chunk.position_in_trial
+            if len(chunk.chunk_data) > 0:
+#                fig = plt.figure()
+#                print chunk
+#                plt.plot(np.array(chunk.chunk_time_data), np.array(chunk.chunk_data))
+#                plt.plot(chunk.chunk_time_data, np.array(chunk.chunk_shutter_data)*chunk.chunk_data[1]/chunk.frequency)
+#                print "chunk.chunk_data[1]", chunk.chunk_data[1]
+#                print "chunk.frequency", chunk.frequency
 
+                freq = int(chunk.frequency*10)
+                print "freq", freq
+                frequency_chunk_list[freq].append(chunk)
+
+                intensity = chunk.intensity
+                intensity_chunk_list[intensity].append(chunk)
+                
+
+    print 'frequency_chunk_list', frequency_chunk_list
+    print 'intensity_chunk_list', intensity_chunk_list
+
+
+    for f in range(len(frequency_chunk_list)):
+        chunk_list = frequency_chunk_list[f]
+        print 'chunk_list', chunk_list
+
+        if (chunk_list != []):
+            fig = plt.figure()
+            for chunk in chunk_list:
+                plt.plot(np.array(chunk.chunk_time_data) - chunk.chunk_time_data[0], np.array(chunk.chunk_data - chunk.chunk_data[100]), alpha=0.3, color='0.75')
+            medianPulse = CalculateMedianPulse(chunk_list)
+        
+            firstChunk = chunk_list[0]
+            timeData = np.array(firstChunk.chunk_time_data) - firstChunk.chunk_time_data[0]
+            minLen = min(len(timeData), len(medianPulse))
+            plt.plot(timeData[0:minLen], np.array(medianPulse[0:minLen]) - medianPulse[0], linewidth=5, color='k')
+
+    plt.show()
