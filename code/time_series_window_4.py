@@ -40,8 +40,8 @@ class FiberModel( HasTraits ):
     analog_in_2   = Int( 1 ) 
     analog_in_3   = Int( 1 ) 
 
-    savepath = '/Users/kellyz/Documents/Data/Fiberkontrol/20120121/'
-    filename = '20120121-test'
+    savepath = '/Users/kellyz/Documents/Data/Fiberkontrol/20120130/'
+    filename = '20120130-'
 
     view = View(Group( 'savepath',
                        'filename',
@@ -126,11 +126,13 @@ class FiberModel( HasTraits ):
             self.start_time = time.time()
             self.shutterChunkTime = 10 #in seconds
 
-            self.shutterPlan = [0, 30, 0, 10, 0, 0.5, 0, 5, 0, 50,
-                                0, 20, 0, 1, 0, 30, 0, 5, 0, 10, 
-                                0, 0.5, 0, 20, 0, 1, 0] #in Hz
+            base = 1
+            alt = 5
+            self.shutterPlan = [0, base, 0, alt, 0, base, 0, alt,
+                                0, base, 0, alt, 0, base, 0, alt,
+                                0, base, 0, alt, 0, base, 0, alt]
 
-            freq = 10 #in Hz
+            freq = 0.5 #in Hz
             if(True):
                 self.shutterPlan = [0, freq, 0, freq, 0, freq, 0, freq, 0,
                                     freq, 0, freq, 0, freq, 0, freq, 0, freq,
