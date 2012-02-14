@@ -1,4 +1,5 @@
 import numpy as np
+import scipy as sp
 import os
 import sys
 
@@ -8,14 +9,14 @@ import unpack_data
 
 
 
-def ConvertSecondsToDataPoints(tStartIndex, seconds, t):
-    t0 = t[tStartIndex]
+#def ConvertSecondsToDataPoints(tStartIndex, seconds, t):
+#    t0 = t[tStartIndex]
 
-    for i in range(len(t)):
-        elapsedTime = t[i] - t0
+#    for i in range(len(t)):
+#        elapsedTime = t[i] - t0
 
-        if elapsedTime >= seconds:
-            return i
+#        if elapsedTime >= seconds:
+#            return i
 
 def FindTimeIndex(desired_t, t_data):
     for i in range(len(t_data)):
@@ -65,12 +66,16 @@ def SplitTrialIntoChunks(trial):
         pulseStart = FindTimeIndex(pulseStartTime, trial.all_time_data)
         pulseEndTime = trial.all_time_data[onIndex] + tOn + tOff
         pulseEnd = FindTimeIndex(pulseEndTime, trial.all_time_data)
-        print "pulseEnd", pulseEnd
-        print "pulseEndTime", pulseEndTime
-
         stimEndTime = trial.all_time_data[onIndex] + tOn
         stimEnd = FindTimeIndex(stimEndTime, trial.all_time_data)
-        
+
+        if (stimEnd == pulseEnd):
+            break
+
+
+        print 'stimEnd', stimEnd
+        print 'pulseEnd', pulseEnd
+
 
         if(pulseEnd >= len(trial.all_y_data)):
             pulseEnd = len(trial.all_y_data)-1
@@ -87,18 +92,17 @@ def SplitTrialIntoChunks(trial):
         else:
             chunk.intensity  = trial.intensity_list[0]
 
-        print "trial.intensity", trial.intensity_list
-
         if (len(trial.frequency_list) > trial.chunk_counter):
             chunk.frequency = trial.frequency_list[trial.chunk_counter]
         else:
             chunk.frequency = trial.frequency_list[0]
-
+        print 'chunk.frequency', chunk.frequency
         
 
         chunk.start_time        = trial.all_time_data[pulseStart]
         chunk.start_stim_time   = trial.all_time_data[onIndex]
         chunk.end_time          = trial.all_time_data[pulseEnd]
+        chunk.end_stim_time     = trial.all_time_data[stimEnd]
         chunk.position_in_trial = trial.chunk_counter
         
         ### ------ CHANGE THE TAG depending on the trial type ('stim', 'sugar', 'juvenile')
@@ -108,14 +112,21 @@ def SplitTrialIntoChunks(trial):
         chunk.day_of_trial = trial.day_of_trial
 
 
-        chunk.chunk_data  = trial.all_y_data[pulseStart:pulseEnd]
+        dataToUse = trial.low_pass_y
 
-        chunk.before_data = trial.all_y_data[pulseStart:onIndex - 1]
+        chunk.chunk_data = dataToUse[pulseStart:pulseEnd]
+        chunk.before_data = dataToUse[pulseStart:onIndex -1]
+        chunk.during_data = dataToUse[onIndex:stimEnd]
+        chunk.after_data  = dataToUse[stimEnd + 1: pulseEnd]
 
-
-        chunk.during_data = trial.all_y_data[onIndex:stimEnd]
-        chunk.after_data  = trial.all_y_data[stimEnd + 1: pulseEnd]
+#        chunk.chunk_data  = trial.all_y_data[pulseStart:pulseEnd]
+#        chunk.before_data = trial.all_y_data[pulseStart:onIndex - 1]
+#        chunk.during_data = trial.all_y_data[onIndex:stimEnd]
+#        chunk.after_data  = trial.all_y_data[stimEnd + 1: pulseEnd]
         
+
+
+
 
         chunk.chunk_shutter_data = trial.all_shutter_data[pulseStart:pulseEnd]
         chunk.chunk_time_data    = trial.all_time_data[pulseStart:pulseEnd]
@@ -152,6 +163,31 @@ def ReadFileList(f, filenames, frequency_strings, intensity_strings):
 
     print 'frequency_strings', frequency_strings
     print 'intensity_strings', intensity_strings
+
+
+
+def LowPassFilter(trial, cutoff):
+    data = trial.all_y_data
+    rawsignal = np.array(data)
+    fft = sp.fft(rawsignal)
+
+
+    bp = fft[:]
+    for i in range(len(bp)):
+        if i>= cutoff: bp[i] = 0
+    ibp = sp.ifft(bp)
+
+
+    print 'ibp[0]', ibp[0]
+    print 'data[0]', data[0]
+    trial.low_pass_y = np.real(ibp)
+    trial.low_pass_y += np.median(data) - np.median(trial.low_pass_y)
+#    trial.low_pass_y = trial.low_pass_y*np.abs(data[100])/np.abs(trial.low_pass_y[100])
+#    trial.low_pass_y = trial.low_pass_y*np.abs(data[200])/np.abs(trial.low_pass_y[200])
+#    trial.low_pass_y = trial.low_pass_y*np.abs(data[300])/np.abs(trial.low_pass_y[300])
+
+    trial.cutoff = cutoff
+
 
 
 def ReadData(list_of_files):
@@ -235,7 +271,8 @@ def ReadData(list_of_files):
        d = dFlat[0]
 
 
-       trial.all_y_data = d[0:min_length-1]
+       trial.all_y_data = np.array(d[0:min_length-1]) - np.median(d[0:min_length-1])
+#       trial.all_y_data = d[0:min_length-1]
        trial.all_shutter_data = s[0:min_length-1]
        trial.all_time_data = t[0:min_length-1]
        if (len(i1)>0):
@@ -263,9 +300,11 @@ def ReadData(list_of_files):
        trial.day_of_trial = file[-16:-8]
        trial.file_name = file
 
+       LowPassFilter(trial, 3000)
+
        trial.list_of_StimChunks = []
 
-       SplitTrialIntoChunks(trial)
+#       SplitTrialIntoChunks(trial)
        trialCounter += 1
        print "trialCounter", trialCounter
 

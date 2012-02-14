@@ -35,7 +35,7 @@ def FlattenData(flattenedData, givenData, givenX, fitCurves):
 
 
 #    print 'a', a0
-    a, success = leastsq(error, a0, args=(x, y), maxfev=200)
+    a, success = leastsq(error, a0, args=(x, y), maxfev=50)
 
     yfit = fp(a, x)
 

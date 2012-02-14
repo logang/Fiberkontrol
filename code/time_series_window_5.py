@@ -172,15 +172,66 @@ class FiberModel( HasTraits ):
 
 
             # set recording to be true
-            self.recording = True
-
+#            self.recording = False
+#            self.trialEnded = False
 
 
 
     def _get_current_data( self ):
         """ If currently recording, query labjack for current analog input registers """
-        if self.recording is True:
+        
+        if self.recording is False and self.trialEnded is False:
 
+
+            print 'just streaming, not saving'
+            rgen = self.labjack.streamData()
+            rdata = rgen.next()
+
+
+            if rdata is None:
+                print 'ERROR rdata is NONE'
+            else:
+                last_y = 0
+                last_i1 = 0
+                last_i2 = 0
+                last_i3 = 0
+
+
+                maxNumData = len(rdata['AIN0'])
+                if maxNumData > len(rdata['AIN1']):
+                    maxNumData = len(rdata['AIN1'])
+                if maxNumData > len(rdata['AIN2']):
+                    maxNumData = len(rdata['AIN2'])
+                if maxNumData > len(rdata['AIN3']):
+                    maxNumData = len(rdata['AIN3'])
+
+                last_data_point = rdata['AIN2'][0]
+
+                for dataCount in range(maxNumData):
+
+                    # 'AIN2'
+                    print 'IS RECORDING???'
+                    print 'AIN0', rdata['AIN0'][dataCount]
+                    print 'AIN1', rdata['AIN1'][dataCount]
+                    print 'AIN2', rdata['AIN2'][dataCount]
+                    print 'AIN3', rdata['AIN3'][dataCount]
+                    print 'last_data_point', last_data_point
+                    if rdata['AIN2'][dataCount] < 10.1:
+                        if np.abs(rdata['AIN2'][dataCount] - last_data_point) > 3:
+                            print 'RECORDING!!!!'
+                            self.recording = True
+                            
+                        else:
+                            print 'NOT RECORDING!!!'
+                            last_data_point = rdata['AIN2'][dataCount]
+                            self.recording = False
+
+
+
+
+        elif self.recording is True:
+
+            print 'streaming and saving'
             rgen = self.labjack.streamData()
             rdata = rgen.next()
 
@@ -325,8 +376,8 @@ class FiberModel( HasTraits ):
         np.savez( full_save_path_i3, self._i3data )
 
 
-        self.labjack.streamStop()
-        self.labjack.close()
+#        self.labjack.streamStop()
+#        self.labjack.close()
 
 
 
@@ -385,29 +436,39 @@ class FiberView( HasTraits ):
 
         # Start the timer!
 
+        self.model.labjack.streamStart()
+        self.model._set_frequency()
+
+#        self.recording = False
+        self.model.recording = False
+#        self.trialEnded = False
+        self.model.trialEnded = False
+        print '_init'
         self.timer = Timer(self.model.dt, self.time_update) # update every 1 ms
 
     def run( self ):
         self.model.start_time = time.time()
         self.model.prev_time = 0
         
-        self.model.labjack.streamStart()
+##        self.model.labjack.streamStart()
 
-        self.model._set_frequency()
+##        self.model._set_frequency()
         self._plot_update()
+        print 'RUN'
+        print 'self.model.recording', self.model.recording
         self.model._get_current_data()
 
-        
-#        while(self.recording):
-#            self.time_update()
-#            self.plot.request_redraw()
 
     def time_update( self ):
         """ Callback that gets called on a timer to get the next data point over the labjack """
 
-        
 
-        if self.recording is True:
+        if self.model.recording is False:
+            self.model._get_current_data()
+            if self.model.recording is True:
+                self.run()
+
+        elif self.model.recording is True:
             time1 = time.time()-self.model.start_time
 
             self.model._set_frequency()
@@ -464,20 +525,32 @@ class FiberView( HasTraits ):
     # Note: These should be moved to a proper handler (ModelViewController)
 
     def _record_fired( self ):
-        self.recording = True
-        self.run()
+        print 'RECORD FIRED!_____'
+#        self.recording = True
+        if self.model.recording is False:
+            self.model.recording = True
+            self.run()
             
 
     def _stop_fired( self ):
-        self.recording = False
+#        self.recording = False
+        self.model.recording = False
+#        self.trialEnded = True
+        self.model.trialEnded = True
+
 
     def _load_data_fired( self ):
         pass
 
     def _save_data_fired( self ):
         self.model.save( path = self.model.savepath, name = self.model.filename )
+        self.model.labjack.streamStop()
+        self.model.labjack.close()
+
+    
         print 'time',self.model._tdata
 
+        print 'streamStopped'
 
     def _save_plot_fired( self ):
         pass
@@ -507,5 +580,5 @@ class SaveDialog(HasTraits):
 
 if __name__ == "__main__":
     F = FiberView()
-    F.recording = False
+#    F.recording = False
     F.configure_traits()

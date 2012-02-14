@@ -17,6 +17,9 @@ class TrialData:
     all_input2_data = None
     all_input3_data = None
 
+    low_pass_y = None           # data filtered by a low pass filter
+    cutoff = None               # the cutoff for the low pass filter
+
     frequency_list = None
     intensity_list = None
 
@@ -33,6 +36,7 @@ class StimChunk:
     frequency = -1             # in Hz
     start_time = -1            # in s
     start_stim_time = -1
+    end_stim_time = -1
     end_time = -1              # in s
     position_in_trial = -1     # i.e. n in "this is the nth chunk in the trial
     tag = None                 # 'stim', 'sugar', 'juvenile', 'blow'
@@ -44,6 +48,11 @@ class StimChunk:
     before_data = None         # before stim
     during_data = None         # during stim
     after_data = None          # after stim
+
+    before_data_line = None
+    during_data_line = None
+    after_data_line = None
+    full_data_line = None
 
     chunk_shutter_data = None
     chunk_time_data = None
