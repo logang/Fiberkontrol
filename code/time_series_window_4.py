@@ -40,8 +40,8 @@ class FiberModel( HasTraits ):
     analog_in_2   = Int( 1 ) 
     analog_in_3   = Int( 1 ) 
 
-    savepath = '/Users/kellyz/Documents/Data/Fiberkontrol/20120209/'
-    filename = '20120209-'
+    savepath = '/Users/kellyz/Documents/Data/Fiberkontrol/20120214/'
+    filename = '20120214-'
 
     view = View(Group( 'savepath',
                        'filename',
