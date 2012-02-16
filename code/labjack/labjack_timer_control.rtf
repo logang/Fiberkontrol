@@ -1,0 +1,41 @@
+{\rtf1\ansi\ansicpg1252\cocoartf1038\cocoasubrtf360
+{\fonttbl\f0\fswiss\fcharset0 Helvetica;\f1\fnil\fcharset0 Monaco;}
+{\colortbl;\red255\green255\blue255;\red255\green255\blue255;}
+\margl1440\margr1440\vieww9000\viewh8400\viewkind0
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\ql\qnatural\pardirnatural
+
+\f0\fs24 \cf0 import u6\
+\
+d = u6.U6()\
+\
+FI02_STATE_REGISTER = 6002\
+d.writeRegister(FI02_STATE_REGISTER, 1)\
+\
+d.getCalibrationData()\
+\
+d.configIO (NumberTimersEnabled = 1)\
+d.getFeedback(u6.TimerConfig(timer = 0, TimerMode = 7, Value = 65535))\
+\
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\ql\qnatural\pardirnatural
+\cf0 #enable timers\
+d.writeRegister(50501, 1)\
+\
+#timer clock\
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\ql\qnatural\pardirnatural
+\cf0 d.writeRegister(7000, 4)\
+#timer divisor\
+d.writeRegister(7002, 256)\
+\
+NumChannels = 1\
+channelNumbers = [200]\
+channelOptions = [0]\
+d.streamConfig( NumChannels, ChannelNumbers = channelNumbers, ChannelOptions = channelOptions, SettlingFactor = 1, ResolutionIndex = 1, SampleFrequency = 200)\
+\
+\pard\pardeftab720\sl380\ql\qnatural
+
+\f1\fs26 \cf0 \cb2 from datetime import datetime, timedelta\
+start = datetime.now()\
+\
+
+\f0\fs24 \cb1 \
+}
