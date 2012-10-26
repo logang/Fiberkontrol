@@ -16,6 +16,9 @@ def get_event_window( event_ts, window_size = 1000 ):
 class FiberAnalyze( object ):
 
     def __init__(self, options):
+        """
+        Initialize the FiberAnalyze class using options object from OptionsParser.
+        """
         self.smoothness = options.smoothness
         self.plot_type = options.plot_type
         self.input_path = options.input_path
@@ -26,7 +29,7 @@ class FiberAnalyze( object ):
         
     def load( self ):
         """
-        Load time series and events from npz file. 
+        Load time series and events from NPZ file. 
         """
         self.data = np.load( self.input_path )['data']
         self.time_stamps = np.load( self.input_path )['time_stamps']
@@ -44,6 +47,11 @@ class FiberAnalyze( object ):
         self.trigger_data += 1
         
     def plot_basic_tseries( self ):
+        """
+        Generate a plot showing the raw calcium time series, with triggers
+        corresponding to events (e.g. licking for sucrose) superimposed.
+        Note this is currently rather overfit to our setup.
+        """
         pl.clf()
         time_vals = self.time_stamps[range(len(self.fluor_data))]
         pl.plot( time_vals, self.data[:,3], 'r-', alpha=0.3 )
@@ -53,24 +61,39 @@ class FiberAnalyze( object ):
         pl.show()
 
     def low_pass_filter(self, cutoff):
-         rawsignal = self.fluor_data
-         fft = sp.fft(rawsignal)
-         bp = fft[:]
-         for i in range(len(bp)):
-              if i>= cutoff: bp[i] = 0
-         ibp = sp.ifft(bp)
-         low_pass_y = np.real(ibp)
-         low_pass_y += np.median(self.fluor_data) - np.median(low_pass_y)
-         return low_pass_y
+        """
+        Low pass filter the data with frequency cutoff: 'cutoff'.
+        """
+        rawsignal = self.fluor_data
+        fft = sp.fft(rawsignal)
+        bp = fft[:]
+        for i in range(len(bp)):
+            if i>= cutoff: bp[i] = 0
+        ibp = sp.ifft(bp)
+        low_pass_y = np.real(ibp)
+        low_pass_y += np.median(self.fluor_data) - np.median(low_pass_y)
+        return low_pass_y
 
     def plot_periodogram( self, window = None ):
+        """
+        Plot periodogram of fluoroscence data.
+        """
         fft = sp.fft(self.fluor_data)
-        1/0
+        1/0 # not finished
 
+def test_FiberAnalyze(options):
+    """
+    Test the FiberAnalyze class.
+    """
+    FA = FiberAnalyze( options )
+    FA.load()
+#    FA.plot_periodogram()
+    FA.plot_basic_tseries()
+    1/0
 
 if __name__ == "__main__":
 
-        # Parse command line options
+    # Parse command line options
     from optparse import OptionParser
 
     parser = OptionParser()
@@ -84,10 +107,8 @@ if __name__ == "__main__":
                       help="Should the time series be smoothed, and how much.")
 
     (options, args) = parser.parse_args()
-
-    FA = FiberAnalyze( options )
-    FA.load()
-#    FA.plot_periodogram()
-    FA.plot_basic_tseries()
+    
+    # Test the class
+    test_FiberAnalyze(options)
     
 # EOF
