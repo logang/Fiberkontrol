@@ -6,12 +6,7 @@ from debleach import exponential_basis_debleach
 from scipy.stats import ranksums
 from scipy.interpolate import UnivariateSpline
 
-def get_event_window( event_ts, window_size = 1000 ):
-    on_side = np.where(event_ts > 1)[0]
-    diff = np.diff(event_ts)
-    enter_event = np.where(diff > 1)[0]
-    exit_event = np.where(diff < -1)[0]
-    return on_side, enter_event, exit_event
+#-----------------------------------------------------------------------------------------
 
 class FiberAnalyze( object ):
 
@@ -74,12 +69,45 @@ class FiberAnalyze( object ):
         low_pass_y += np.median(self.fluor_data) - np.median(low_pass_y)
         return low_pass_y
 
+    # --- not yet implemented --- #
+
     def plot_periodogram( self, window = None ):
         """
         Plot periodogram of fluoroscence data.
         """
         fft = sp.fft(self.fluor_data)
         1/0 # not finished
+
+    def get_peaks( self ):
+        """
+        Heuristic for finding local peaks in the calcium data. 
+        """
+        pass
+
+    def plot_perievent_hist( self, event_times ):
+        """
+        Peri-event time histogram for given event times.
+        """
+        pass
+
+    def plot_peak_statistics( self, peak_times, peak_vals ):
+        """
+        Plots showing statistics of calcium peak data.
+          --> Peak height as function of time since last peak
+          --> Histograms of peak times and vals
+        """
+        pass
+
+#-----------------------------------------------------------------------------------------
+
+def get_event_window( event_ts, window_size = 1000 ):
+    on_side = np.where(event_ts > 1)[0]
+    diff = np.diff(event_ts)
+    enter_event = np.where(diff > 1)[0]
+    exit_event = np.where(diff < -1)[0]
+    return on_side, enter_event, exit_event
+
+#-----------------------------------------------------------------------------------------
 
 def test_FiberAnalyze(options):
     """
@@ -90,6 +118,8 @@ def test_FiberAnalyze(options):
 #    FA.plot_periodogram()
     FA.plot_basic_tseries()
     1/0
+
+#-----------------------------------------------------------------------------------------
 
 if __name__ == "__main__":
 
