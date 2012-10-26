@@ -30,7 +30,7 @@
 # Visualizing the data offline
 #----------------------------------------------------------------------------#
 
-- Plotting
+x- Plotting
 -- histograms 
 -- scatterplots
 -- time series
