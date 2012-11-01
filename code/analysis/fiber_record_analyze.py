@@ -113,20 +113,67 @@ class FiberAnalyze( object ):
         self.peak_times = self.time_stamps[self.peak_inds]
         return self.peak_inds, self.peak_vals, self.peak_times
 
-    # --- not yet implemented --- #
+    def notch_filter(self, low, high):
+                    
+        rawsignal = self.fluor_data
+        fft = sp.fft(rawsignal)
+        
+        bp = fft[:]
 
-    def debleach( self ):
-        """
-        Remove trend from data due to photobleaching. 
-        """
-        pass
+        n = rawsignal.size
+        timestep = np.max(self.time_stamps[1:] - self.time_stamps[:-1])
+        freq = np.fft.fftfreq(n, d=timestep)
+
+        for i in range(len(bp)):
+            if freq[i]<= high and freq[i]>= low:
+                bp[i] = 0
+        ibp = sp.ifft(bp)
+        self.fft = bp
+        notch_y = np.real(ibp)
+        notch_y += np.median(self.fluor_data) - np.median(notch_y)
+        self.cleaned_fluor_data = notch_y
+        return notch_y
 
     def plot_periodogram( self, window = None ):
         """
         Plot periodogram of fluoroscence data.
         """
-        fft = sp.fft(self.fluor_data)
-        1/0 # not finished
+        print "Plotting periodogram"
+
+        self.notch_filter(9, 11)
+        if self.fft.any():
+            Y = self.fft
+        else:
+            Y = np.fft.fft(self.notch_filter(9, 11))
+
+        Y = np.abs(Y)**2
+        n = self.cleaned_fluor_data.size
+        timestep = np.max(self.time_stamps[1:] - self.time_stamps[:-1])
+        print self.time_stamps[1:] - self.time_stamps[:-1]
+        freq = np.fft.fftfreq(n, d=timestep)
+        
+        ## Smooth spectral density
+        window_len = 20 
+        s = np.r_[Y[window_len-1:0:-1],Y,Y[-1:-window_len:-1]] #periodic boundary
+        w = np.bartlett(window_len)
+        Y = np.convolve(w/w.sum(), s, mode='valid')
+                                     
+        freq_vals = freq[range(min(len(Y), len(freq)))]
+        Y = Y[range(min(len(Y), len(freq)))]
+        startindex = len(Y)*97/200 #cut off the huge spike around zero
+        pl.plot( freq_vals[:startindex], Y[:startindex], 'k-')
+        pl.ylabel('Spectral Density (a.u.)')
+        pl.xlabel('Frequency (Hz)')
+        pl.title(self.input_path)
+        pl.axis([1, 100, 0, 10000])
+        pl.show()
+
+        pl.figure()
+        pl.plot( freq_vals[:startindex], np.log(Y[:startindex]), 'k-')
+        pl.ylabel('Log(Spectral Density) (a.u.)')
+        pl.xlabel('Frequency (Hz)')
+        pl.title(self.input_path)
+        pl.show()
         
     def plot_peak_data( self ):
         """
@@ -137,6 +184,14 @@ class FiberAnalyze( object ):
         pl.plot(self.fluor_data)
         pl.plot(lines)
         pl.show()
+
+    # --- not yet implemented --- #
+
+    def debleach( self ):
+        """
+        Remove trend from data due to photobleaching. 
+        """
+        pass
     
     def plot_perievent_hist( self, event_times ):
         """
@@ -151,8 +206,6 @@ class FiberAnalyze( object ):
           --> Histograms of peak times and vals
         """
         pass
-
-#-----------------------------------------------------------------------------------------
 
 #-----------------------------------------------------------------------------------------
 
