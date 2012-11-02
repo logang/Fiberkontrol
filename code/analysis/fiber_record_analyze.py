@@ -88,11 +88,10 @@ class FiberAnalyze( object ):
         self.e_vals = np.load(e_filename)['arr_0']
         return zip(self.s_vals,self.e_vals)
 
-    def plot_basic_tseries( self ):
+    def plot_basic_tseries( self, out_path=None ):
         """
         Generate a plot showing the raw calcium time series, with triggers
         corresponding to events (e.g. licking for sucrose) superimposed.
-        Note this is currently rather overfit to our setup.
         """
         pl.clf()
         time_vals = self.time_stamps[range(len(self.fluor_data))]
@@ -100,7 +99,10 @@ class FiberAnalyze( object ):
         pl.plot( time_vals, self.fluor_data, 'k-')
         pl.ylabel('Fluorescence Intensity (a.u.)')
         pl.xlabel('Time (seconds)')
-        pl.show()
+        if out_path is None:
+            pl.show()
+        else:
+            pl.savefig(out_path)
 
     def low_pass_filter(self, cutoff):
         """
@@ -121,7 +123,7 @@ class FiberAnalyze( object ):
         Heuristic for finding local peaks in the calcium data. 
         """
         peak_widths = np.array([50,100,500,1000])
-        self.peak_inds = signal.find_peaks_cwt(self.fluor_data, widths=peak_widths, wavelet=None, max_distances=None, gap_thresh=None, min_length=None, min_snr=5, noise_perc=50)
+        self.peak_inds = signal.find_peaks_cwt(self.fluor_data, widths=peak_widths, wavelet=None, max_distances=None, gap_thresh=None, min_length=None, min_snr=5, noise_perc=30)
         self.peak_vals = self.fluor_data[self.peak_inds]
         self.peak_times = self.time_stamps[self.peak_inds]
         return self.peak_inds, self.peak_vals, self.peak_times
@@ -190,7 +192,7 @@ class FiberAnalyze( object ):
         pl.title(self.input_path)
         pl.show()
         
-    def plot_peak_data( self ):
+    def plot_peak_data( self, out_path=None ):
         """
         Plot fluorescent data with chosen peak_inds overlayed as lines.
         """
@@ -198,7 +200,13 @@ class FiberAnalyze( object ):
         lines[self.peak_inds] = 1.0
         pl.plot(self.fluor_data)
         pl.plot(lines)
-        pl.show()
+        pl.ylabel('Fluorescence Intensity (a.u.)')
+        pl.xlabel('Time (seconds)')
+
+        if out_path is None:
+            pl.show()
+        else:
+            pl.savefig(out_path)
 
     # --- not yet implemented --- #
 
