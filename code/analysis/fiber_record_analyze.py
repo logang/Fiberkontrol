@@ -83,6 +83,10 @@ class FiberAnalyze( object ):
             self.fluor_data = self.fluor_data[t_start:t_end]
             self.trigger_data = self.trigger_data[t_start:t_end]
 
+        self.fft = None #place holder for fft of rawsignal, if calculated
+        self.fft_freq = None #place holder for frequency labels of fft
+        self.filt_fluor_data = None #place holder for filtered rawsignal, if calculated
+
     def load_trigger_data( self, s_filename, e_filename ):
         self.s_vals = np.load(s_filename)['arr_0']
         self.e_vals = np.load(e_filename)['arr_0']
@@ -108,14 +112,24 @@ class FiberAnalyze( object ):
         """
         Low pass filter the data with frequency cutoff: 'cutoff'.
         """
-        rawsignal = self.fluor_data
-        fft = sp.fft(rawsignal)
-        bp = fft[:]
+
+        if self.filt_fluor_data is None:
+            rawsignal = self.fluor_data
+        else:
+            rawsignal = self.filt_fluor_data
+
+        if self.fft is None:
+            self.get_fft()
+        bp = self.fft
+
         for i in range(len(bp)):
-            if i>= cutoff: bp[i] = 0
+            if self.fft_freq[i]>= cutoff: bp[i] = 0
+        self.fft = bp #update fft of the class to the filtered version
+
         ibp = sp.ifft(bp)
         low_pass_y = np.real(ibp)
         low_pass_y += np.median(self.fluor_data) - np.median(low_pass_y)
+        self.filt_fluor_data = low_pass_y
         return low_pass_y
 
     def get_peaks( self ):
@@ -130,67 +144,82 @@ class FiberAnalyze( object ):
 
     def notch_filter(self, low, high):
         """
-        Notch filter the data with bandpass [low,high].
+        Notch filter that cuts out frequencies (Hz) between [low:high].
         """
-        rawsignal = self.fluor_data
-        fft = sp.fft(rawsignal)
-        
-        bp = fft[:]
+        if self.filt_fluor_data is None:
+            rawsignal = self.fluor_data
+        else:
+            rawsignal = self.filt_fluor_data
 
-        n = rawsignal.size
-        timestep = np.max(self.time_stamps[1:] - self.time_stamps[:-1])
-        freq = np.fft.fftfreq(n, d=timestep)
+        if self.fft is None:
+            self.get_fft()
+        bp = self.fft
 
         for i in range(len(bp)):
-            if freq[i]<= high and freq[i]>= low:
+            if self.fft_freq[i]<= high and self.fft_freq[i]>= low:
                 bp[i] = 0
-        ibp = sp.ifft(bp)
-        self.fft = bp
-        notch_y = np.real(ibp)
-        notch_y += np.median(self.fluor_data) - np.median(notch_y)
-        self.cleaned_fluor_data = notch_y
-        return notch_y
+        self.fft = bp #update fft of the class to the filtered version
 
-    def plot_periodogram( self, window = None ):
+        ibp = sp.ifft(bp)
+        notch_filt_y = np.real(ibp)
+        notch_filt_y += np.median(self.fluor_data) - np.median(notch_filt_y)
+        self.filt_fluor_data = notch_filt_y
+        return notch_filt_y
+
+    def plot_periodogram( self, out_path = None, log_out_path = None, window_len = 20):
         """
         Plot periodogram of fluoroscence data.
         """
         print "Plotting periodogram"
 
-        self.notch_filter(9, 11)
-        if self.fft.any():
-            Y = self.fft
+        if self.filt_fluor_data is None:
+            rawsignal = self.fluor_data
         else:
-            Y = np.fft.fft(self.notch_filter(9, 11))
+            rawsignal = self.filt_fluor_data
+            
+        if self.fft is None:
+            self.get_fft()
 
-        Y = np.abs(Y)**2
-        n = self.cleaned_fluor_data.size
-        timestep = np.max(self.time_stamps[1:] - self.time_stamps[:-1])
-        print self.time_stamps[1:] - self.time_stamps[:-1]
-        freq = np.fft.fftfreq(n, d=timestep)
+        Y = np.abs(self.fft)**2 #power spectral density
+        freq = self.fft_freq
         
-        ## Smooth spectral density
-        window_len = 20 
+        ## Smooth spectral density 
         s = np.r_[Y[window_len-1:0:-1],Y,Y[-1:-window_len:-1]] #periodic boundary
         w = np.bartlett(window_len)
         Y = np.convolve(w/w.sum(), s, mode='valid')
                                      
-        freq_vals = freq[range(min(len(Y), len(freq)))]
-        Y = Y[range(min(len(Y), len(freq)))]
-        startindex = len(Y)*97/200 #cut off the huge spike around zero
-        pl.plot( freq_vals[:startindex], Y[:startindex], 'k-')
+        num_values = int(min(len(Y), len(freq))*.5) #Cut off negative frequencies
+        start_freq = 0.25*(num_values/100) #i.e. start at 0.25 Hz
+        freq_vals = freq[range(num_values)]
+        Y = Y[range(num_values)]
+
+
+        pl.figure()
+        pl.plot( freq_vals[start_freq:num_values], Y[start_freq:num_values], 'k-')
         pl.ylabel('Spectral Density (a.u.)')
         pl.xlabel('Frequency (Hz)')
         pl.title(self.input_path)
-        pl.axis([1, 100, 0, 10000])
-        pl.show()
+        pl.axis([1, 100, 0, 1.1*np.max(Y[start_freq:num_values])])
+
+        if out_path is None:
+            pl.show()
+        else:
+            pl.savefig(out_path)
+
 
         pl.figure()
-        pl.plot( freq_vals[:startindex], np.log(Y[:startindex]), 'k-')
+        pl.plot( freq_vals[start_freq:num_values], np.log(Y[start_freq:num_values]), 'k-')
         pl.ylabel('Log(Spectral Density) (a.u.)')
         pl.xlabel('Frequency (Hz)')
         pl.title(self.input_path)
-        pl.show()
+        pl.axis([1, 100, 0, 1.1*np.log(np.max(Y[start_freq:num_values]))])
+
+        if log_out_path is None:
+            if out_path is None:
+                pl.show()
+        else:
+            pl.savefig(log_out_path)
+
         
     def plot_peak_data( self, out_path=None ):
         """
@@ -230,6 +259,21 @@ class FiberAnalyze( object ):
         """
         pass
 
+    def get_fft(self):
+        if self.filt_fluor_data is None:
+            rawsignal = self.fluor_data
+        else:
+            rawsignal = self.filt_fluor_data
+        
+        fft = sp.fft(rawsignal)
+        self.fft = fft[:]
+
+        n = rawsignal.size
+        timestep = np.max(self.time_stamps[1:] - self.time_stamps[:-1])
+        self.fft_freq = np.fft.fftfreq(n, d=timestep)
+
+
+
 #-----------------------------------------------------------------------------------------
 
 def get_event_window( event_ts, window_size = 1000 ):
@@ -247,10 +291,12 @@ def test_FiberAnalyze(options):
     """
     FA = FiberAnalyze( options )
     FA.load()
-#    FA.plot_periodogram()
-    FA.plot_basic_tseries()
-    peak_inds, peak_vals, peak_times = FA.get_peaks()
-    FA.plot_peak_data()
+    FA.plot_periodogram()
+    FA.notch_filter(10.0, 10.3)
+    FA.plot_periodogram()
+    #FA.plot_basic_tseries()
+    #peak_inds, peak_vals, peak_times = FA.get_peaks()
+    #FA.plot_peak_data()
     1/0
 
 #-----------------------------------------------------------------------------------------
