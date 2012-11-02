@@ -48,6 +48,7 @@ class FiberAnalyze( object ):
         # normalize triggers to fluor data
         if self.trigger_path is None:
             self.trigger_data = self.data[:,self.trigger_channel]
+            self.time_tuples = None
         else:
             try:
                 self.time_tuples = self.load_trigger_data(self.s_file, self.e_file)
@@ -58,11 +59,9 @@ class FiberAnalyze( object ):
                 for i in xrange(len(self.trigger_data)):
                     if self.time_stamps[i] < time_vec[j]:
                         self.trigger_data[i] = np.mod(j,2)
-                        print j, np.mod(j,2)
                     else:
                         j+=1
                         self.trigger_data[i] = np.mod(j,2)
-                        print j, np.mod(j,2)
             except Exception, e:
                 print "Error loading trigger data:"
                 print "\t-->",e
@@ -75,6 +74,11 @@ class FiberAnalyze( object ):
         # if time range is specified, crop data    
         if options.time_range != None:
             tlist = options.time_range.split(':')
+            if tlist[0] == '-1':
+                t_start = 0
+            if tlist[1] == '-1':
+                t_start = len(self.fluor_data)
+
             if len(tlist) != 2:
                 print 'Error parsing --time-range argument.  Be sure to use <start-time>:<end-time> syntax.'
                 sys.exit(1)
@@ -88,6 +92,9 @@ class FiberAnalyze( object ):
         self.filt_fluor_data = None #place holder for filtered rawsignal, if calculated
 
     def load_trigger_data( self, s_filename, e_filename ):
+        """
+        Load start and end times for coded events. 
+        """
         self.s_vals = np.load(s_filename)['arr_0']
         self.e_vals = np.load(e_filename)['arr_0']
         return zip(self.s_vals,self.e_vals)
@@ -136,8 +143,8 @@ class FiberAnalyze( object ):
         """
         Heuristic for finding local peaks in the calcium data. 
         """
-        peak_widths = np.array([50,100,500,1000])
-        self.peak_inds = signal.find_peaks_cwt(self.fluor_data, widths=peak_widths, wavelet=None, max_distances=None, gap_thresh=None, min_length=None, min_snr=5, noise_perc=30)
+        peak_widths = np.array([100,250,500,750,1000])
+        self.peak_inds = signal.find_peaks_cwt(self.fluor_data, widths=peak_widths, wavelet=None, max_distances=None, gap_thresh=None, min_length=None, min_snr=5, noise_perc=20)
         self.peak_vals = self.fluor_data[self.peak_inds]
         self.peak_times = self.time_stamps[self.peak_inds]
         return self.peak_inds, self.peak_vals, self.peak_times
@@ -241,15 +248,55 @@ class FiberAnalyze( object ):
 
     def debleach( self ):
         """
-        Remove trend from data due to photobleaching. 
+        Remove trend from data due to photobleaching.
+        Is this necessary?
         """
         pass
     
-    def plot_perievent_hist( self, event_times ):
+    def plot_perievent_hist( self, event_times, window_size ):
         """
         Peri-event time histogram for given event times.
+        Plots the time series and their median over a time window around
+        each event in event_times, with before and after event durations
+        specifiend in window_size as [before, after] (in seconds).
         """
-        pass
+        time_chunks = []
+        for e in event_times:
+            try:
+                e_idx = np.where(e<self.time_stamps)[0][0]
+                chunk = self.fluor_data[range((e_idx-window_size[0]),(e_idx+window_size[1]))]
+                print [range((e_idx-window_size[0]),(e_idx+window_size[1]))]
+                time_chunks.append(chunk)
+            except:
+                print "Unable to extract window:", [(e-window_size[0]),(e+window_size[1])]
+        time_arr = np.asarray(time_chunks).T
+        x = self.time_stamps[0:time_arr.shape[0]]-self.time_stamps[window_size[0]]
+        ymax = np.max(time_arr)
+        ymax += 0.1*ymax
+        for i in xrange(time_arr.shape[1]):
+            pl.plot(x, time_arr[:,i], color=pl.cm.jet(255-255*i/time_arr.shape[1]), alpha=0.75, linewidth=2)
+            pl.ylim([0,ymax])
+        pl.axvline(x=0,color='black',linewidth=2)
+        pl.show()
+
+    def plot_peritrigger_edge( self, window_size, edge="rising" ):
+        """
+        Wrapper for plot_perievent histograms specialized for
+        loaded event data that comes as a list of pairs of
+        event start and end times.
+        """
+        if self.time_tuples is not None:
+            event_times = []
+            for pair in self.time_tuples:
+                if edge == "rising":
+                    event_times.append(pair[0])
+                elif edge == "falling":
+                    event_times.append(pair[1])
+                else:
+                    raise ValueError("Edge type must be 'rising' or 'falling'.")
+            self.plot_perievent_hist( event_times, window_size )
+        else:
+            print "No event times loaded. Cannot find edges."        
 
     def plot_peak_statistics( self, peak_times, peak_vals ):
         """
@@ -291,12 +338,16 @@ def test_FiberAnalyze(options):
     """
     FA = FiberAnalyze( options )
     FA.load()
+
     FA.plot_periodogram()
     FA.notch_filter(10.0, 10.3)
     FA.plot_periodogram()
-    #FA.plot_basic_tseries()
-    #peak_inds, peak_vals, peak_times = FA.get_peaks()
-    #FA.plot_peak_data()
+
+    FA.plot_basic_tseries()
+#    peak_inds, peak_vals, peak_times = FA.get_peaks()
+    FA.plot_peritrigger_edge(window_size=[100,1000])
+#    FA.plot_peak_data()
+
     1/0
 
 #-----------------------------------------------------------------------------------------
@@ -314,7 +365,7 @@ if __name__ == "__main__":
     parser.add_option("-i", "--input-path", dest="input_path",
                       help="Specify the input path.")
     parser.add_option("", "--time-range", dest="time_range",default=None,
-                      help="Specify a time window over which to analyze the time series.")
+                      help="Specify a time window over which to analyze the time series in format start:end. -1 chooses the appropriate extremum")
     parser.add_option('-p', "--plot-type", default = 'tseries', dest="plot_type",
                       help="Type of plot to produce.")
     parser.add_option('-s', "--smoothness", default = None, dest="smoothness",
