@@ -22,7 +22,7 @@ class FiberAnalyze( object ):
         self.output_path = options.output_path
         self.time_range = options.time_range
         self.trigger_path = options.trigger_path
-        
+
         if self.trigger_path is not None:
             self.s_file = options.trigger_path + '_s.npz'
             self.e_file = options.trigger_path + '_e.npz'
@@ -75,17 +75,18 @@ class FiberAnalyze( object ):
         if options.time_range != None:
             tlist = options.time_range.split(':')
             if tlist[0] == '-1':
-                t_start = 0
+                self.t_start = 0
             if tlist[1] == '-1':
-                t_start = len(self.fluor_data)
+                self.t_end = len(self.fluor_data)
 
             if len(tlist) != 2:
                 print 'Error parsing --time-range argument.  Be sure to use <start-time>:<end-time> syntax.'
                 sys.exit(1)
-            t_start = int(tlist[0])
-            t_end   = int(tlist[1])
-            self.fluor_data = self.fluor_data[t_start:t_end]
-            self.trigger_data = self.trigger_data[t_start:t_end]
+            self.t_start = int(tlist[0])
+            self.t_end   = int(tlist[1])
+            self.fluor_data = self.fluor_data[self.t_start:self.t_end]
+            self.trigger_data = self.trigger_data[self.t_start:self.t_end]
+            self.time_stamps = self.time_stamps[self.t_start:self.t_end]
 
         self.fft = None #place holder for fft of rawsignal, if calculated
         self.fft_freq = None #place holder for frequency labels of fft
@@ -113,8 +114,21 @@ class FiberAnalyze( object ):
         if out_path is None:
             pl.show()
         else:
-            pl.savefig(out_path)
+            pl.savefig(os.path.join(out_path,"basic_time_series"))
 
+    def event_vs_baseline_barplot( self, out_path=None ):
+        """
+        Make a simple barplot of intensity during coded events vs during non-event times.
+        """
+        pl.clf()
+        event = self.trigger_data*self.fluor_data
+        baseline = self.fluor_data[ 0:(self.time_tuples[0][0]-self.t_start) ]
+        pl.boxplot([event,baseline])
+        if out_path is None:
+            pl.show()
+        else:
+            pl.savefig(os.path.join(out_path,"event_vs_baseline_barplot"))
+        
     def low_pass_filter(self, cutoff):
         """
         Low pass filter the data with frequency cutoff: 'cutoff'.
@@ -173,12 +187,13 @@ class FiberAnalyze( object ):
         self.filt_fluor_data = notch_filt_y
         return notch_filt_y
 
-    def plot_periodogram( self, out_path = None, log_out_path = None, window_len = 20):
+    def plot_periodogram( self, out_path = None, plot_type="log", window_len = 20):
         """
         Plot periodogram of fluoroscence data.
         """
         print "Plotting periodogram"
-
+        pl.clf()
+        
         if self.filt_fluor_data is None:
             rawsignal = self.fluor_data
         else:
@@ -200,66 +215,53 @@ class FiberAnalyze( object ):
         freq_vals = freq[range(num_values)]
         Y = Y[range(num_values)]
 
-
         pl.figure()
-        pl.plot( freq_vals[start_freq:num_values], Y[start_freq:num_values], 'k-')
-        pl.ylabel('Spectral Density (a.u.)')
-        pl.xlabel('Frequency (Hz)')
-        pl.title(self.input_path)
-        pl.axis([1, 100, 0, 1.1*np.max(Y[start_freq:num_values])])
+        if plot_type == "standard":
+            pl.plot( freq_vals[start_freq:num_values], Y[start_freq:num_values], 'k-')
+            pl.ylabel('Spectral Density (a.u.)')
+            pl.xlabel('Frequency (Hz)')
+            pl.title(self.input_path)
+            pl.axis([1, 100, 0, 1.1*np.max(Y[start_freq:num_values])])
+        elif plot_type == "log":
+            pl.plot( freq_vals[start_freq:num_values], np.log(Y[start_freq:num_values]), 'k-')
+            pl.ylabel('Log(Spectral Density) (a.u.)')
+            pl.xlabel('Frequency (Hz)')
+            pl.title(self.input_path)
+            pl.axis([1, 100, 0, 1.1*np.log(np.max(Y[start_freq:num_values]))])
+        else:
+            print "Currently only 'standard' and 'log' plot types are available"
 
         if out_path is None:
             pl.show()
         else:
-            pl.savefig(out_path)
-
-
-        pl.figure()
-        pl.plot( freq_vals[start_freq:num_values], np.log(Y[start_freq:num_values]), 'k-')
-        pl.ylabel('Log(Spectral Density) (a.u.)')
-        pl.xlabel('Frequency (Hz)')
-        pl.title(self.input_path)
-        pl.axis([1, 100, 0, 1.1*np.log(np.max(Y[start_freq:num_values]))])
-
-        if log_out_path is None:
-            if out_path is None:
-                pl.show()
-        else:
-            pl.savefig(log_out_path)
-
+            print "Saving periodogram..."
+            pl.savefig(os.path.join(out_path,'periodogram'))
         
     def plot_peak_data( self, out_path=None ):
         """
         Plot fluorescent data with chosen peak_inds overlayed as lines.
         """
+        pl.clf()
         lines = np.zeros(len(self.fluor_data))
         lines[self.peak_inds] = 1.0
         pl.plot(self.fluor_data)
         pl.plot(lines)
         pl.ylabel('Fluorescence Intensity (a.u.)')
-        pl.xlabel('Time (seconds)')
+        pl.xlabel('Time (samples)')
 
         if out_path is None:
             pl.show()
         else:
-            pl.savefig(out_path)
+            pl.savefig(os.path.join(out_path,'peak_finding'))
 
-    # --- not yet implemented --- #
-
-    def debleach( self ):
-        """
-        Remove trend from data due to photobleaching.
-        Is this necessary?
-        """
-        pass
-    
-    def plot_perievent_hist( self, event_times, window_size ):
+    def plot_perievent_hist( self, event_times, window_size, out_path=None ):
         """
         Peri-event time histogram for given event times.
         Plots the time series and their median over a time window around
         each event in event_times, with before and after event durations
-        specifiend in window_size as [before, after] (in seconds).
+        specified in window_size as [before, after] (in seconds).
         """
+        pl.clf()
         time_chunks = []
         for e in event_times:
             try:
@@ -276,10 +278,17 @@ class FiberAnalyze( object ):
         for i in xrange(time_arr.shape[1]):
             pl.plot(x, time_arr[:,i], color=pl.cm.jet(255-255*i/time_arr.shape[1]), alpha=0.75, linewidth=2)
             pl.ylim([0,ymax])
-        pl.axvline(x=0,color='black',linewidth=2)
-        pl.show()
+        pl.axvline(x=0,color='black',linewidth=2,linestyle='--')
+        pl.ylabel('Fluorescence Intensity (a.u.)')
+        pl.xlabel('Time from event (seconds)')
+        
+        if out_path is None:
+            pl.show()
+        else:
+            print "Saving peri-event time series..."
+            pl.savefig(os.path.join(out_path,'perievent_tseries'))
 
-    def plot_peritrigger_edge( self, window_size, edge="rising" ):
+    def plot_peritrigger_edge( self, window_size, edge="rising", out_path=None ):
         """
         Wrapper for plot_perievent histograms specialized for
         loaded event data that comes as a list of pairs of
@@ -294,17 +303,9 @@ class FiberAnalyze( object ):
                     event_times.append(pair[1])
                 else:
                     raise ValueError("Edge type must be 'rising' or 'falling'.")
-            self.plot_perievent_hist( event_times, window_size )
+            self.plot_perievent_hist( event_times, window_size, out_path=out_path )
         else:
             print "No event times loaded. Cannot find edges."        
-
-    def plot_peak_statistics( self, peak_times, peak_vals ):
-        """
-        Plots showing statistics of calcium peak data.
-          --> Peak height as function of time since last peak
-          --> Histograms of peak times and vals
-        """
-        pass
 
     def get_fft(self):
         if self.filt_fluor_data is None:
@@ -319,7 +320,22 @@ class FiberAnalyze( object ):
         timestep = np.max(self.time_stamps[1:] - self.time_stamps[:-1])
         self.fft_freq = np.fft.fftfreq(n, d=timestep)
 
+    # --- not yet implemented --- #
 
+    def debleach( self ):
+        """
+        Remove trend from data due to photobleaching.
+        Is this necessary?
+        """
+        pass
+
+    def plot_peak_statistics( self, peak_times, peak_vals ):
+        """
+        Plots showing statistics of calcium peak data.
+          --> Peak height as function of time since last peak
+          --> Histograms of peak times and vals
+        """
+        pass
 
 #-----------------------------------------------------------------------------------------
 
@@ -338,14 +354,13 @@ def test_FiberAnalyze(options):
     """
     FA = FiberAnalyze( options )
     FA.load()
-
-    FA.plot_periodogram()
+    
     FA.notch_filter(10.0, 10.3)
-    FA.plot_periodogram()
-
-    FA.plot_basic_tseries()
+#    FA.plot_periodogram(plot_type="log",out_path = options.output_path)
+    FA.plot_basic_tseries(out_path = options.output_path)
+#    FA.event_vs_baseline_barplot(out_path = options.output_path)
 #    peak_inds, peak_vals, peak_times = FA.get_peaks()
-    FA.plot_peritrigger_edge(window_size=[100,1000])
+    FA.plot_peritrigger_edge(window_size=[100,1000],out_path = options.output_path)
 #    FA.plot_peak_data()
 
     1/0
@@ -358,8 +373,8 @@ if __name__ == "__main__":
     from optparse import OptionParser
 
     parser = OptionParser()
-    parser.add_option("-o", "--output-path", dest="output_path",
-                      help="Specify the output path.")
+    parser.add_option("-o", "--output-path", dest="output_path", default=None,
+                      help="Specify the ouput path.")
     parser.add_option("", "--trigger-path", dest="trigger_path", default=None,
                       help="Specify path to files with trigger times, minus the '_s.npz' and '_e.npz' suffixes.")
     parser.add_option("-i", "--input-path", dest="input_path",
