@@ -21,11 +21,13 @@ class FiberAnalyze( object ):
         self.input_path = options.input_path
         self.output_path = options.output_path
         self.time_range = options.time_range
-        if options.trigger_input is not None:
-            self.s_file = options.trigger_input[0]
-            self.e_file = options.trigger_input[1]
+        self.trigger_path = options.trigger_path
+        
+        if self.trigger_path is not None:
+            self.s_file = options.trigger_path + '_s.npz'
+            self.e_file = options.trigger_path + '_e.npz'
         else:
-            self.trigger_input = None
+            self.trigger_path= None
             
         # hard coded values
         self.fluor_channel = 0
@@ -44,16 +46,27 @@ class FiberAnalyze( object ):
         self.fluor_data /= np.max(self.fluor_data)
         
         # normalize triggers to fluor data
-        if self.trigger_input is None:
+        if self.trigger_path is None:
             self.trigger_data = self.data[:,self.trigger_channel]
         else:
             try:
-                trigger_files = self.trigger_input.split(":")
-                time_tuples = self.load_trigger_data(trigger_files[0], trigger_files[1])
+                self.time_tuples = self.load_trigger_data(self.s_file, self.e_file)
+                time_vec = np.asarray(self.time_tuples).flatten()
+                time_vec = np.append(time_vec,np.inf)
+                self.trigger_data = np.zeros(len(self.fluor_data))
+                j = 0
+                for i in xrange(len(self.trigger_data)):
+                    if self.time_stamps[i] < time_vec[j]:
+                        self.trigger_data[i] = np.mod(j,2)
+                        print j, np.mod(j,2)
+                    else:
+                        j+=1
+                        self.trigger_data[i] = np.mod(j,2)
+                        print j, np.mod(j,2)
             except Exception, e:
                 print "Error loading trigger data:"
                 print "\t-->",e
-                
+        
         self.trigger_data /= np.max(self.trigger_data)
         self.trigger_data -= np.min(self.trigger_data)
         self.trigger_data *= -1
@@ -83,7 +96,7 @@ class FiberAnalyze( object ):
         """
         pl.clf()
         time_vals = self.time_stamps[range(len(self.fluor_data))]
-        pl.plot( time_vals, self.data[:,3], 'r-', alpha=0.3 )
+        pl.fill( time_vals, self.trigger_data, facecolor='r', alpha=0.5 )
         pl.plot( time_vals, self.fluor_data, 'k-')
         pl.ylabel('Fluorescence Intensity (a.u.)')
         pl.xlabel('Time (seconds)')
@@ -114,7 +127,9 @@ class FiberAnalyze( object ):
         return self.peak_inds, self.peak_vals, self.peak_times
 
     def notch_filter(self, low, high):
-                    
+        """
+        Notch filter the data with bandpass [low,high].
+        """
         rawsignal = self.fluor_data
         fft = sp.fft(rawsignal)
         
@@ -240,8 +255,8 @@ if __name__ == "__main__":
     parser = OptionParser()
     parser.add_option("-o", "--output-path", dest="output_path",
                       help="Specify the output path.")
-    parser.add_option("", "--trigger-input", dest="trigger_input",default=None,
-                      help="Specify filenames for NPZ files with trigger start and end times in format s_file:e_file.")
+    parser.add_option("", "--trigger-path", dest="trigger_path", default=None,
+                      help="Specify path to files with trigger times, minus the '_s.npz' and '_e.npz' suffixes.")
     parser.add_option("-i", "--input-path", dest="input_path",
                       help="Specify the input path.")
     parser.add_option("", "--time-range", dest="time_range",default=None,
