@@ -7,6 +7,7 @@ import scipy.signal as signal
 from scipy.stats import ranksums
 from scipy.interpolate import UnivariateSpline
 
+from wavelets import *
 #-----------------------------------------------------------------------------------------
 
 class FiberAnalyze( object ):
@@ -22,7 +23,8 @@ class FiberAnalyze( object ):
         self.output_path = options.output_path
         self.time_range = options.time_range
         self.trigger_path = options.trigger_path
-
+        self.fluor_normalization = options.fluor_normalization
+        
         if self.trigger_path is not None:
             self.s_file = options.trigger_path + '_s.npz'
             self.e_file = options.trigger_path + '_e.npz'
@@ -42,8 +44,12 @@ class FiberAnalyze( object ):
 
         # normalized fluor data, which is in arbitrary units
         self.fluor_data = self.data[:,self.fluor_channel]
-        self.fluor_data -= np.min(self.fluor_data)
-        self.fluor_data /= np.max(self.fluor_data)
+        if self.fluor_normalization == "deltaF":
+            median = np.median(self.fluor_data)
+            self.fluor_data = (self.fluor_data-median)/median #dF/F
+        else:
+            self.fluor_data -= np.min(self.fluor_data)
+            self.fluor_data /= np.max(self.fluor_data)
         
         # normalize triggers to fluor data
         if self.trigger_path is None:
@@ -70,6 +76,8 @@ class FiberAnalyze( object ):
         self.trigger_data -= np.min(self.trigger_data)
         self.trigger_data *= -1
         self.trigger_data += 1
+        if self.fluor_normalization == "deltaF":
+            self.trigger_data *= 1.5*np.max(self.fluor_data)
 
         # if time range is specified, crop data    
         if options.time_range != None:
@@ -105,16 +113,26 @@ class FiberAnalyze( object ):
         Generate a plot showing the raw calcium time series, with triggers
         corresponding to events (e.g. licking for sucrose) superimposed.
         """
+        # clear figure
         pl.clf()
+
+        # get appropriate time values for x-axis
         time_vals = self.time_stamps[range(len(self.fluor_data))]
+
+        # make filled blocks for
+        ymax = 1.1*np.max(self.fluor_data)
         pl.fill( time_vals, self.trigger_data, facecolor='r', alpha=0.5 )
         pl.plot( time_vals, self.fluor_data, 'k-')
-        pl.ylabel('Fluorescence Intensity (a.u.)')
-        pl.xlabel('Time (seconds)')
+        pl.ylim([0,ymax])
+        if self.fluor_normalization == "deltaF":
+            pl.ylabel(r'$\delta F/F$')
+        else:
+            pl.ylabel('Fluorescence Intensity (a.u.)')
+        pl.xlabel('Time since recording onset (seconds)')
         if out_path is None:
             pl.show()
         else:
-            pl.savefig(os.path.join(out_path,"basic_time_series"))
+            pl.savefig(os.path.join(out_path,"basic_time_series.pdf"))
 
     def event_vs_baseline_barplot( self, out_path=None ):
         """
@@ -158,7 +176,7 @@ class FiberAnalyze( object ):
         Heuristic for finding local peaks in the calcium data. 
         """
         peak_widths = np.array([100,250,500,750,1000])
-        self.peak_inds = signal.find_peaks_cwt(self.fluor_data, widths=peak_widths, wavelet=None, max_distances=None, gap_thresh=None, min_length=None, min_snr=5, noise_perc=20)
+        self.peak_inds = signal.find_peaks_cwt(self.fluor_data, widths=peak_widths, wavelet=None, max_distances=None, gap_thresh=None, min_length=None, min_snr=5, noise_perc=50)
         self.peak_vals = self.fluor_data[self.peak_inds]
         self.peak_times = self.time_stamps[self.peak_inds]
         return self.peak_inds, self.peak_vals, self.peak_times
@@ -246,7 +264,10 @@ class FiberAnalyze( object ):
         lines[self.peak_inds] = 1.0
         pl.plot(self.fluor_data)
         pl.plot(lines)
-        pl.ylabel('Fluorescence Intensity (a.u.)')
+        if self.fluor_normalization == "deltaF":
+            pl.ylabel(r'$\delta F/F$')
+        else:
+            pl.ylabel('Fluorescence Intensity (a.u.)')
         pl.xlabel('Time (samples)')
 
         if out_path is None:
@@ -261,7 +282,12 @@ class FiberAnalyze( object ):
         each event in event_times, with before and after event durations
         specified in window_size as [before, after] (in seconds).
         """
+        # new figure
         pl.clf()
+        fig = pl.figure()
+        ax = fig.add_subplot(111)
+
+        # get blocks of time series for window around each event time
         time_chunks = []
         for e in event_times:
             try:
@@ -271,17 +297,32 @@ class FiberAnalyze( object ):
                 time_chunks.append(chunk)
             except:
                 print "Unable to extract window:", [(e-window_size[0]),(e+window_size[1])]
+
+        # plot each time window, colored by order
         time_arr = np.asarray(time_chunks).T
         x = self.time_stamps[0:time_arr.shape[0]]-self.time_stamps[window_size[0]]
         ymax = np.max(time_arr)
         ymax += 0.1*ymax
         for i in xrange(time_arr.shape[1]):
-            pl.plot(x, time_arr[:,i], color=pl.cm.jet(255-255*i/time_arr.shape[1]), alpha=0.75, linewidth=2)
+            ax.plot(x, time_arr[:,i], color=pl.cm.jet(255-255*i/time_arr.shape[1]), alpha=0.75, linewidth=1)
+            x.shape = (len(x),1) 
+            x_padded = np.vstack([x[0], x, x[-1]])
+            time_vec = time_arr[:,i]; time_vec.shape = (len(time_vec),1)
+            time_vec_padded = np.vstack([0, time_vec,0]) 
+            pl.fill(x_padded, time_vec_padded, facecolor=pl.cm.jet(255-255*i/time_arr.shape[1]), alpha=0.25 )            
             pl.ylim([0,ymax])
-        pl.axvline(x=0,color='black',linewidth=2,linestyle='--')
-        pl.ylabel('Fluorescence Intensity (a.u.)')
-        pl.xlabel('Time from event (seconds)')
-        
+            
+        # add a line for the event onset time
+        pl.axvline(x=0,color='black',linewidth=1,linestyle='--')
+
+        # label the plot axes
+        if self.fluor_normalization == "deltaF":
+            pl.ylabel(r'$\delta F/F$')
+        else:
+            pl.ylabel('Fluorescence Intensity (a.u.)')
+        pl.xlabel('Time from onset of social bout (seconds)')
+
+        # show plot now or save of an output path was specified
         if out_path is None:
             pl.show()
         else:
@@ -337,6 +378,76 @@ class FiberAnalyze( object ):
         """
         pass
 
+
+    def wavelet_plot( self ):
+        wavelet=Morlet
+        maxscale=4
+        notes=16
+        scaling="log" #or "linear"
+        #scaling="linear"
+        plotpower2d=True
+
+        # set up some data
+        Ns=1024
+        #limits of analysis
+        Nlo=0 
+        Nhi=Ns
+        # sinusoids of two periods, 128 and 32.
+        x = self.time_stamps
+        A = self.fluor_data
+
+        # Wavelet transform the data
+        cw=wavelet(A,maxscale,notes,scaling=scaling)
+        scales=cw.getscales()     
+        cwt=cw.getdata()
+        # power spectrum
+        pwr=cw.getpower()
+        scalespec=np.sum(pwr,axis=1)/scales # calculate scale spectrum
+        # scales
+        y=cw.fourierwl*scales
+        x=np.arange(Nlo*1.0,Nhi*1.0,1.0)
+
+        fig=pl.figure(1)
+
+        # 2-d coefficient plot
+        ax=pl.axes([0.4,0.1,0.55,0.4])
+        pl.xlabel('Time [s]')
+        plotcwt=np.clip(np.fabs(cwt.real), 0., 1000.)
+        if plotpower2d: plotcwt=pwr
+        im=pl.imshow(plotcwt,cmap=pl.cm.jet,extent=[x[0],x[-1],y[-1],y[0]],aspect='auto')
+        #colorbar()
+        if scaling=="log": ax.set_yscale('log')
+        pl.ylim(y[0],y[-1])
+        ax.xaxis.set_ticks(np.arange(Nlo*1.0,(Nhi+1)*1.0,100.0))
+        ax.yaxis.set_ticklabels(["",""])
+        theposition=pl.gca().get_position()
+
+        # data plot
+        ax2=pl.axes([0.4,0.54,0.55,0.3])
+        pl.ylabel('Data')
+        pos=ax.get_position()
+        pl.plot(x,A,'b-')
+        pl.xlim(Nlo*1.0,Nhi*1.0)
+        ax2.xaxis.set_ticklabels(["",""])
+        pl.text(0.5,0.9,"Wavelet example with extra panes",
+             fontsize=14,bbox=dict(facecolor='green',alpha=0.2),
+             transform = fig.transFigure,horizontalalignment='center')
+
+        # projected power spectrum
+        ax3=pl.axes([0.08,0.1,0.29,0.4])
+        pl.xlabel('Power')
+        pl.ylabel('Period [s]')
+        vara=1.0
+        if scaling=="log":
+            pl.loglog(scalespec/vara+0.01,y,'b-')
+        else:
+            pl.semilogx(scalespec/vara+0.01,y,'b-')
+        pl.ylim(y[0],y[-1])
+        pl.xlim(1000.0,0.01)
+
+        pl.show()
+
+
 #-----------------------------------------------------------------------------------------
 
 def get_event_window( event_ts, window_size = 1000 ):
@@ -354,13 +465,13 @@ def test_FiberAnalyze(options):
     """
     FA = FiberAnalyze( options )
     FA.load()
-    
-    FA.notch_filter(10.0, 10.3)
+#    FA.wavelet_plot()
+#    FA.notch_filter(10.0, 10.3)
 #    FA.plot_periodogram(plot_type="log",out_path = options.output_path)
     FA.plot_basic_tseries(out_path = options.output_path)
 #    FA.event_vs_baseline_barplot(out_path = options.output_path)
+    FA.plot_peritrigger_edge(window_size=[100,600],out_path = options.output_path)
 #    peak_inds, peak_vals, peak_times = FA.get_peaks()
-    FA.plot_peritrigger_edge(window_size=[100,1000],out_path = options.output_path)
 #    FA.plot_peak_data()
 
     1/0
@@ -383,6 +494,8 @@ if __name__ == "__main__":
                       help="Specify a time window over which to analyze the time series in format start:end. -1 chooses the appropriate extremum")
     parser.add_option('-p', "--plot-type", default = 'tseries', dest="plot_type",
                       help="Type of plot to produce.")
+    parser.add_option('', "--fluor_normalization", default = 'deltaF', dest="fluor_normalization",
+                      help="Normalization of fluorescence trace. Can be a.u. between [0,1]: 'stardardize' or deltaF/F: 'deltaF'.")
     parser.add_option('-s', "--smoothness", default = None, dest="smoothness",
                       help="Should the time series be smoothed, and how much.")
 
