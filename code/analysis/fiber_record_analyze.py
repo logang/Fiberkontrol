@@ -2,7 +2,8 @@ import os,sys
 import numpy as np
 import scipy as sp
 import pylab as pl
-import scipy.signal as signal
+#import scipy.signal as sgnl
+from scipy.signal import find_peaks_cwt
 #from debleach import exponential_basis_debleach
 from scipy.stats import ranksums
 from scipy.interpolate import UnivariateSpline
@@ -137,7 +138,7 @@ class FiberAnalyze( object ):
         Heuristic for finding local peaks in the calcium data. 
         """
         peak_widths = np.array([50,100,500,1000])
-        self.peak_inds = signal.find_peaks_cwt(self.fluor_data, widths=peak_widths, wavelet=None, max_distances=None, gap_thresh=None, min_length=None, min_snr=5, noise_perc=30)
+        self.peak_inds = sp.signal.find_peaks_cwt(self.fluor_data, widths=peak_widths, wavelet=None, max_distances=None, gap_thresh=None, min_length=None, min_snr=5, noise_perc=30)
         self.peak_vals = self.fluor_data[self.peak_inds]
         self.peak_times = self.time_stamps[self.peak_inds]
         return self.peak_inds, self.peak_vals, self.peak_times
@@ -237,6 +238,20 @@ class FiberAnalyze( object ):
         else:
             pl.savefig(out_path)
 
+
+    def get_fft(self):
+        if self.filt_fluor_data is None:
+            rawsignal = self.fluor_data
+        else:
+            rawsignal = self.filt_fluor_data
+        
+        fft = sp.fft(rawsignal)
+        self.fft = fft[:]
+
+        n = rawsignal.size
+        timestep = np.max(self.time_stamps[1:] - self.time_stamps[:-1])
+        self.fft_freq = np.fft.fftfreq(n, d=timestep)
+
     # --- not yet implemented --- #
 
     def debleach( self ):
@@ -259,19 +274,27 @@ class FiberAnalyze( object ):
         """
         pass
 
-    def get_fft(self):
-        if self.filt_fluor_data is None:
-            rawsignal = self.fluor_data
-        else:
-            rawsignal = self.filt_fluor_data
-        
-        fft = sp.fft(rawsignal)
-        self.fft = fft[:]
+    def plot_average_area_under_curve( self, peak_times, window):
+        """
+        Plots of area under curve as a function of time 
+        -- choosing the window around the event onset is still arbitrary, 
+        we need to discuss how to choose this well...
+        """
+        pass
 
-        n = rawsignal.size
-        timestep = np.max(self.time_stamps[1:] - self.time_stamps[:-1])
-        self.fft_freq = np.fft.fftfreq(n, d=timestep)
+    def plot_frequencies_vs_time( self ):
+        """
+        Using wavelet analysis, plot frequency content of time series
+        as a function of time.
+        """
+        pass
 
+    def plot_approach_activity( self, peak_times, window):
+        """
+        Plot calcium activity level just before approaching the object/conspecific, 
+        -->does activity prior to an approach predict an approach? 
+        """
+        pass
 
 
 #-----------------------------------------------------------------------------------------
@@ -294,7 +317,7 @@ def test_FiberAnalyze(options):
     FA.plot_periodogram()
     FA.notch_filter(10.0, 10.3)
     FA.plot_periodogram()
-    #FA.plot_basic_tseries()
+    FA.plot_basic_tseries()
     #peak_inds, peak_vals, peak_times = FA.get_peaks()
     #FA.plot_peak_data()
     1/0
