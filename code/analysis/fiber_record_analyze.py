@@ -138,7 +138,7 @@ class FiberAnalyze( object ):
         Heuristic for finding local peaks in the calcium data. 
         """
         peak_widths = np.array([50,100,500,1000])
-        self.peak_inds = sp.signal.find_peaks_cwt(self.fluor_data, widths=peak_widths, wavelet=None, max_distances=None, gap_thresh=None, min_length=None, min_snr=5, noise_perc=30)
+        self.peak_inds = signal.find_peaks_cwt(self.fluor_data, widths=peak_widths, wavelet=None, max_distances=None, gap_thresh=None, min_length=None, min_snr=5, noise_perc=30)
         self.peak_vals = self.fluor_data[self.peak_inds]
         self.peak_times = self.time_stamps[self.peak_inds]
         return self.peak_inds, self.peak_vals, self.peak_times
