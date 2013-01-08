@@ -2,8 +2,8 @@ import os,sys
 import numpy as np
 import scipy as sp
 import pylab as pl
-#import scipy.signal as sgnl
-from scipy.signal import find_peaks_cwt
+import scipy.signal as signal
+
 #from debleach import exponential_basis_debleach
 from scipy.stats import ranksums
 from scipy.interpolate import UnivariateSpline
