@@ -7,7 +7,7 @@ import scipy.signal as signal
 from scipy.stats import ranksums
 from scipy.interpolate import UnivariateSpline
 
-from wavelets import *
+#from wavelet import *
 #-----------------------------------------------------------------------------------------
 
 class FiberAnalyze( object ):
@@ -39,6 +39,7 @@ class FiberAnalyze( object ):
         """
         Load time series and events from NPZ file. 
         """
+        print self.input_path
         self.data = np.load( self.input_path )['data']
         self.time_stamps = np.load( self.input_path )['time_stamps']
 
@@ -99,6 +100,7 @@ class FiberAnalyze( object ):
         self.fft = None #place holder for fft of rawsignal, if calculated
         self.fft_freq = None #place holder for frequency labels of fft
         self.filt_fluor_data = None #place holder for filtered rawsignal, if calculated
+        print "finished loading data"
 
     def load_trigger_data( self, s_filename, e_filename ):
         """
@@ -175,6 +177,7 @@ class FiberAnalyze( object ):
         """
         Heuristic for finding local peaks in the calcium data. 
         """
+        print "get_peaks"
         peak_widths = np.array([100,250,500,750,1000])
         self.peak_inds = signal.find_peaks_cwt(self.fluor_data, widths=peak_widths, wavelet=None, max_distances=None, gap_thresh=None, min_length=None, min_snr=5, noise_perc=50)
         self.peak_vals = self.fluor_data[self.peak_inds]
@@ -233,6 +236,7 @@ class FiberAnalyze( object ):
         freq_vals = freq[range(num_values)]
         Y = Y[range(num_values)]
 
+        #plot 
         pl.figure()
         if plot_type == "standard":
             pl.plot( freq_vals[start_freq:num_values], Y[start_freq:num_values], 'k-')
@@ -259,6 +263,7 @@ class FiberAnalyze( object ):
         """
         Plot fluorescent data with chosen peak_inds overlayed as lines.
         """
+        print "plot_peak_data"
         pl.clf()
         lines = np.zeros(len(self.fluor_data))
         lines[self.peak_inds] = 1.0
@@ -275,6 +280,25 @@ class FiberAnalyze( object ):
         else:
             pl.savefig(os.path.join(out_path,'peak_finding'))
 
+    def get_time_chunks_around_events(self, event_times, window_size):
+        """
+        Extracts chunks of fluorescence data around each event in 
+        event_times, with before and after event durations
+        specified in window_size as [before, after] (in seconds).
+        """
+
+        time_chunks = []
+        for e in event_times:
+            try:
+                e_idx = np.where(e<self.time_stamps)[0][0]
+                chunk = self.fluor_data[range((e_idx-window_size[0]),(e_idx+window_size[1]))]
+                print [range((e_idx-window_size[0]),(e_idx+window_size[1]))]
+                time_chunks.append(chunk)
+            except:
+                print "Unable to extract window:", [(e-window_size[0]),(e+window_size[1])]
+        return time_chunks
+
+
     def plot_perievent_hist( self, event_times, window_size, out_path=None ):
         """
         Peri-event time histogram for given event times.
@@ -288,15 +312,17 @@ class FiberAnalyze( object ):
         ax = fig.add_subplot(111)
 
         # get blocks of time series for window around each event time
-        time_chunks = []
-        for e in event_times:
-            try:
-                e_idx = np.where(e<self.time_stamps)[0][0]
-                chunk = self.fluor_data[range((e_idx-window_size[0]),(e_idx+window_size[1]))]
-                print [range((e_idx-window_size[0]),(e_idx+window_size[1]))]
-                time_chunks.append(chunk)
-            except:
-                print "Unable to extract window:", [(e-window_size[0]),(e+window_size[1])]
+        time_chunks = self.get_time_chunks_around_events(event_times, window_size)
+
+        # time_chunks = []
+        # for e in event_times:
+        #     try:
+        #         e_idx = np.where(e<self.time_stamps)[0][0]
+        #         chunk = self.fluor_data[range((e_idx-window_size[0]),(e_idx+window_size[1]))]
+        #         print [range((e_idx-window_size[0]),(e_idx+window_size[1]))]
+        #         time_chunks.append(chunk)
+        #     except:
+        #         print "Unable to extract window:", [(e-window_size[0]),(e+window_size[1])]
 
         # plot each time window, colored by order
         time_arr = np.asarray(time_chunks).T
@@ -304,12 +330,12 @@ class FiberAnalyze( object ):
         ymax = np.max(time_arr)
         ymax += 0.1*ymax
         for i in xrange(time_arr.shape[1]):
-            ax.plot(x, time_arr[:,i], color=pl.cm.jet(255-255*i/time_arr.shape[1]), alpha=0.75, linewidth=1)
+            ax.plot(x, time_arr[:,i], color=pl.cm.winter(255-255*i/time_arr.shape[1]), alpha=0.75, linewidth=1)
             x.shape = (len(x),1) 
             x_padded = np.vstack([x[0], x, x[-1]])
             time_vec = time_arr[:,i]; time_vec.shape = (len(time_vec),1)
             time_vec_padded = np.vstack([0, time_vec,0]) 
-            pl.fill(x_padded, time_vec_padded, facecolor=pl.cm.jet(255-255*i/time_arr.shape[1]), alpha=0.25 )            
+            pl.fill(x_padded, time_vec_padded, facecolor=pl.cm.winter(255-255*i/time_arr.shape[1]), alpha=0.25 )            
             pl.ylim([0,ymax])
             
         # add a line for the event onset time
@@ -335,18 +361,11 @@ class FiberAnalyze( object ):
         loaded event data that comes as a list of pairs of
         event start and end times.
         """
-        if self.time_tuples is not None:
-            event_times = []
-            for pair in self.time_tuples:
-                if edge == "rising":
-                    event_times.append(pair[0])
-                elif edge == "falling":
-                    event_times.append(pair[1])
-                else:
-                    raise ValueError("Edge type must be 'rising' or 'falling'.")
+        event_times = self.get_event_times(edge)
+        if event_times != -1:
             self.plot_perievent_hist( event_times, window_size, out_path=out_path )
         else:
-            print "No event times loaded. Cannot find edges."        
+            print "No event times loaded. Cannot plot perievent."        
 
     def get_fft(self):
         if self.filt_fluor_data is None:
@@ -363,6 +382,29 @@ class FiberAnalyze( object ):
 
     # --- not yet implemented --- #
 
+    def get_event_times( self, edge="rising"):
+        """
+        Extracts a list of the times corresponding to
+        interaction events to be time-locked with the signal
+        specialized for loaded event data that comes as a list of 
+        pairs of event start and end times.
+        """
+        if self.time_tuples is not None:
+            event_times = []
+            for pair in self.time_tuples:
+                if edge == "rising":
+                    event_times.append(pair[0])
+                elif edge == "falling":
+                    event_times.append(pair[1])
+                else:
+                    raise ValueError("Edge type must be 'rising' or 'falling'.")
+            return event_times
+        else:
+            print "No event times loaded. Cannot find edges."        
+            return -1
+
+
+
     def debleach( self ):
         """
         Remove trend from data due to photobleaching.
@@ -377,6 +419,33 @@ class FiberAnalyze( object ):
           --> Histograms of peak times and vals
         """
         pass
+
+    def plot_area_under_curve( self, event_times, window_size, out_path=None):
+        """
+        Plots of area under curve as a function of time 
+        -- choosing the window around the event onset is still arbitrary, 
+        we need to discuss how to choose this well...
+        """
+        for t in event_times:
+            self.fluor_data
+
+        pass
+
+
+
+    def plot_area_under_curve_wrapper( self, window_size, edge="rising", out_path=None):
+        """
+        Wrapper for plot_area_under_curve vs. time plots specialized for
+        loaded event data that comes as a list of pairs of
+        event start and end times.
+        """
+
+        event_times = self.get_event_times(edge)
+        if event_times != -1:
+            self.plot_area_under_curve( event_times, window_size, out_path=out_path )
+        else:
+            print "No event times loaded. Cannot plot perievent."  
+
 
 
     def wavelet_plot( self ):
@@ -468,11 +537,11 @@ def test_FiberAnalyze(options):
 #    FA.wavelet_plot()
 #    FA.notch_filter(10.0, 10.3)
 #    FA.plot_periodogram(plot_type="log",out_path = options.output_path)
-    FA.plot_basic_tseries(out_path = options.output_path)
+   # FA.plot_basic_tseries(out_path = options.output_path)
 #    FA.event_vs_baseline_barplot(out_path = options.output_path)
     FA.plot_peritrigger_edge(window_size=[100,600],out_path = options.output_path)
-#    peak_inds, peak_vals, peak_times = FA.get_peaks()
-#    FA.plot_peak_data()
+    peak_inds, peak_vals, peak_times = FA.get_peaks()
+    FA.plot_peak_data()
 
     1/0
 
