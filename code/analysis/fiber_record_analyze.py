@@ -6,6 +6,8 @@ import scipy.signal as signal
 #from debleach import exponential_basis_debleach
 from scipy.stats import ranksums
 from scipy.interpolate import UnivariateSpline
+import tkFileDialog
+
 
 #from wavelet import *
 #-----------------------------------------------------------------------------------------
@@ -19,11 +21,17 @@ class FiberAnalyze( object ):
         # values from option parser
         self.smoothness = options.smoothness
         self.plot_type = options.plot_type
-        self.input_path = options.input_path
-        self.output_path = options.output_path
         self.time_range = options.time_range
-        self.trigger_path = options.trigger_path
         self.fluor_normalization = options.fluor_normalization
+        if options.selectfiles:
+            self.input_path = tkFileDialog.askopenfilename()
+            self.output_path = self.input_path[:-4] + '_out'
+            self.trigger_path = tkFileDialog.askopenfilename()
+        else:
+            self.input_path = options.input_path
+            self.output_path = options.output_path
+            print self.output_path
+            self.trigger_path = options.trigger_path
         
         if self.trigger_path is not None:
             self.s_file = options.trigger_path + '_s.npz'
@@ -134,7 +142,10 @@ class FiberAnalyze( object ):
         if out_path is None:
             pl.show()
         else:
-            pl.savefig(os.path.join(out_path,"basic_time_series.pdf"))
+           # pl.savefig(os.path.join(out_path,"basic_time_series.pdf"))
+            pl.savefig(out_path + "basic_time_series.pdf")
+
+
 
     def event_vs_baseline_barplot( self, out_path=None ):
         """
@@ -147,7 +158,8 @@ class FiberAnalyze( object ):
         if out_path is None:
             pl.show()
         else:
-            pl.savefig(os.path.join(out_path,"event_vs_baseline_barplot"))
+           # pl.savefig(os.path.join(out_path,"event_vs_baseline_barplot"))
+            pl.savefig(out_path + "event_vs_baseline_barplot.pdf")
         
     def low_pass_filter(self, cutoff):
         """
@@ -257,7 +269,9 @@ class FiberAnalyze( object ):
             pl.show()
         else:
             print "Saving periodogram..."
-            pl.savefig(os.path.join(out_path,'periodogram'))
+          #  pl.savefig(os.path.join(out_path,'periodogram'))
+            pl.savefig(out_path + "periodogram.pdf")
+
         
     def plot_peak_data( self, out_path=None ):
         """
@@ -278,7 +292,9 @@ class FiberAnalyze( object ):
         if out_path is None:
             pl.show()
         else:
-            pl.savefig(os.path.join(out_path,'peak_finding'))
+          #  pl.savefig(os.path.join(out_path,'peak_finding'))
+            pl.savefig(out_path + "peak_finding.pdf")
+
 
     def get_time_chunks_around_events(self, event_times, window_size):
         """
@@ -292,7 +308,7 @@ class FiberAnalyze( object ):
             try:
                 e_idx = np.where(e<self.time_stamps)[0][0]
                 chunk = self.fluor_data[range((e_idx-window_size[0]),(e_idx+window_size[1]))]
-                print [range((e_idx-window_size[0]),(e_idx+window_size[1]))]
+                #print [range((e_idx-window_size[0]),(e_idx+window_size[1]))]
                 time_chunks.append(chunk)
             except:
                 print "Unable to extract window:", [(e-window_size[0]),(e+window_size[1])]
@@ -313,16 +329,6 @@ class FiberAnalyze( object ):
 
         # get blocks of time series for window around each event time
         time_chunks = self.get_time_chunks_around_events(event_times, window_size)
-
-        # time_chunks = []
-        # for e in event_times:
-        #     try:
-        #         e_idx = np.where(e<self.time_stamps)[0][0]
-        #         chunk = self.fluor_data[range((e_idx-window_size[0]),(e_idx+window_size[1]))]
-        #         print [range((e_idx-window_size[0]),(e_idx+window_size[1]))]
-        #         time_chunks.append(chunk)
-        #     except:
-        #         print "Unable to extract window:", [(e-window_size[0]),(e+window_size[1])]
 
         # plot each time window, colored by order
         time_arr = np.asarray(time_chunks).T
@@ -353,7 +359,9 @@ class FiberAnalyze( object ):
             pl.show()
         else:
             print "Saving peri-event time series..."
-            pl.savefig(os.path.join(out_path,'perievent_tseries'))
+            #pl.savefig(os.path.join(out_path,'perievent_tseries'))
+            pl.savefig(out_path + "perievent_tseries.pdf")
+
 
     def plot_peritrigger_edge( self, window_size, edge="rising", out_path=None ):
         """
@@ -422,14 +430,55 @@ class FiberAnalyze( object ):
 
     def plot_area_under_curve( self, event_times, window_size, out_path=None):
         """
-        Plots of area under curve as a function of time 
+        Plots of area under curve for each event_time 
+        with before and after event durationsspecified in window_size as 
+        [before, after] (in seconds).
         -- choosing the window around the event onset is still arbitrary, 
         we need to discuss how to choose this well...
         """
-        for t in event_times:
-            self.fluor_data
+        
+        normalize = True  #change this depending on whether you wish to divide (normalize)
+                          # by the maximum fluorescence value in the window following
+                          # each event
 
-        pass
+        #Calculate the area underneath the signal at each event
+        time_chunks = self.get_time_chunks_around_events(event_times, window_size)
+        areas = []
+        for chunk in time_chunks:
+            if normalize:
+                if max(chunk) < 0.01: 
+                    areas.append(sum(chunk)/len(chunk)/0.01)
+                else:
+                    areas.append(sum(chunk)/len(chunk)/max(chunk))
+            else: 
+                areas.append(sum(chunk)/len(chunk))
+            
+
+        #Plot the area vs the time of each event
+        pl.clf()
+        ymax = 1.1*np.max(areas)
+        pl.stem( event_times, areas, linefmt='k-', markerfmt='ko', basefmt='k-')
+        pl.ylim([0,ymax])
+        pl.xlim([0, np.max(self.time_stamps)])
+
+        print 'self.time_stamps[window_size[1]] ', self.time_stamps[window_size[1]]  
+        if self.fluor_normalization == "deltaF":
+            if normalize:
+                pl.ylabel('Sharpness of peak: ' r'$\frac{\sum\delta F/F}{\max(peak)}}$' + ' with window of ' + "{0:.2f}".format(self.time_stamps[window_size[1]]) + ' s')
+            else:
+                pl.ylabel('Sharpness of peak: ' r'$\sum\delta F/F}$' + ' with window of ' + "{0:.2f}".format(self.time_stamps[window_size[1]]) + ' s')
+        else:
+            pl.ylabel('Fluorescence Intensity (a.u.) integrated over window of ' + "0:.2f}".format(self.time_stamps[window_size[1]]) + ' s')
+        pl.xlabel('Time in trial (seconds)')
+        pl.title(out_path)
+        if out_path is None:
+            pl.show()
+        else:
+           # pl.savefig(os.path.join(out_path,"plot_area_under_curve.pdf"))
+            if normalize:
+                pl.savefig(out_path + "plot_area_under_curve_normal.pdf")
+            else:
+                pl.savefig(out_path + "plot_area_under_curve_non_normal.pdf")
 
 
 
@@ -537,11 +586,14 @@ def test_FiberAnalyze(options):
 #    FA.wavelet_plot()
 #    FA.notch_filter(10.0, 10.3)
 #    FA.plot_periodogram(plot_type="log",out_path = options.output_path)
-   # FA.plot_basic_tseries(out_path = options.output_path)
+    #FA.plot_basic_tseries(out_path = options.output_path)
 #    FA.event_vs_baseline_barplot(out_path = options.output_path)
-    FA.plot_peritrigger_edge(window_size=[100,600],out_path = options.output_path)
-    peak_inds, peak_vals, peak_times = FA.get_peaks()
-    FA.plot_peak_data()
+    #FA.plot_peritrigger_edge(window_size=[100,600],out_path = options.output_path)
+    FA.plot_area_under_curve_wrapper( window_size=[0, 485], edge="rising", out_path = options.output_path)
+    # 485 corresponds to 2s
+
+    #peak_inds, peak_vals, peak_times = FA.get_peaks()
+    #FA.plot_peak_data()
 
     1/0
 
@@ -555,7 +607,7 @@ if __name__ == "__main__":
     parser = OptionParser()
     parser.add_option("-o", "--output-path", dest="output_path", default=None,
                       help="Specify the ouput path.")
-    parser.add_option("", "--trigger-path", dest="trigger_path", default=None,
+    parser.add_option("-t", "--trigger-path", dest="trigger_path", default=None,
                       help="Specify path to files with trigger times, minus the '_s.npz' and '_e.npz' suffixes.")
     parser.add_option("-i", "--input-path", dest="input_path",
                       help="Specify the input path.")
@@ -567,6 +619,8 @@ if __name__ == "__main__":
                       help="Normalization of fluorescence trace. Can be a.u. between [0,1]: 'stardardize' or deltaF/F: 'deltaF'.")
     parser.add_option('-s', "--smoothness", default = None, dest="smoothness",
                       help="Should the time series be smoothed, and how much.")
+    parser.add_option('-x', "--selectfiles", default = False, dest = "selectfiles",
+                       help="Should you select filepaths in a pop window instead of in the command line.")
 
     (options, args) = parser.parse_args()
     
