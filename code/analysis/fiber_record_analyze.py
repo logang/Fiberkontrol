@@ -256,12 +256,13 @@ class FiberAnalyze( object ):
             pl.xlabel('Frequency (Hz)')
             pl.title(self.input_path)
             pl.axis([1, 100, 0, 1.1*np.max(Y[start_freq:num_values])])
-        elif plot_type == "log":
+        elif plot_type == "log": 
             pl.plot( freq_vals[start_freq:num_values], np.log(Y[start_freq:num_values]), 'k-')
             pl.ylabel('Log(Spectral Density) (a.u.)')
             pl.xlabel('Frequency (Hz)')
             pl.title(self.input_path)
-            pl.axis([1, 100, 0, 1.1*np.log(np.max(Y[start_freq:num_values]))])
+            #pl.axis([1, 100, 0, 1.1*np.log(np.max(Y[start_freq:num_values]))])
+            pl.axis([1, 100, -5, 10])
         else:
             print "Currently only 'standard' and 'log' plot types are available"
 
@@ -471,14 +472,24 @@ class FiberAnalyze( object ):
             pl.ylabel('Fluorescence Intensity (a.u.) integrated over window of ' + "0:.2f}".format(self.time_stamps[window_size[1]]) + ' s')
         pl.xlabel('Time in trial (seconds)')
         pl.title(out_path)
+
+        print "window_size", window_size
+
+        print "self.time_stamps[window_size]", self.time_stamps[window_size[1]]
+
         if out_path is None:
             pl.show()
         else:
            # pl.savefig(os.path.join(out_path,"plot_area_under_curve.pdf"))
             if normalize:
                 pl.savefig(out_path + "plot_area_under_curve_normal.pdf")
+                np.savez(out_path + "normalized_area_under_peaks_" + str(int(10*self.time_stamps[window_size[1]])) + "s.npz", areas=areas, event_times=event_times, window_size=self.time_stamps[window_size[1]])
+
             else:
                 pl.savefig(out_path + "plot_area_under_curve_non_normal.pdf")
+                np.savez(out_path + "non-normalized_area_under_peaks_" + str(int(10*self.time_stamps[window_size[1]]))+ "s.npz", areas=areas, event_times=event_times, window_size=self.time_stamps[window_size[1]])
+
+
 
 
 
@@ -585,12 +596,12 @@ def test_FiberAnalyze(options):
     FA.load()
 #    FA.wavelet_plot()
 #    FA.notch_filter(10.0, 10.3)
-#    FA.plot_periodogram(plot_type="log",out_path = options.output_path)
+    #FA.plot_periodogram(plot_type="log",out_path = options.output_path)
     #FA.plot_basic_tseries(out_path = options.output_path)
 #    FA.event_vs_baseline_barplot(out_path = options.output_path)
     #FA.plot_peritrigger_edge(window_size=[100,600],out_path = options.output_path)
     FA.plot_area_under_curve_wrapper( window_size=[0, 485], edge="rising", out_path = options.output_path)
-    # 485 corresponds to 2s
+    ### 485 corresponds to 2s
 
     #peak_inds, peak_vals, peak_times = FA.get_peaks()
     #FA.plot_peak_data()
