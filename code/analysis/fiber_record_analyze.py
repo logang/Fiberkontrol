@@ -394,7 +394,7 @@ class FiberAnalyze( object ):
         """
 
         window_indices = [self.convert_seconds_to_index( window_size_in_seconds[0]),
-                       self.convert_seconds_to_index( window_size_in_seconds[1])]
+                          self.convert_seconds_to_index( window_size_in_seconds[1])]
 
         time_chunks = []
         for e in event_times:
@@ -408,7 +408,7 @@ class FiberAnalyze( object ):
         return time_chunks
 
 
-    def plot_perievent_hist( self, event_times, window_size, out_path=None ):
+    def plot_perievent_hist( self, event_times, window_size_in_seconds, out_path=None ):
         """
         Peri-event time histogram for given event times.
         Plots the time series and their median over a time window around
@@ -421,11 +421,14 @@ class FiberAnalyze( object ):
         ax = fig.add_subplot(111)
 
         # get blocks of time series for window around each event time
-        time_chunks = self.get_time_chunks_around_events(event_times, window_size)
+        time_chunks = self.get_time_chunks_around_events(event_times, window_size_in_seconds)
+
+        window_indices = [ self.convert_seconds_to_index(window_size_in_seconds[0]),
+                           self.convert_seconds_to_index(window_size_in_seconds[1]) ]
 
         # plot each time window, colored by order
         time_arr = np.asarray(time_chunks).T
-        x = self.time_stamps[0:time_arr.shape[0]]-self.time_stamps[window_size[0]]
+        x = self.time_stamps[0:time_arr.shape[0]]-self.time_stamps[window_indices[0]] ###IS THIS RIGHT?
         ymax = np.max(time_arr)
         ymax += 0.1*ymax
         ymin = np.min(time_arr)
@@ -459,7 +462,7 @@ class FiberAnalyze( object ):
             pl.savefig(out_path + "perievent_tseries.pdf")
 
 
-    def plot_peritrigger_edge( self, window_size, edge="rising", out_path=None ):
+    def plot_peritrigger_edge( self, window_size_in_seconds, edge="rising", out_path=None ):
         """
         Wrapper for plot_perievent histograms specialized for
         loaded event data that comes as a list of pairs of
@@ -467,7 +470,7 @@ class FiberAnalyze( object ):
         """
         event_times = self.get_event_times(edge)
         if event_times != -1:
-            self.plot_perievent_hist( event_times, window_size, out_path=out_path )
+            self.plot_perievent_hist( event_times, window_size_in_seconds, out_path=out_path )
         else:
             print "No event times loaded. Cannot plot perievent."        
 
@@ -561,9 +564,9 @@ class FiberAnalyze( object ):
 
         areas = self.get_areas_under_curve(start_times, window_size_in_seconds)
 
+
         window_indices = [ self.convert_seconds_to_index(window_size_in_seconds[0]),
-                self.convert_seconds_to_index(window_size_in_seconds[1]) ]
-        
+                           self.convert_seconds_to_index(window_size_in_seconds[1]) ]
         #Plot the area vs the time of each event
         pl.clf()
         ymax = 1.1*np.max(areas) + 0.1
@@ -616,7 +619,6 @@ class FiberAnalyze( object ):
         Return the maximum fluorescence value found between
         start_time and end_time (in seconds)
         """
-
         start_time_index = self.convert_seconds_to_index(start_time)
         end_time_index = self.convert_seconds_to_index(end_time)
         return np.max(self.fluor_data[start_time_index : end_time_index])
@@ -754,6 +756,7 @@ def test_FiberAnalyze(options):
    # FA.plot_peritrigger_edge(window_size=[200,735],out_path = options.output_path)
        ### 485 corresponds to 2s
 
+    FA.plot_peritrigger_edge(window_size_in_seconds=[1, 3],out_path = options.output_path)
     FA.plot_area_under_curve_wrapper( window_size_in_seconds=[0, 3], edge="rising", normalize=False, out_path = options.output_path)
     #FA.plot_peaks_vs_time(out_path = options.output_path)
 
