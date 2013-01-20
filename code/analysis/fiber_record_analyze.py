@@ -1,4 +1,5 @@
 import os,sys
+import h5py
 import numpy as np
 import scipy as sp
 import pylab as pl
@@ -7,7 +8,6 @@ import scipy.signal as signal
 from scipy.stats import ranksums
 from scipy.interpolate import UnivariateSpline
 import tkFileDialog
-
 
 #from wavelet import *
 #-----------------------------------------------------------------------------------------
@@ -35,6 +35,8 @@ class FiberAnalyze( object ):
             self.trigger_path = options.trigger_path
 
         self.save_txt = options.save_txt
+        self.save_to_h5 = options.save_to_h5
+        self.save_and_exit = options.save_and_exit
         
         if self.trigger_path is not None:
             self.s_file = options.trigger_path + '_s.npz'
@@ -111,7 +113,12 @@ class FiberAnalyze( object ):
         self.fft = None #place holder for fft of rawsignal, if calculated
         self.fft_freq = None #place holder for frequency labels of fft
         self.filt_fluor_data = None #place holder for filtered rawsignal, if calculated
-        print "finished loading data"
+        print "\t--> Finished loading data."
+
+        if self.save_txt:
+            self.save_time_series(self.output_path)
+        if self.save_to_h5 is not None:
+            self.save_time_series(self.output_path, output_type="h5", h5_filename=self.save_to_h5)
 
     def load_trigger_data( self, s_filename, e_filename ):
         """
@@ -149,17 +156,13 @@ class FiberAnalyze( object ):
            # pl.savefig(os.path.join(out_path,"basic_time_series.pdf"))
             pl.savefig(out_path + "basic_time_series.pdf")
 
-
-
-        if self.save_txt:
-            self.savetxt_time_series(self.output_path)
-
-    def savetxt_time_series( self, save_path='.' ):
+    def save_time_series( self, save_path='.', output_type="txt", h5_filename=None ):
         """
         Save the raw calcium time series, with triggers corresponding to events
         (e.g. licking times for sucrose, approach/interaction times for novel object
-        and social) in the same time frame of reference, outputting a txt file
-        for analysis in, for example, R. 
+        and social) in the same time frame of reference, outputting either
+          -- a txt file, if ouput_type is txt
+          -- write to an hdf5 file specified by self.save_to_h5 is output_type is h5
         """
         # get appropriate time values 
         time_vals = self.time_stamps[range(len(self.fluor_data))]
@@ -174,11 +177,63 @@ class FiberAnalyze( object ):
         prefix=self.input_path.split("/")[-1].split(".")[0]
         outfile_name = prefix+"_tseries.txt"
         out_path = os.path.join(save_path,outfile_name)
-        
-        print "Saving to file:", out_path
-        np.savetxt(os.path.join(out_path), out_arr)
-        sys.exit(0)
 
+        if output_type == "txt":
+            print "Saving to file:", out_path
+            np.savetxt(os.path.join(out_path), out_arr)
+            if self.save_and_exit:
+                sys.exit(0)
+            
+        elif output_type == "h5":
+            print "\t--> Writing to HDF5 file", self.save_to_h5
+            # check if specified h5 file already exists
+            h5_exists = os.path.isfile(self.save_to_h5)
+            try:
+                if h5_exists:
+                    # write to existing h5 file
+                    h5_file = h5py.File(self.save_to_h5)
+                    print "\t--> Writing to exising  HDF5 file:", self.save_to_h5
+                else:
+                    # create new h5 file
+                    h5_file = h5py.File(self.save_to_h5,'w')
+                    print "\t--> Created new HDF5 file:", self.save_to_h5
+            except Exception, e:
+                print "Unable to open HDF5 file", self.save_to_h5, "due to error:"
+                print e
+
+            # save output array to folder in h5 file creating a data set named after the subject number
+            # with columns corresponding to time, triggers, and fluorescence data, respectively.
+
+            # group by animal number, subgroup by date, subsubgroup by run type
+            if prefix.split("-")[3] not in list(h5_file):
+                print "\t---> Creating group:", prefix.split("-")[3]
+                subject_num= h5_file.create_group(prefix.split("-")[3])
+            else:
+                print "\t---> Loading group:", prefix.split("-")[3]
+                subject_num = h5_file[prefix.split("-")[3]]
+                
+            if prefix.split("-")[0] not in list(subject_num):
+                print "\t---> Creating subgroup:", prefix.split("-")[0]
+                date = subject_num.create_group(prefix.split("-")[0])
+            else:
+                print "\t---> Loading subgroup:", prefix.split("-")[0]
+                date = subject_num[prefix.split("-")[0]]
+            try:
+                print "\t---> Creating subsubgroup:", prefix.split("-")[2]
+                run_type = date.create_group(prefix.split("-")[2])
+                dset = run_type.create_dataset("time_series_arr", data=out_arr)
+                dset.attrs["time_series_arr_names"] = ("time_stamp", "trigger_data", "fluor_data")
+                dset.attrs["original_file_name"] = prefix
+            except Exception, e:
+                print "Unable to write data array due to error:", e
+                
+            h5_file.close() # close the file
+            
+            if self.save_and_exit:
+                sys.exit(0)
+        else:
+            raise NotImplemented("The entered output_type has not been implemented.")
+                
     def event_vs_baseline_barplot( self, out_path=None ):
         """
         Make a simple barplot of intensity during coded events vs during non-event times.
@@ -447,8 +502,6 @@ class FiberAnalyze( object ):
             print "No event times loaded. Cannot find edges."        
             return -1
 
-
-
     def debleach( self ):
         """
         Remove trend from data due to photobleaching.
@@ -671,8 +724,12 @@ if __name__ == "__main__":
                       help="Should the time series be smoothed, and how much.")
     parser.add_option('-x', "--selectfiles", default = False, dest = "selectfiles",
                        help="Should you select filepaths in a pop window instead of in the command line.")
-    parser.add_option("", "--save-txt", action="store_true", default=True, dest="save_txt",
-                      help="Save data matrix to text file.")
+    parser.add_option("", "--save-txt", action="store_true", default=False, dest="save_txt",
+                      help="Save data matrix out to a text file.")
+    parser.add_option("", "--save-to-h5", default=None, dest="save_to_h5",
+                      help="Save data matrix to a dataset in an hdf5 file.")
+    parser.add_option("", "--save-and-exit", action="store_true", default=False, dest="save_and_exit",
+                      help="Exit immediately after saving data out.")
 
     (options, args) = parser.parse_args()
     
