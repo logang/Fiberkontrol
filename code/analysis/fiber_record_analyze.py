@@ -650,7 +650,7 @@ class FiberAnalyze( object ):
             pl.plot(start_times, peaks, 'o')
             pl.xlabel('Time [s]')
             pl.ylabel('Fluorescence [dF/F]')
-            pl.title('Peak fluorescence of interaction event vs. event start time', w)
+            pl.title('Peak fluorescence of interaction event vs. event start time')
 
             if out_path is None:
                 pl.title("No output path given")
@@ -755,7 +755,7 @@ def test_FiberAnalyze(options):
 
     FA.plot_peritrigger_edge(window_size=[1, 3],out_path = options.output_path)
     FA.plot_area_under_curve_wrapper( window_size=[0, 3], edge="rising", normalize=False, out_path = options.output_path)
-    #FA.plot_peaks_vs_time(out_path = options.output_path)
+    FA.plot_peaks_vs_time(out_path = options.output_path)
 
     #peak_inds, peak_vals, peak_times = FA.get_peaks()
     #FA.plot_peak_data()
