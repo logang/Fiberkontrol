@@ -336,6 +336,8 @@ class FiberAnalyze( object ):
         x = self.time_stamps[0:time_arr.shape[0]]-self.time_stamps[window_size[0]]
         ymax = np.max(time_arr)
         ymax += 0.1*ymax
+        ymin = np.min(time_arr)
+        ymin -= 0.1*ymin
         for i in xrange(time_arr.shape[1]):
             ax.plot(x, time_arr[:,i], color=pl.cm.winter(255-255*i/time_arr.shape[1]), alpha=0.75, linewidth=1)
             x.shape = (len(x),1) 
@@ -343,7 +345,8 @@ class FiberAnalyze( object ):
             time_vec = time_arr[:,i]; time_vec.shape = (len(time_vec),1)
             time_vec_padded = np.vstack([0, time_vec,0]) 
             pl.fill(x_padded, time_vec_padded, facecolor=pl.cm.winter(255-255*i/time_arr.shape[1]), alpha=0.25 )            
-            pl.ylim([0,ymax])
+            #pl.ylim([0,ymax])
+            pl.ylim([ymin, ymax])
             
         # add a line for the event onset time
         pl.axvline(x=0,color='black',linewidth=1,linestyle='--')
@@ -429,7 +432,7 @@ class FiberAnalyze( object ):
         """
         pass
 
-    def plot_area_under_curve( self, event_times, window_size, out_path=None):
+    def plot_area_under_curve( self, event_times, end_times, window_size, normalize=True, out_path=None):
         """
         Plots of area under curve for each event_time 
         with before and after event durationsspecified in window_size as 
@@ -438,9 +441,9 @@ class FiberAnalyze( object ):
         we need to discuss how to choose this well...
         """
         
-        normalize = True  #change this depending on whether you wish to divide (normalize)
-                          # by the maximum fluorescence value in the window following
-                          # each event
+        #change the normalization depending on whether you wish to divide (normalize)
+        # by the maximum fluorescence value in the window following
+        # each event
 
         #Calculate the area underneath the signal at each event
         time_chunks = self.get_time_chunks_around_events(event_times, window_size)
@@ -450,16 +453,19 @@ class FiberAnalyze( object ):
                 if max(chunk) < 0.01: 
                     areas.append(sum(chunk)/len(chunk)/0.01)
                 else:
-                    areas.append(sum(chunk)/len(chunk)/max(chunk))
+                    #areas.append(sum(chunk)/len(chunk)/max(chunk))
+                    areas.append(sum(chunk)/len(chunk)/(max(abs(chunk))))
             else: 
                 areas.append(sum(chunk)/len(chunk))
             
 
         #Plot the area vs the time of each event
         pl.clf()
-        ymax = 1.1*np.max(areas)
+        ymax = 1.1*np.max(areas) + 0.1
+        ymin = 1.1*np.min(areas) - 0.1
         pl.stem( event_times, areas, linefmt='k-', markerfmt='ko', basefmt='k-')
-        pl.ylim([0,ymax])
+#        pl.ylim([0,ymax])
+        pl.ylim([ymin,ymax])
         pl.xlim([0, np.max(self.time_stamps)])
 
         print 'self.time_stamps[window_size[1]] ', self.time_stamps[window_size[1]]  
@@ -482,27 +488,26 @@ class FiberAnalyze( object ):
         else:
            # pl.savefig(os.path.join(out_path,"plot_area_under_curve.pdf"))
             if normalize:
-                pl.savefig(out_path + "plot_area_under_curve_normal.pdf")
-                np.savez(out_path + "normalized_area_under_peaks_" + str(int(10*self.time_stamps[window_size[1]])) + "s.npz", areas=areas, event_times=event_times, window_size=self.time_stamps[window_size[1]])
-
+                pl.savefig(out_path + "plot_area_under_curve_normal" + str(int(10*self.time_stamps[window_size[1]])) + "s.pdf")
+                np.savez(out_path + "normalized_area_under_peaks_" + str(int(10*self.time_stamps[window_size[1]])) + "s.npz", scores=areas, event_times=event_times, end_times=end_times, window_size=self.time_stamps[window_size[1]])
+                # Assume not using windows longer than a few seconds. Thus save the file so as to display one decimal point
             else:
-                pl.savefig(out_path + "plot_area_under_curve_non_normal.pdf")
-                np.savez(out_path + "non-normalized_area_under_peaks_" + str(int(10*self.time_stamps[window_size[1]]))+ "s.npz", areas=areas, event_times=event_times, window_size=self.time_stamps[window_size[1]])
+                pl.savefig(out_path + "plot_area_under_curve_non_normal" + str(int(10*self.time_stamps[window_size[1]])) + "s.pdf")
+                np.savez(out_path + "non-normalized_area_under_peaks_" + str(int(10*self.time_stamps[window_size[1]]))+ "s.npz", scores=areas, event_times=event_times, end_times=end_times, window_size=self.time_stamps[window_size[1]])
 
 
 
-
-
-    def plot_area_under_curve_wrapper( self, window_size, edge="rising", out_path=None):
+    def plot_area_under_curve_wrapper( self, window_size, edge="rising", normalize=True, out_path=None):
         """
         Wrapper for plot_area_under_curve vs. time plots specialized for
         loaded event data that comes as a list of pairs of
         event start and end times.
         """
 
-        event_times = self.get_event_times(edge)
+        event_times = self.get_event_times("rising")
+        end_times = self.get_event_times("falling")
         if event_times != -1:
-            self.plot_area_under_curve( event_times, window_size, out_path=out_path )
+            self.plot_area_under_curve( event_times, end_times, window_size, normalize, out_path=out_path )
         else:
             print "No event times loaded. Cannot plot perievent."  
 
@@ -600,13 +605,17 @@ def test_FiberAnalyze(options):
     #FA.plot_basic_tseries(out_path = options.output_path)
 #    FA.event_vs_baseline_barplot(out_path = options.output_path)
     #FA.plot_peritrigger_edge(window_size=[100,600],out_path = options.output_path)
-    FA.plot_area_under_curve_wrapper( window_size=[0, 485], edge="rising", out_path = options.output_path)
+    FA.plot_peritrigger_edge(window_size=[200,735],out_path = options.output_path)
+    #FA.plot_area_under_curve_wrapper( window_size=[0, 485], edge="rising", out_path = options.output_path)
+    FA.plot_area_under_curve_wrapper( window_size=[0, 735], edge="rising", normalize=True, out_path = options.output_path)
+  #  FA.plot_area_under_curve_wrapper( window_size=[0, 223], edge="rising", normalize=True, out_path = options.output_path)
+    FA.plot_area_under_curve_wrapper( window_size=[0, 735], edge="rising", normalize=False, out_path = options.output_path)
     ### 485 corresponds to 2s
 
     #peak_inds, peak_vals, peak_times = FA.get_peaks()
     #FA.plot_peak_data()
 
-    1/0
+
 
 #-----------------------------------------------------------------------------------------
 
