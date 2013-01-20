@@ -234,8 +234,57 @@ class FiberAnalyze( object ):
             if self.save_and_exit:
                 sys.exit(0)
         else:
-            raise NotImplemented("The entered output_type has not been implemented.")
-                
+            raise NotImplemented("The entered output_type has not been implemented.")                
+
+    def next_event_vs_intensity( self, intensity_measure="peak", next_event_measure="onset"):
+        """
+        Generate a plot of next event onset delay (onset) or event length (length) as a function
+        of an intensity measure that can be one of
+          -- peak intensity of last event (peak)
+          -- integrated intensity of last event (integrated)
+          -- integrated intensity over history window (window)
+        """
+        # !!! UNDER CONSTRUCTION !!!
+        # get intensity values
+        if intensity_measure == "peak":
+            intensity = self.get_peaks()
+        elif intensity_measure == "integrated":
+            intensity = self.get_AUC()
+        elif intensity_measure == "window":
+            intensity = self.get_windowed_AUC()
+        else:
+            raise ValueError("Entered intensity_measure not implemented.")
+
+        # get next event values
+        if next_event_measure == "onset":
+            self.next_vals = self.get_next_onsets()
+        elif next_event_measure == "length":
+            self.next_vals = self.get_next_length()
+        else:
+            raise ValueError("Entered next_event_measure not implemented.")
+
+        #Plot the area vs the time of each event
+        pl.clf()
+        ymax = 1.1*np.max(areas) + 0.1
+        ymin = 1.1*np.min(areas) - 0.1
+        pl.stem( event_times, areas, linefmt='k-', markerfmt='ko', basefmt='k-')
+#        pl.ylim([0,ymax])
+        pl.ylim([ymin,ymax])
+        pl.xlim([0, np.max(self.time_stamps)])
+
+
+                pl.ylabel('Sharpness of peak: ' r'$\frac{\sum\delta F/F}{\max(peak)}}$' + ' with window of ' + "{0:.2f}".format(self.time_stamps[window_size[1]]) + ' s')
+
+        pl.xlabel('Time in trial (seconds)')
+        pl.title(out_path)
+
+        if out_path is None:
+            pl.show()
+        else:
+           pl.savefig(os.path.join(out_path,"next_event_vs_intensity.pdf"))
+           # !!! UNDER CONSTRUCTION !!!
+
+
     def event_vs_baseline_barplot( self, out_path=None ):
         """
         Make a simple barplot of intensity during coded events vs during non-event times.
