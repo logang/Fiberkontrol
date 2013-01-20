@@ -134,9 +134,10 @@ class FiberAnalyze( object ):
 
         # make filled blocks for trigger onset/offset
         ymax = 1.1*np.max(self.fluor_data)
+        ymin = 1.1*np.min(self.fluor_data)
         pl.fill( time_vals, self.trigger_data, facecolor='r', alpha=0.5 )
         pl.plot( time_vals, self.fluor_data, 'k-')
-        pl.ylim([0,ymax])
+        pl.ylim([ymin,ymax])
         if self.fluor_normalization == "deltaF":
             pl.ylabel(r'$\delta F/F$')
         else:
@@ -428,7 +429,7 @@ class FiberAnalyze( object ):
 
     def get_event_times( self, edge="rising"):
         """
-        Extracts a list of the times corresponding to
+        Extracts a list of the times (in seconds) corresponding to
         interaction events to be time-locked with the signal
         specialized for loaded event data that comes as a list of 
         pairs of event start and end times.
@@ -447,8 +448,11 @@ class FiberAnalyze( object ):
             print "No event times loaded. Cannot find edges."        
             return -1
 
+    def convert_seconds_to_index( self, time_in_seconds):
+        return np.where( self.time_stamps >= time_in_seconds)[0][0]
 
-    def plot_area_under_curve( self, event_times, end_times, window_size, normalize=True, out_path=None):
+
+    def plot_area_under_curve( self, start_times, end_times, window_size_in_seconds, normalize=True, out_path=None):
         """
         Plots of area under curve for each event_time 
         with before and after event durationsspecified in window_size as 
@@ -461,8 +465,14 @@ class FiberAnalyze( object ):
         # by the maximum fluorescence value in the window following
         # each event
 
+        window_size = [ self.convert_seconds_to_index(window_size_in_seconds[0]),
+                        self.convert_seconds_to_index(window_size_in_seconds[1]) ]
+
+        print "window_size", window_size
+
         #Calculate the area underneath the signal at each event
-        time_chunks = self.get_time_chunks_around_events(event_times, window_size)
+        time_chunks = self.get_time_chunks_around_events(start_times, window_size)
+        
         areas = []
         for chunk in time_chunks:
             if normalize:
@@ -478,7 +488,7 @@ class FiberAnalyze( object ):
         pl.clf()
         ymax = 1.1*np.max(areas) + 0.1
         ymin = 1.1*np.min(areas) - 0.1
-        pl.stem( event_times, areas, linefmt='k-', markerfmt='ko', basefmt='k-')
+        pl.stem( start_times, areas, linefmt='k-', markerfmt='ko', basefmt='k-')
 #        pl.ylim([0,ymax])
         pl.ylim([ymin,ymax])
         pl.xlim([0, np.max(self.time_stamps)])
@@ -499,42 +509,72 @@ class FiberAnalyze( object ):
         print "self.time_stamps[window_size]", self.time_stamps[window_size[1]]
 
         if out_path is None:
+            pl.title("No output path given")
             pl.show()
         else:
             if normalize:
                 pl.savefig(out_path + "plot_area_under_curve_normal" + str(int(10*self.time_stamps[window_size[1]])) + "s.pdf")
-                np.savez(out_path + "normalized_area_under_peaks_" + str(int(10*self.time_stamps[window_size[1]])) + "s.npz", scores=areas, event_times=event_times, end_times=end_times, window_size=self.time_stamps[window_size[1]])
+                np.savez(out_path + "normalized_area_under_peaks_" + str(int(10*self.time_stamps[window_size[1]])) + "s.npz", scores=areas, event_times=start_times, end_times=end_times, window_size=self.time_stamps[window_size[1]])
                 # Assume not using windows longer than a few seconds. Thus save the file so as to display one decimal point
             else:
                 pl.savefig(out_path + "plot_area_under_curve_non_normal" + str(int(10*self.time_stamps[window_size[1]])) + "s.pdf")
-                np.savez(out_path + "non-normalized_area_under_peaks_" + str(int(10*self.time_stamps[window_size[1]]))+ "s.npz", scores=areas, event_times=event_times, end_times=end_times, window_size=self.time_stamps[window_size[1]])
+                np.savez(out_path + "non-normalized_area_under_peaks_" + str(int(10*self.time_stamps[window_size[1]]))+ "s.npz", scores=areas, event_times=start_times, end_times=end_times, window_size=self.time_stamps[window_size[1]])
 
 
-
-    def plot_area_under_curve_wrapper( self, window_size, edge="rising", normalize=True, out_path=None):
+    def plot_area_under_curve_wrapper( self, window_size_in_seconds, edge="rising", normalize=True, out_path=None):
         """
         Wrapper for plot_area_under_curve vs. time plots specialized for
         loaded event data that comes as a list of pairs of
         event start and end times.
+
         """
 
-        event_times = self.get_event_times("rising")
+        start_times = self.get_event_times("rising")
         end_times = self.get_event_times("falling")
-        if event_times != -1:
-            self.plot_area_under_curve( event_times, end_times, window_size, normalize, out_path=out_path )
+        if start_times != -1:
+            self.plot_area_under_curve( start_times, end_times, window_size_in_seconds, normalize, out_path=out_path )
         else:
             print "No event times loaded. Cannot plot perievent."  
 
-    def plot_peaks_vs_time( self ):
+
+    def get_peak( self, start_time, end_time ):
+        """
+        Return the maximum fluorescence value found between
+        start_time and end_time (in seconds)
+        """
+
+        start_time_index = self.convert_seconds_to_index(start_time)
+        end_time_index = self.convert_seconds_to_index(end_time)
+        return np.max(self.fluor_data[start_time_index : end_time_index])
+
+
+    def plot_peaks_vs_time( self, out_path=None ):
         """
         Plot the maximum fluorescence value within each interaction bout vs the start time
         of the bout
         """
 
-        pass
+        start_times = self.get_event_times("rising")
+        end_times = self.get_event_times("falling")
+        if start_times != -1:
 
+            peaks = np.zeros(len(start_times))
+            for i in range(len(start_times)):
+                peak = self.get_peak(start_times[i], end_times[i])
+                peaks[i] = peak
 
+            pl.plot(start_times, peaks, 'o')
+            pl.xlabel('Time [s]')
+            pl.ylabel('Fluorescence [dF/F]')
+            pl.title('Peak fluorescence of interaction event vs. event start time')
 
+            if out_path is None:
+                pl.title("No output path given")
+                pl.show()
+            else:
+                pl.savefig(out_path + "plot_peaks_vs_time.pdf")
+        else:
+            print "No event times loaded. Cannot plot peaks_vs_time."  
 
 
     def wavelet_plot( self ):
@@ -625,16 +665,19 @@ def test_FiberAnalyze(options):
 #    FA.wavelet_plot()
 #    FA.notch_filter(10.0, 10.3)
     #FA.plot_periodogram(plot_type="log",out_path = options.output_path)
-    #FA.plot_basic_tseries(out_path = options.output_path)
+    FA.plot_basic_tseries(out_path = options.output_path)
 #    FA.event_vs_baseline_barplot(out_path = options.output_path)
 
     #FA.plot_peritrigger_edge(window_size=[100,600],out_path = options.output_path)
-    FA.plot_peritrigger_edge(window_size=[200,735],out_path = options.output_path)
+   # FA.plot_peritrigger_edge(window_size=[200,735],out_path = options.output_path)
     #FA.plot_area_under_curve_wrapper( window_size=[0, 485], edge="rising", out_path = options.output_path)
-    FA.plot_area_under_curve_wrapper( window_size=[0, 735], edge="rising", normalize=True, out_path = options.output_path)
+    #FA.plot_area_under_curve_wrapper( window_size=[0, 735], edge="rising", normalize=True, out_path = options.output_path)
   #  FA.plot_area_under_curve_wrapper( window_size=[0, 223], edge="rising", normalize=True, out_path = options.output_path)
-    FA.plot_area_under_curve_wrapper( window_size=[0, 735], edge="rising", normalize=False, out_path = options.output_path)
+   # FA.plot_area_under_curve_wrapper( window_size=[0, 735], edge="rising", normalize=False, out_path = options.output_path)
+  
+   # FA.plot_area_under_curve_wrapper( window_size=[0, 3], edge="rising", normalize=False, out_path = options.output_path)
     ### 485 corresponds to 2s
+  #  FA.plot_peaks_vs_time(out_path = options.output_path)
 
     #peak_inds, peak_vals, peak_times = FA.get_peaks()
     #FA.plot_peak_data()
