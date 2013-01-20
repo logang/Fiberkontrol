@@ -386,15 +386,15 @@ class FiberAnalyze( object ):
             pl.savefig(out_path + "peak_finding.pdf")
 
 
-    def get_time_chunks_around_events(self, event_times, window_size_in_seconds):
+    def get_time_chunks_around_events(self, event_times, window_size):
         """
         Extracts chunks of fluorescence data around each event in 
         event_times, with before and after event durations
-        specified in window_size_in_seconds as [before, after] (in seconds).
+        specified in window_size as [before, after] (in seconds).
         """
 
-        window_indices = [self.convert_seconds_to_index( window_size_in_seconds[0]),
-                          self.convert_seconds_to_index( window_size_in_seconds[1])]
+        window_indices = [self.convert_seconds_to_index( window_size[0]),
+                          self.convert_seconds_to_index( window_size[1])]
 
         time_chunks = []
         for e in event_times:
@@ -408,7 +408,7 @@ class FiberAnalyze( object ):
         return time_chunks
 
 
-    def plot_perievent_hist( self, event_times, window_size_in_seconds, out_path=None ):
+    def plot_perievent_hist( self, event_times, window_size, out_path=None ):
         """
         Peri-event time histogram for given event times.
         Plots the time series and their median over a time window around
@@ -421,10 +421,10 @@ class FiberAnalyze( object ):
         ax = fig.add_subplot(111)
 
         # get blocks of time series for window around each event time
-        time_chunks = self.get_time_chunks_around_events(event_times, window_size_in_seconds)
+        time_chunks = self.get_time_chunks_around_events(event_times, window_size)
 
-        window_indices = [ self.convert_seconds_to_index(window_size_in_seconds[0]),
-                           self.convert_seconds_to_index(window_size_in_seconds[1]) ]
+        window_indices = [ self.convert_seconds_to_index(window_size[0]),
+                           self.convert_seconds_to_index(window_size[1]) ]
 
         # plot each time window, colored by order
         time_arr = np.asarray(time_chunks).T
@@ -462,7 +462,7 @@ class FiberAnalyze( object ):
             pl.savefig(out_path + "perievent_tseries.pdf")
 
 
-    def plot_peritrigger_edge( self, window_size_in_seconds, edge="rising", out_path=None ):
+    def plot_peritrigger_edge( self, window_size, edge="rising", out_path=None ):
         """
         Wrapper for plot_perievent histograms specialized for
         loaded event data that comes as a list of pairs of
@@ -470,7 +470,7 @@ class FiberAnalyze( object ):
         """
         event_times = self.get_event_times(edge)
         if event_times != -1:
-            self.plot_perievent_hist( event_times, window_size_in_seconds, out_path=out_path )
+            self.plot_perievent_hist( event_times, window_size, out_path=out_path )
         else:
             print "No event times loaded. Cannot plot perievent."        
 
@@ -549,7 +549,7 @@ class FiberAnalyze( object ):
         return areas
             
 
-    def plot_area_under_curve( self, start_times, end_times, window_size_in_seconds, normalize=False, out_path=None):
+    def plot_area_under_curve( self, start_times, end_times, window_size, normalize=False, out_path=None):
         """
         Plots of area under curve for each event_time 
         with before and after event durationsspecified in window_size as 
@@ -562,11 +562,11 @@ class FiberAnalyze( object ):
         # by the maximum fluorescence value in the window following
         # each event
 
-        areas = self.get_areas_under_curve(start_times, window_size_in_seconds)
+        areas = self.get_areas_under_curve(start_times, window_size)
 
 
-        window_indices = [ self.convert_seconds_to_index(window_size_in_seconds[0]),
-                           self.convert_seconds_to_index(window_size_in_seconds[1]) ]
+        window_indices = [ self.convert_seconds_to_index(window_size[0]),
+                           self.convert_seconds_to_index(window_size[1]) ]
         #Plot the area vs the time of each event
         pl.clf()
         ymax = 1.1*np.max(areas) + 0.1
@@ -592,14 +592,14 @@ class FiberAnalyze( object ):
         else:
             if normalize:
                 pl.savefig(out_path + "plot_area_under_curve_normal" + str(int(10*self.time_stamps[window_indices[1]])) + "s.pdf")
-                np.savez(out_path + "normalized_area_under_peaks_" + str(int(10*self.time_stamps[window_indices[1]])) + "s.npz", scores=areas, event_times=start_times, end_times=end_times, window_size=self.time_stamps[window_size[1]])
+                np.savez(out_path + "normalized_area_under_peaks_" + str(int(10*self.time_stamps[window_indices[1]])) + "s.npz", scores=areas, event_times=start_times, end_times=end_times, window_size=self.time_stamps[window_indices[1]])
                 # Assume not using windows longer than a few seconds. Thus save the file so as to display one decimal point
             else:
                 pl.savefig(out_path + "plot_area_under_curve_non_normal" + str(int(10*self.time_stamps[window_indices[1]])) + "s.pdf")
-                np.savez(out_path + "non-normalized_area_under_peaks_" + str(int(10*self.time_stamps[window_indices[1]]))+ "s.npz", scores=areas, event_times=start_times, end_times=end_times, window_size=self.time_stamps[window_size[1]])
+                np.savez(out_path + "non-normalized_area_under_peaks_" + str(int(10*self.time_stamps[window_indices[1]]))+ "s.npz", scores=areas, event_times=start_times, end_times=end_times, window_size=self.time_stamps[window_indices[1]])
 
 
-    def plot_area_under_curve_wrapper( self, window_size_in_seconds, edge="rising", normalize=True, out_path=None):
+    def plot_area_under_curve_wrapper( self, window_size, edge="rising", normalize=True, out_path=None):
         """
         Wrapper for plot_area_under_curve vs. time plots specialized for
         loaded event data that comes as a list of pairs of
@@ -609,7 +609,7 @@ class FiberAnalyze( object ):
         start_times = self.get_event_times("rising")
         end_times = self.get_event_times("falling")
         if start_times != -1:
-            self.plot_area_under_curve( start_times, end_times, window_size_in_seconds, normalize, out_path=out_path )
+            self.plot_area_under_curve( start_times, end_times, window_size, normalize, out_path=out_path )
         else:
             print "No event times loaded. Cannot plot perievent."  
 
@@ -731,7 +731,8 @@ class FiberAnalyze( object ):
 
 #-----------------------------------------------------------------------------------------
 
-def get_event_window( event_ts, window_size = 1000 ):
+def get_event_window( event_ts):
+
     on_side = np.where(event_ts > 1)[0]
     diff = np.diff(event_ts)
     enter_event = np.where(diff > 1)[0]
@@ -752,12 +753,8 @@ def test_FiberAnalyze(options):
    # FA.plot_basic_tseries(out_path = options.output_path)
 #    FA.event_vs_baseline_barplot(out_path = options.output_path)
 
-    #FA.plot_peritrigger_edge(window_size=[100,600],out_path = options.output_path)
-   # FA.plot_peritrigger_edge(window_size=[200,735],out_path = options.output_path)
-       ### 485 corresponds to 2s
-
-    FA.plot_peritrigger_edge(window_size_in_seconds=[1, 3],out_path = options.output_path)
-    FA.plot_area_under_curve_wrapper( window_size_in_seconds=[0, 3], edge="rising", normalize=False, out_path = options.output_path)
+    FA.plot_peritrigger_edge(window_size=[1, 3],out_path = options.output_path)
+    FA.plot_area_under_curve_wrapper( window_size=[0, 3], edge="rising", normalize=False, out_path = options.output_path)
     #FA.plot_peaks_vs_time(out_path = options.output_path)
 
     #peak_inds, peak_vals, peak_times = FA.get_peaks()
