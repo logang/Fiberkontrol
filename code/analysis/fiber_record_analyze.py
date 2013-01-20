@@ -23,6 +23,7 @@ class FiberAnalyze( object ):
         self.plot_type = options.plot_type
         self.time_range = options.time_range
         self.fluor_normalization = options.fluor_normalization
+
         if options.selectfiles:
             self.input_path = tkFileDialog.askopenfilename()
             self.output_path = self.input_path[:-4] + '_out'
@@ -32,6 +33,8 @@ class FiberAnalyze( object ):
             self.output_path = options.output_path
             print self.output_path
             self.trigger_path = options.trigger_path
+
+        self.save_txt = options.save_txt
         
         if self.trigger_path is not None:
             self.s_file = options.trigger_path + '_s.npz'
@@ -129,7 +132,7 @@ class FiberAnalyze( object ):
         # get appropriate time values for x-axis
         time_vals = self.time_stamps[range(len(self.fluor_data))]
 
-        # make filled blocks for
+        # make filled blocks for trigger onset/offset
         ymax = 1.1*np.max(self.fluor_data)
         pl.fill( time_vals, self.trigger_data, facecolor='r', alpha=0.5 )
         pl.plot( time_vals, self.fluor_data, 'k-')
@@ -141,11 +144,40 @@ class FiberAnalyze( object ):
         pl.xlabel('Time since recording onset (seconds)')
         if out_path is None:
             pl.show()
+            out_path = '.'
         else:
            # pl.savefig(os.path.join(out_path,"basic_time_series.pdf"))
             pl.savefig(out_path + "basic_time_series.pdf")
 
 
+
+        if self.save_txt:
+            self.savetxt_time_series(self.output_path)
+
+    def savetxt_time_series( self, save_path='.' ):
+        """
+        Save the raw calcium time series, with triggers corresponding to events
+        (e.g. licking times for sucrose, approach/interaction times for novel object
+        and social) in the same time frame of reference, outputting a txt file
+        for analysis in, for example, R. 
+        """
+        # get appropriate time values 
+        time_vals = self.time_stamps[range(len(self.fluor_data))]
+
+        # make output array
+        out_arr = np.zeros((len(time_vals),3))
+        out_arr[:,0] = time_vals
+        out_arr[:,1] = self.trigger_data
+        out_arr[:,2] = self.fluor_data
+
+        # get data prefix
+        prefix=self.input_path.split("/")[-1].split(".")[0]
+        outfile_name = prefix+"_tseries.txt"
+        out_path = os.path.join(save_path,outfile_name)
+        
+        print "Saving to file:", out_path
+        np.savetxt(os.path.join(out_path), out_arr)
+        sys.exit(0)
 
     def event_vs_baseline_barplot( self, out_path=None ):
         """
@@ -581,7 +613,6 @@ class FiberAnalyze( object ):
 
         pl.show()
 
-
 #-----------------------------------------------------------------------------------------
 
 def get_event_window( event_ts, window_size = 1000 ):
@@ -604,6 +635,7 @@ def test_FiberAnalyze(options):
     #FA.plot_periodogram(plot_type="log",out_path = options.output_path)
     #FA.plot_basic_tseries(out_path = options.output_path)
 #    FA.event_vs_baseline_barplot(out_path = options.output_path)
+
     #FA.plot_peritrigger_edge(window_size=[100,600],out_path = options.output_path)
     FA.plot_peritrigger_edge(window_size=[200,735],out_path = options.output_path)
     #FA.plot_area_under_curve_wrapper( window_size=[0, 485], edge="rising", out_path = options.output_path)
@@ -614,8 +646,6 @@ def test_FiberAnalyze(options):
 
     #peak_inds, peak_vals, peak_times = FA.get_peaks()
     #FA.plot_peak_data()
-
-
 
 #-----------------------------------------------------------------------------------------
 
@@ -641,6 +671,8 @@ if __name__ == "__main__":
                       help="Should the time series be smoothed, and how much.")
     parser.add_option('-x', "--selectfiles", default = False, dest = "selectfiles",
                        help="Should you select filepaths in a pop window instead of in the command line.")
+    parser.add_option("", "--save-txt", action="store_true", default=True, dest="save_txt",
+                      help="Save data matrix to text file.")
 
     (options, args) = parser.parse_args()
     
