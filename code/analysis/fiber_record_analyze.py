@@ -1,4 +1,5 @@
 import os,sys
+import h5py
 import numpy as np
 import scipy as sp
 import pylab as pl
@@ -7,7 +8,6 @@ import scipy.signal as signal
 from scipy.stats import ranksums
 from scipy.interpolate import UnivariateSpline
 import tkFileDialog
-
 
 #from wavelet import *
 #-----------------------------------------------------------------------------------------
@@ -35,6 +35,8 @@ class FiberAnalyze( object ):
             self.trigger_path = options.trigger_path
 
         self.save_txt = options.save_txt
+        self.save_to_h5 = options.save_to_h5
+        self.save_and_exit = options.save_and_exit
         
         if self.trigger_path is not None:
             self.s_file = options.trigger_path + '_s.npz'
@@ -111,7 +113,12 @@ class FiberAnalyze( object ):
         self.fft = None #place holder for fft of rawsignal, if calculated
         self.fft_freq = None #place holder for frequency labels of fft
         self.filt_fluor_data = None #place holder for filtered rawsignal, if calculated
-        print "finished loading data"
+        print "\t--> Finished loading data."
+
+        if self.save_txt:
+            self.save_time_series(self.output_path)
+        if self.save_to_h5 is not None:
+            self.save_time_series(self.output_path, output_type="h5", h5_filename=self.save_to_h5)
 
     def load_trigger_data( self, s_filename, e_filename ):
         """
@@ -151,17 +158,13 @@ class FiberAnalyze( object ):
             pl.savefig(out_path + "basic_time_series.pdf")
             pl.savefig(out_path + "basic_time_series.png")
 
-
-
-        if self.save_txt:
-            self.savetxt_time_series(self.output_path)
-
-    def savetxt_time_series( self, save_path='.' ):
+    def save_time_series( self, save_path='.', output_type="txt", h5_filename=None ):
         """
         Save the raw calcium time series, with triggers corresponding to events
         (e.g. licking times for sucrose, approach/interaction times for novel object
-        and social) in the same time frame of reference, outputting a txt file
-        for analysis in, for example, R. 
+        and social) in the same time frame of reference, outputting either
+          -- a txt file, if ouput_type is txt
+          -- write to an hdf5 file specified by self.save_to_h5 is output_type is h5
         """
         # get appropriate time values 
         time_vals = self.time_stamps[range(len(self.fluor_data))]
@@ -176,11 +179,63 @@ class FiberAnalyze( object ):
         prefix=self.input_path.split("/")[-1].split(".")[0]
         outfile_name = prefix+"_tseries.txt"
         out_path = os.path.join(save_path,outfile_name)
-        
-        print "Saving to file:", out_path
-        np.savetxt(os.path.join(out_path), out_arr)
-        sys.exit(0)
 
+        if output_type == "txt":
+            print "Saving to file:", out_path
+            np.savetxt(os.path.join(out_path), out_arr)
+            if self.save_and_exit:
+                sys.exit(0)
+            
+        elif output_type == "h5":
+            print "\t--> Writing to HDF5 file", self.save_to_h5
+            # check if specified h5 file already exists
+            h5_exists = os.path.isfile(self.save_to_h5)
+            try:
+                if h5_exists:
+                    # write to existing h5 file
+                    h5_file = h5py.File(self.save_to_h5)
+                    print "\t--> Writing to exising  HDF5 file:", self.save_to_h5
+                else:
+                    # create new h5 file
+                    h5_file = h5py.File(self.save_to_h5,'w')
+                    print "\t--> Created new HDF5 file:", self.save_to_h5
+            except Exception, e:
+                print "Unable to open HDF5 file", self.save_to_h5, "due to error:"
+                print e
+
+            # save output array to folder in h5 file creating a data set named after the subject number
+            # with columns corresponding to time, triggers, and fluorescence data, respectively.
+
+            # group by animal number, subgroup by date, subsubgroup by run type
+            if prefix.split("-")[3] not in list(h5_file):
+                print "\t---> Creating group:", prefix.split("-")[3]
+                subject_num= h5_file.create_group(prefix.split("-")[3])
+            else:
+                print "\t---> Loading group:", prefix.split("-")[3]
+                subject_num = h5_file[prefix.split("-")[3]]
+                
+            if prefix.split("-")[0] not in list(subject_num):
+                print "\t---> Creating subgroup:", prefix.split("-")[0]
+                date = subject_num.create_group(prefix.split("-")[0])
+            else:
+                print "\t---> Loading subgroup:", prefix.split("-")[0]
+                date = subject_num[prefix.split("-")[0]]
+            try:
+                print "\t---> Creating subsubgroup:", prefix.split("-")[2]
+                run_type = date.create_group(prefix.split("-")[2])
+                dset = run_type.create_dataset("time_series_arr", data=out_arr)
+                dset.attrs["time_series_arr_names"] = ("time_stamp", "trigger_data", "fluor_data")
+                dset.attrs["original_file_name"] = prefix
+            except Exception, e:
+                print "Unable to write data array due to error:", e
+                
+            h5_file.close() # close the file
+            
+            if self.save_and_exit:
+                sys.exit(0)
+        else:
+            raise NotImplemented("The entered output_type has not been implemented.")
+                
     def event_vs_baseline_barplot( self, out_path=None ):
         """
         Make a simple barplot of intensity during coded events vs during non-event times.
@@ -331,22 +386,25 @@ class FiberAnalyze( object ):
             pl.savefig(out_path + "peak_finding.pdf")
 
 
-    def get_time_chunks_around_events(self, event_times, window_size):
+    def get_time_chunks_around_events(self, event_times, window_size_in_seconds):
         """
         Extracts chunks of fluorescence data around each event in 
         event_times, with before and after event durations
-        specified in window_size as [before, after] (in seconds).
+        specified in window_size_in_seconds as [before, after] (in seconds).
         """
+
+        window_indices = [self.convert_seconds_to_index( window_size_in_seconds[0]),
+                       self.convert_seconds_to_index( window_size_in_seconds[1])]
 
         time_chunks = []
         for e in event_times:
             try:
                 e_idx = np.where(e<self.time_stamps)[0][0]
-                chunk = self.fluor_data[range((e_idx-window_size[0]),(e_idx+window_size[1]))]
-                #print [range((e_idx-window_size[0]),(e_idx+window_size[1]))]
+                chunk = self.fluor_data[range((e_idx-window_indices[0]),(e_idx+window_indices[1]))]
+                #print [range((e_idx-window_indices[0]),(e_idx+window_indices[1]))]
                 time_chunks.append(chunk)
             except:
-                print "Unable to extract window:", [(e-window_size[0]),(e+window_size[1])]
+                print "Unable to extract window:", [(e-window_indices[0]),(e+window_indices[1])]
         return time_chunks
 
 
@@ -451,8 +509,44 @@ class FiberAnalyze( object ):
     def convert_seconds_to_index( self, time_in_seconds):
         return np.where( self.time_stamps >= time_in_seconds)[0][0]
 
+    def debleach( self ):
+        """
+        Remove trend from data due to photobleaching.
+        Is this necessary?
+        """
+        pass
 
-    def plot_area_under_curve( self, start_times, end_times, window_size_in_seconds, normalize=True, out_path=None):
+    def plot_peak_statistics( self, peak_times, peak_vals ):
+        """
+        Plots showing statistics of calcium peak data.
+          --> Peak height as function of time since last peak
+          --> Histograms of peak times and vals
+        """
+        pass
+
+    def get_areas_under_curve( self, start_times, window_size, normalize=False):
+        """
+        Returns a vector of the area under the fluorescence curve within the provided
+        window [before, after] (in seconds), that surrounds each start_time.
+        Normalize determines whether to divide the area by the maximum fluorescence
+        value of the window
+        """
+        time_chunks = self.get_time_chunks_around_events(start_times, window_size)
+        
+        areas = []
+        for chunk in time_chunks:
+            if normalize:
+                if max(chunk) < 0.01: 
+                    areas.append(sum(chunk)/len(chunk)/0.01)
+                else:
+                    areas.append(sum(chunk)/len(chunk)/(max(abs(chunk))))
+            else: 
+                areas.append(sum(chunk)/len(chunk))
+
+        return areas
+            
+
+    def plot_area_under_curve( self, start_times, end_times, window_size_in_seconds, normalize=False, out_path=None):
         """
         Plots of area under curve for each event_time 
         with before and after event durationsspecified in window_size as 
@@ -465,68 +559,48 @@ class FiberAnalyze( object ):
         # by the maximum fluorescence value in the window following
         # each event
 
-        window_size = [ self.convert_seconds_to_index(window_size_in_seconds[0]),
-                        self.convert_seconds_to_index(window_size_in_seconds[1]) ]
+        areas = self.get_areas_under_curve(start_times, window_size_in_seconds)
 
-        print "window_size", window_size
-
-        #Calculate the area underneath the signal at each event
-        time_chunks = self.get_time_chunks_around_events(start_times, window_size)
+        window_indices = [ self.convert_seconds_to_index(window_size_in_seconds[0]),
+                self.convert_seconds_to_index(window_size_in_seconds[1]) ]
         
-        areas = []
-        for chunk in time_chunks:
-            if normalize:
-                if max(chunk) < 0.01: 
-                    areas.append(sum(chunk)/len(chunk)/0.01)
-                else:
-                    areas.append(sum(chunk)/len(chunk)/(max(abs(chunk))))
-            else: 
-                areas.append(sum(chunk)/len(chunk))
-            
-
         #Plot the area vs the time of each event
         pl.clf()
         ymax = 1.1*np.max(areas) + 0.1
         ymin = 1.1*np.min(areas) - 0.1
         pl.stem( start_times, areas, linefmt='k-', markerfmt='ko', basefmt='k-')
-#        pl.ylim([0,ymax])
+        pl.plot([0, start_times[-1]], [0, 0], 'k-')
         pl.ylim([ymin,ymax])
         pl.xlim([0, np.max(self.time_stamps)])
 
-        print 'self.time_stamps[window_size[1]] ', self.time_stamps[window_size[1]]  
         if self.fluor_normalization == "deltaF":
             if normalize:
-                pl.ylabel('Sharpness of peak: ' r'$\frac{\sum\delta F/F}{\max(peak)}}$' + ' with window of ' + "{0:.2f}".format(self.time_stamps[window_size[1]]) + ' s')
+                pl.ylabel('Sharpness of peak: ' r'$\frac{\sum\delta F/F}{\max(peak)}}$' + ' with window of ' + "{0:.2f}".format(self.time_stamps[window_indices[1]]) + ' s')
             else:
-                pl.ylabel('Sharpness of peak: ' r'$\sum\delta F/F}$' + ' with window of ' + "{0:.2f}".format(self.time_stamps[window_size[1]]) + ' s')
+                pl.ylabel('Sharpness of peak: ' r'$\sum\delta F/F}$' + ' with window of ' + "{0:.2f}".format(self.time_stamps[window_indices[1]]) + ' s')
         else:
-            pl.ylabel('Fluorescence Intensity (a.u.) integrated over window of ' + "0:.2f}".format(self.time_stamps[window_size[1]]) + ' s')
+            pl.ylabel('Fluorescence Intensity (a.u.) integrated over window of ' + "0:.2f}".format(self.time_stamps[window_indices[1]]) + ' s')
         pl.xlabel('Time in trial (seconds)')
         pl.title(out_path)
-
-        print "window_size", window_size
-
-        print "self.time_stamps[window_size]", self.time_stamps[window_size[1]]
 
         if out_path is None:
             pl.title("No output path given")
             pl.show()
         else:
             if normalize:
-                pl.savefig(out_path + "plot_area_under_curve_normal" + str(int(10*self.time_stamps[window_size[1]])) + "s.pdf")
-                np.savez(out_path + "normalized_area_under_peaks_" + str(int(10*self.time_stamps[window_size[1]])) + "s.npz", scores=areas, event_times=start_times, end_times=end_times, window_size=self.time_stamps[window_size[1]])
+                pl.savefig(out_path + "plot_area_under_curve_normal" + str(int(10*self.time_stamps[window_indices[1]])) + "s.pdf")
+                np.savez(out_path + "normalized_area_under_peaks_" + str(int(10*self.time_stamps[window_indices[1]])) + "s.npz", scores=areas, event_times=start_times, end_times=end_times, window_size=self.time_stamps[window_size[1]])
                 # Assume not using windows longer than a few seconds. Thus save the file so as to display one decimal point
             else:
-                pl.savefig(out_path + "plot_area_under_curve_non_normal" + str(int(10*self.time_stamps[window_size[1]])) + "s.pdf")
-                np.savez(out_path + "non-normalized_area_under_peaks_" + str(int(10*self.time_stamps[window_size[1]]))+ "s.npz", scores=areas, event_times=start_times, end_times=end_times, window_size=self.time_stamps[window_size[1]])
+                pl.savefig(out_path + "plot_area_under_curve_non_normal" + str(int(10*self.time_stamps[window_indices[1]])) + "s.pdf")
+                np.savez(out_path + "non-normalized_area_under_peaks_" + str(int(10*self.time_stamps[window_indices[1]]))+ "s.npz", scores=areas, event_times=start_times, end_times=end_times, window_size=self.time_stamps[window_size[1]])
 
 
     def plot_area_under_curve_wrapper( self, window_size_in_seconds, edge="rising", normalize=True, out_path=None):
         """
         Wrapper for plot_area_under_curve vs. time plots specialized for
         loaded event data that comes as a list of pairs of
-        event start and end times.
-
+        event start and end times (in seconds)
         """
 
         start_times = self.get_event_times("rising")
@@ -550,8 +624,8 @@ class FiberAnalyze( object ):
 
     def plot_peaks_vs_time( self, out_path=None ):
         """
-        Plot the maximum fluorescence value within each interaction bout vs the start time
-        of the bout
+        Plot the maximum fluorescence value within each interaction event vs the start time
+        of the event
         """
 
         start_times = self.get_event_times("rising")
@@ -563,10 +637,18 @@ class FiberAnalyze( object ):
                 peak = self.get_peak(start_times[i], end_times[i])
                 peaks[i] = peak
 
+
+            pl.figure()
+
+            #Fit exponential to data - this may need work
+            A = np.array([start_times, np.ones(len(start_times))])
+            w = np.linalg.lstsq(A.T, np.log(peaks + 1))[0]
+            pl.plot(start_times, np.exp(w[0]*np.array(start_times) + w[1])-1, 'r-')
+
             pl.plot(start_times, peaks, 'o')
             pl.xlabel('Time [s]')
             pl.ylabel('Fluorescence [dF/F]')
-            pl.title('Peak fluorescence of interaction event vs. event start time')
+            pl.title('Peak fluorescence of interaction event vs. event start time', w)
 
             if out_path is None:
                 pl.title("No output path given")
@@ -665,19 +747,15 @@ def test_FiberAnalyze(options):
 #    FA.wavelet_plot()
 #    FA.notch_filter(10.0, 10.3)
     #FA.plot_periodogram(plot_type="log",out_path = options.output_path)
-    FA.plot_basic_tseries(out_path = options.output_path)
+   # FA.plot_basic_tseries(out_path = options.output_path)
 #    FA.event_vs_baseline_barplot(out_path = options.output_path)
 
     #FA.plot_peritrigger_edge(window_size=[100,600],out_path = options.output_path)
    # FA.plot_peritrigger_edge(window_size=[200,735],out_path = options.output_path)
-    #FA.plot_area_under_curve_wrapper( window_size=[0, 485], edge="rising", out_path = options.output_path)
-    #FA.plot_area_under_curve_wrapper( window_size=[0, 735], edge="rising", normalize=True, out_path = options.output_path)
-  #  FA.plot_area_under_curve_wrapper( window_size=[0, 223], edge="rising", normalize=True, out_path = options.output_path)
-   # FA.plot_area_under_curve_wrapper( window_size=[0, 735], edge="rising", normalize=False, out_path = options.output_path)
-  
-   # FA.plot_area_under_curve_wrapper( window_size=[0, 3], edge="rising", normalize=False, out_path = options.output_path)
-    ### 485 corresponds to 2s
-  #  FA.plot_peaks_vs_time(out_path = options.output_path)
+       ### 485 corresponds to 2s
+
+    FA.plot_area_under_curve_wrapper( window_size_in_seconds=[0, 3], edge="rising", normalize=False, out_path = options.output_path)
+    #FA.plot_peaks_vs_time(out_path = options.output_path)
 
     #peak_inds, peak_vals, peak_times = FA.get_peaks()
     #FA.plot_peak_data()
@@ -706,8 +784,12 @@ if __name__ == "__main__":
                       help="Should the time series be smoothed, and how much.")
     parser.add_option('-x', "--selectfiles", default = False, dest = "selectfiles",
                        help="Should you select filepaths in a pop window instead of in the command line.")
-    parser.add_option("", "--save-txt", action="store_true", default=True, dest="save_txt",
-                      help="Save data matrix to text file.")
+    parser.add_option("", "--save-txt", action="store_true", default=False, dest="save_txt",
+                      help="Save data matrix out to a text file.")
+    parser.add_option("", "--save-to-h5", default=None, dest="save_to_h5",
+                      help="Save data matrix to a dataset in an hdf5 file.")
+    parser.add_option("", "--save-and-exit", action="store_true", default=False, dest="save_and_exit",
+                      help="Exit immediately after saving data out.")
 
     (options, args) = parser.parse_args()
     
