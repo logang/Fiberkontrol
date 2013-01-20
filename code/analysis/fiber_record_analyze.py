@@ -148,6 +148,7 @@ class FiberAnalyze( object ):
         else:
            # pl.savefig(os.path.join(out_path,"basic_time_series.pdf"))
             pl.savefig(out_path + "basic_time_series.pdf")
+            pl.savefig(out_path + "basic_time_series.png")
 
 
 
@@ -424,7 +425,6 @@ class FiberAnalyze( object ):
         timestep = np.max(self.time_stamps[1:] - self.time_stamps[:-1])
         self.fft_freq = np.fft.fftfreq(n, d=timestep)
 
-    # --- not yet implemented --- #
 
     def get_event_times( self, edge="rising"):
         """
@@ -448,28 +448,12 @@ class FiberAnalyze( object ):
             return -1
 
 
-
-    def debleach( self ):
-        """
-        Remove trend from data due to photobleaching.
-        Is this necessary?
-        """
-        pass
-
-    def plot_peak_statistics( self, peak_times, peak_vals ):
-        """
-        Plots showing statistics of calcium peak data.
-          --> Peak height as function of time since last peak
-          --> Histograms of peak times and vals
-        """
-        pass
-
     def plot_area_under_curve( self, event_times, end_times, window_size, normalize=True, out_path=None):
         """
         Plots of area under curve for each event_time 
         with before and after event durationsspecified in window_size as 
         [before, after] (in seconds).
-        -- choosing the window around the event onset is still arbitrary, 
+        -- choosing the window around the event onset is still somewhat arbitrary, 
         we need to discuss how to choose this well...
         """
         
@@ -485,7 +469,6 @@ class FiberAnalyze( object ):
                 if max(chunk) < 0.01: 
                     areas.append(sum(chunk)/len(chunk)/0.01)
                 else:
-                    #areas.append(sum(chunk)/len(chunk)/max(chunk))
                     areas.append(sum(chunk)/len(chunk)/(max(abs(chunk))))
             else: 
                 areas.append(sum(chunk)/len(chunk))
@@ -518,7 +501,6 @@ class FiberAnalyze( object ):
         if out_path is None:
             pl.show()
         else:
-           # pl.savefig(os.path.join(out_path,"plot_area_under_curve.pdf"))
             if normalize:
                 pl.savefig(out_path + "plot_area_under_curve_normal" + str(int(10*self.time_stamps[window_size[1]])) + "s.pdf")
                 np.savez(out_path + "normalized_area_under_peaks_" + str(int(10*self.time_stamps[window_size[1]])) + "s.npz", scores=areas, event_times=event_times, end_times=end_times, window_size=self.time_stamps[window_size[1]])
@@ -542,6 +524,16 @@ class FiberAnalyze( object ):
             self.plot_area_under_curve( event_times, end_times, window_size, normalize, out_path=out_path )
         else:
             print "No event times loaded. Cannot plot perievent."  
+
+    def plot_peaks_vs_time( self ):
+        """
+        Plot the maximum fluorescence value within each interaction bout vs the start time
+        of the bout
+        """
+
+        pass
+
+
 
 
 
