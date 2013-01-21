@@ -621,8 +621,70 @@ class FiberAnalyze( object ):
         """
         start_time_index = self.convert_seconds_to_index(start_time)
         end_time_index = self.convert_seconds_to_index(end_time)
-        return np.max(self.fluor_data[start_time_index : end_time_index])
+        if start_time_index < end_time_index:
+            return np.max(self.fluor_data[start_time_index : end_time_index])
+        else:
+            return 0
 
+    def eNegX(self, p, x):
+        x0, y0, c, k=p
+        y = (1 * np.exp(-k*(x-x0))) + y0
+        return y
+
+    def eNegX_residuals(self, p, x, y):
+        return y - self.eNegX(p, x)
+
+    def fit_exponential(self, x, y):
+
+            # Choose starting estimates for the minimization
+            # of (x0, y0, c, k)
+            # we want k to be large to capture the fast decay
+        kguess = [0, 0.1, 0.5, 1.0, 100, 500, 1000]
+        max_r2 = -1
+        maxvalues = ()
+        for kg in kguess:
+            p_guess=(np.min(x), 0, 1, kg)
+            p, cov, infodict, mesg, ier = sp.optimize.leastsq(
+                self.eNegX_residuals, p_guess, args=(x, y), full_output=1)
+
+            x0,y0,c,k=p 
+            print('''Reference data:\  
+                    x0 = {x0}
+                    y0 = {y0}
+                    c = {c}
+                    k = {k}
+                    '''.format(x0=x0,y0=y0,c=c,k=k))
+
+            numPoints = np.floor((np.max(x) - np.min(x))*100)
+            xp = np.linspace(np.min(x), np.max(x), numPoints)
+            #pxp = np.exp(-1*xp)
+            pxp = self.eNegX(p, xp)
+            yxp = self.eNegX(p, x)
+
+            sstot = np.sum(np.multiply(y - np.mean(y), y - np.mean(y)))
+            sserr = np.sum(np.multiply(y - yxp, y - yxp))
+            r2 = 1 - sserr/sstot
+            if max_r2 == -1:
+                maxvalues = (xp, pxp, x0, y0, c, k, r2)
+            if r2 > max_r2:
+                max_r2 = r2
+                maxvalues = (xp, pxp, x0, y0, c, k, r2)
+
+        return maxvalues
+           # return (xp, pxp, x0, y0, c, k, r2)
+            
+            # A = [[np.sum(np.multiply(y,y)), np.sum(np.multiply(x, np.multiply(y,y)))], 
+            #      [np.sum(np.multiply(x, np.multiply(y,y))), np.sum(np.multiply(np.multiply(x, x), np.multiply(y, y)))]]
+
+            # c = np.log(y)
+            # B = [np.sum(np.multiply(y, c)), np.sum(np.multiply(np.multiply(y, x), c))]
+
+            # w = np.linalg.solve(A, B)
+           # return w
+
+            #Fit exponential to data - this may need work
+            #A = np.array([start_times, np.ones(len(start_times))])
+            #w = np.linalg.lstsq(A.T, np.log(peaks + 1))[0]
 
     def plot_peaks_vs_time( self, out_path=None ):
         """
@@ -642,21 +704,42 @@ class FiberAnalyze( object ):
 
             pl.figure()
 
-            #Fit exponential to data - this may need work
-            A = np.array([start_times, np.ones(len(start_times))])
-            w = np.linalg.lstsq(A.T, np.log(peaks + 1))[0]
-            pl.plot(start_times, np.exp(w[0]*np.array(start_times) + w[1])-1, 'r-')
+            #w = self.fit_exponential(start_times, peaks + 1)
+            xp, pxp, x0, y0, c, k, r2 = self.fit_exponential(start_times, peaks + 1)
+            
+            fig = pl.figure()
+            ax = fig.add_subplot(111)
+            print np.max(peaks) + .3
+            if np.max(peaks) > 0.8:
+                ax.set_ylim([0, 1.3])
+            else:
+                ax.set_ylim([0, 1.1])
 
-            pl.plot(start_times, peaks, 'o')
+            ax.plot(xp, pxp-1)
+            ax.set_xlim([100, 500])
+            #Fit exponential to data - this may need work
+            #A = np.array([start_times, np.ones(len(start_times))])
+            #w = np.linalg.lstsq(A.T, np.log(peaks + 1))[0]
+            #pl.plot(start_times, np.exp(w[1]*np.array(start_times) + w[0])-1, 'r-')
+
+            ax.plot(start_times, peaks, 'o')
             pl.xlabel('Time [s]')
             pl.ylabel('Fluorescence [dF/F]')
             pl.title('Peak fluorescence of interaction event vs. event start time')
+            ax.text(min(200, np.min(start_times)), np.max(peaks) + 0.20, "y = c*exp(-k*(x-x0)) + y0")
+            ax.text(min(200, np.min(start_times)), np.max(peaks) + 0.15, "k = " + "{0:.2f}".format(k) + ", c = " + "{0:.2f}".format(c) + 
+                                                ", x0 = " + "{0:.2f}".format(x0) + ", y0 = " + "{0:.2f}".format(y0) )
+            ax.text(min(200, np.min(start_times)), np.max(peaks) + 0.1, "r^2 = " + str(r2))
+
+
 
             if out_path is None:
                 pl.title("No output path given")
                 pl.show()
             else:
                 pl.savefig(out_path + "plot_peaks_vs_time.pdf")
+                np.savez(out_path + "peaks_vs_time.npz", scores=k, event_times=start_times, end_times=end_times, window_size=0)
+
         else:
             print "No event times loaded. Cannot plot peaks_vs_time."  
 
@@ -749,12 +832,12 @@ def test_FiberAnalyze(options):
     FA.load()
 #    FA.wavelet_plot()
 #    FA.notch_filter(10.0, 10.3)
-    #FA.plot_periodogram(plot_type="log",out_path = options.output_path)
-   # FA.plot_basic_tseries(out_path = options.output_path)
+  #  FA.plot_periodogram(plot_type="log",out_path = options.output_path)
+  #  FA.plot_basic_tseries(out_path = options.output_path)
 #    FA.event_vs_baseline_barplot(out_path = options.output_path)
 
-    FA.plot_peritrigger_edge(window_size=[1, 3],out_path = options.output_path)
-    FA.plot_area_under_curve_wrapper( window_size=[0, 3], edge="rising", normalize=False, out_path = options.output_path)
+    #FA.plot_peritrigger_edge(window_size=[1, 3],out_path = options.output_path)
+    #FA.plot_area_under_curve_wrapper( window_size=[0, 3], edge="rising", normalize=False, out_path = options.output_path)
     FA.plot_peaks_vs_time(out_path = options.output_path)
 
     #peak_inds, peak_vals, peak_times = FA.get_peaks()
