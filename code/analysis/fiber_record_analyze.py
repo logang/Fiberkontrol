@@ -628,6 +628,8 @@ class FiberAnalyze( object ):
 
     def eNegX(self, p, x):
         x0, y0, c, k=p
+        #Set c=1 to normalize all of the trials, since we
+        # are only interested in the rate of decay
         y = (1 * np.exp(-k*(x-x0))) + y0
         return y
 
