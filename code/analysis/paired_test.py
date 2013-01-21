@@ -77,14 +77,25 @@ class PairAnalyze( object ):
 			n_score_list = []
 			s_score_list = []
 
+			
 			for f in self.n_scores:
-				n_score_list.append(f[index]) 
+				if np.shape(f) != ():
+					n_score_list.append(f[index]) 
+				else:
+					n_score_list.append(f)
 
 			for f in self.s_scores:
-				s_score_list.append(f[index])  
+				if np.shape(f) != ():
+					s_score_list.append(f[index]) 
+				else:
+					s_score_list.append(f) 
 
-			print "n_score_list ", n_score_list
-			print "s_score_list ", s_score_list
+			print "  n      s   "
+			for i in range(len(n_score_list)):
+				print "{} \t {}".format(str(n_score_list[i]), str(s_score_list[i]))
+			#	print str(n_score_list[i]) + "  " + str(s_score_list[i])			#print "n_score_list ", n_score_list
+			#print "s_score_list ", s_score_list
+
 
 			if test == "ttest":
 				[tvalue, pvalue] = stats.ttest_rel(s_score_list, n_score_list)
@@ -166,10 +177,10 @@ def test_PairAnalyze(options):
 	PA.Load()
 	PA.CompareEvent(0)
 	PA.CompareEvent(0, "wilcoxon" )
-	print "Novel interaction time:"
-	PA.EventLength_vs_Score(PA.n_scores, PA.n_start_times, PA.n_end_times, just_first=True, title="Novel")
-	print "Social interaction time:"
-	PA.EventLength_vs_Score(PA.s_scores, PA.s_start_times, PA.s_end_times, just_first=True, title="Social")
+	#print "Novel interaction time:"
+	#PA.EventLength_vs_Score(PA.n_scores, PA.n_start_times, PA.n_end_times, just_first=True, title="Novel")
+	#print "Social interaction time:"
+	#PA.EventLength_vs_Score(PA.s_scores, PA.s_start_times, PA.s_end_times, just_first=True, title="Social")
 	plt.show()
 
 

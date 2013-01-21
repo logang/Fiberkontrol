@@ -635,10 +635,10 @@ class FiberAnalyze( object ):
         return y - self.eNegX(p, x)
 
     def fit_exponential(self, x, y):
-
-            # Choose starting estimates for the minimization
-            # of (x0, y0, c, k)
-            # we want k to be large to capture the fast decay
+        # Because we are optimizing over a nonlinear function
+        # choose a number of possible starting values of (x0, y0, c, k)
+        # and use the results from whichever produces the smallest 
+        # residual
         kguess = [0, 0.1, 0.5, 1.0, 100, 500, 1000]
         max_r2 = -1
         maxvalues = ()
@@ -671,20 +671,7 @@ class FiberAnalyze( object ):
                 maxvalues = (xp, pxp, x0, y0, c, k, r2)
 
         return maxvalues
-           # return (xp, pxp, x0, y0, c, k, r2)
-            
-            # A = [[np.sum(np.multiply(y,y)), np.sum(np.multiply(x, np.multiply(y,y)))], 
-            #      [np.sum(np.multiply(x, np.multiply(y,y))), np.sum(np.multiply(np.multiply(x, x), np.multiply(y, y)))]]
 
-            # c = np.log(y)
-            # B = [np.sum(np.multiply(y, c)), np.sum(np.multiply(np.multiply(y, x), c))]
-
-            # w = np.linalg.solve(A, B)
-           # return w
-
-            #Fit exponential to data - this may need work
-            #A = np.array([start_times, np.ones(len(start_times))])
-            #w = np.linalg.lstsq(A.T, np.log(peaks + 1))[0]
 
     def plot_peaks_vs_time( self, out_path=None ):
         """
@@ -717,7 +704,8 @@ class FiberAnalyze( object ):
 
             ax.plot(xp, pxp-1)
             ax.set_xlim([100, 500])
-            #Fit exponential to data - this may need work
+
+            #Lame way to fit exponential to data - this may need work
             #A = np.array([start_times, np.ones(len(start_times))])
             #w = np.linalg.lstsq(A.T, np.log(peaks + 1))[0]
             #pl.plot(start_times, np.exp(w[1]*np.array(start_times) + w[0])-1, 'r-')
@@ -730,8 +718,6 @@ class FiberAnalyze( object ):
             ax.text(min(200, np.min(start_times)), np.max(peaks) + 0.15, "k = " + "{0:.2f}".format(k) + ", c = " + "{0:.2f}".format(c) + 
                                                 ", x0 = " + "{0:.2f}".format(x0) + ", y0 = " + "{0:.2f}".format(y0) )
             ax.text(min(200, np.min(start_times)), np.max(peaks) + 0.1, "r^2 = " + str(r2))
-
-
 
             if out_path is None:
                 pl.title("No output path given")
