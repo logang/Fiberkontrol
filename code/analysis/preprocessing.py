@@ -35,6 +35,7 @@ def generate_GC5_hdf5_file(analysis_filenames,out_path):
                 print info[3], "is not a recognized experiment type. Check filenames."
             cmd += '-o ' + out_path
             cmd += ' --save-to-h5 ' + out_path
+            cmd += ' --fluor-normalization raw '
             result = run_command_wrapper(cmd)
             print result
             
@@ -43,4 +44,4 @@ if __name__ == '__main__':
     print "The list contains:"
     for f in analysis_filenames:
         print '\t',f
-    generate_GC5_hdf5_file(analysis_filenames, '/Users/logang/Documents/Results/FiberRecording/Cell/all_data.h5')
+    generate_GC5_hdf5_file(analysis_filenames, '/Users/logang/Documents/Results/FiberRecording/Cell/all_data_raw.h5')

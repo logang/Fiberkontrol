@@ -67,9 +67,16 @@ class FiberAnalyze( object ):
             if self.fluor_normalization == "deltaF":
                 median = np.median(self.fluor_data)
                 self.fluor_data = (self.fluor_data-median)/median #dF/F
-            else:
+            elif self.fluor_normalization == "standardize":
                 self.fluor_data -= np.min(self.fluor_data)
                 self.fluor_data /= np.max(self.fluor_data)
+            elif self.fluor_normalization == "raw":
+                pass
+            else:
+                raise ValueError( self.fluor_normalization, "is not a valid entry for --fluor-normalization.")
+            # make smallest value positive.
+            self.fluor_data -= np.min(self.fluor_data)
+            self.fluor_data +=0.0000001 # keep strictly positive
 
             # normalize triggers to fluor data
             if self.trigger_path is None:
@@ -267,7 +274,7 @@ class FiberAnalyze( object ):
         if intensity_measure == "peak":
             intensity = np.zeros(len(start_times))
             for i in xrange(len(start_times)):
-                peak = self.get_peak(start_times[i]-window[0], start_times[i]+window[1]) #end_times[i])
+                peak = self.get_peak(start_times[i]-window[0], start_times[i]+window[1]) # end_times[i])
                 intensity[i] = peak
         elif intensity_measure == "integrated":
             intensity = self.get_areas_under_curve( start_times, window, normalize=False)
@@ -815,7 +822,7 @@ def test_FiberAnalyze(options):
     """
     FA = FiberAnalyze( options )
     FA.load()
-    FA.plot_next_event_vs_intensity(intensity_measure="integrated", next_event_measure="length", window=[1, 3], out_path=None)
+    FA.plot_next_event_vs_intensity(intensity_measure="peak", next_event_measure="onset", window=[0, 1], out_path=None)
 
 #    FA.wavelet_plot()
 #    FA.notch_filter(10.0, 10.3)
@@ -848,8 +855,8 @@ if __name__ == "__main__":
                       help="Specify a time window over which to analyze the time series in format start:end. -1 chooses the appropriate extremum")
     parser.add_option('-p', "--plot-type", default = 'tseries', dest="plot_type",
                       help="Type of plot to produce.")
-    parser.add_option('', "--fluor_normalization", default = 'deltaF', dest="fluor_normalization",
-                      help="Normalization of fluorescence trace. Can be a.u. between [0,1]: 'stardardize' or deltaF/F: 'deltaF'.")
+    parser.add_option('', "--fluor-normalization", default = 'deltaF', dest="fluor_normalization",
+                      help="Normalization of fluorescence trace. Can be a.u. between [0,1]: 'stardardize' or deltaF/F: 'deltaF' or 'raw'.")
     parser.add_option('-s', "--smoothness", default = None, dest="smoothness",
                       help="Should the time series be smoothed, and how much.")
     parser.add_option('-x', "--selectfiles", default = False, dest = "selectfiles",

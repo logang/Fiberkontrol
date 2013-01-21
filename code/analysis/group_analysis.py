@@ -2,6 +2,7 @@ import h5py
 import numpy as np
 import pylab as pl
 import matplotlib as mpl
+import statsmodels.api as sm
 from matplotlib import cm
 
 from fiber_record_analyze import FiberAnalyze
@@ -9,7 +10,7 @@ from fiber_record_analyze import FiberAnalyze
 #-------------------------------------------------------------------------------------------
 
 if __name__ == "__main__":
-    all_data = h5py.File("/Users/logang/Documents/Results/FiberRecording/Cell/all_data.h5",'r')
+    all_data = h5py.File("/Users/logang/Documents/Results/FiberRecording/Cell/all_data_raw.h5",'r')
 
     # Parse command line options
     from optparse import OptionParser
@@ -40,14 +41,14 @@ if __name__ == "__main__":
 
     (options, args) = parser.parse_args()
 
+    # --- Plot data --- #
     exp_type = 'homecagenovel'
-    time_window = [0,3] # [before,after] event in seconds 
+    time_window = [0,1] # [before,after] event in seconds 
 
     fig = pl.figure()
-#    mpl.rcParams['axes.color_cycle'] = ['r', 'g', 'b', 'c']
-    mpl.rcParams['axes.color_cycle'] = [cm.jet(k) for k in np.linspace(0, 1, 10)] 
     ax = fig.add_subplot(1,1,1)
 
+    i=0 # color counter
     for animal_id in all_data.keys():
         # load data from hdf5 file by animal-date-exp_type
         animal = all_data[animal_id]
@@ -60,10 +61,41 @@ if __name__ == "__main__":
             FA.load(file_type="hdf5")
 
             # get intensity and next_val values for this animal
-            peak_intensity, length_next_vals = FA.plot_next_event_vs_intensity(intensity_measure="peak", next_event_measure="onset", window=time_window, out_path=None, plotit=False)
-            
-#            ax.plot(peak_intensity, length_next_vals,'o')
-            ax.loglog(peak_intensity, length_next_vals,'o')
-    pl.xlabel("log peak intensity in first second after interaction onset")
+            peak_intensity, onset_next_vals = FA.plot_next_event_vs_intensity(intensity_measure="integrated", next_event_measure="onset", window=time_window, out_path=None, plotit=False)\
+
+            # fit a robust regression
+            if len(onset_next_vals) > 0:
+                X = np.vstack( (np.log(peak_intensity), np.ones((len(onset_next_vals),))) )
+#                rlm_model = sm.RLM(np.log(onset_next_vals), X.TA, M=sm.robust.norms.TukeyBiweight(c=1.0))
+#                rlm_results = rlm_model.fit()
+                lm_model = sm.OLS(np.log(onset_next_vals), X.T)
+                lm_results = lm_model.fit()
+                print "Coefficients:",lm_results.params
+                print "R-squared", lm_results.rsquared
+                try:
+                    print "R-squared Adjusted:", lm_results.rsquared_adj
+                except:
+                    print "Can not calculate adjusted R-squared."
+                yhat = lm_results.fittedvalues
+
+#                fig = pl.figure()
+#                ax = fig.add_subplot(1,1,1)
+#                ax.loglog(peak_intensity,onset_next_vals,'o')
+
+                ax.plot(np.log(peak_intensity), np.log(onset_next_vals),'o',color=cm.jet(float(i)/10.))
+                ax.plot(np.log(peak_intensity), yhat, '-', color=cm.jet(float(i)/10.) )
+
+#                pl.show()
+                i+=1 # increment color counter
+            else:
+                #ax.plot(np.log(peak_intensity), np.log(onset_next_vals),'o')
+                print "No values to plot for", animal_id, dates, exp_type
+
+#    pl.xlabel("log peak intensity in first second after interaction onset")
+    pl.xlabel("log integrated intensity in first second after interaction onset")
+    
     pl.ylabel("log time until next interaction")
+#    pl.ylabel("log length of next interaction")
     pl.show()
+
+#----------------------------------------------------------------------------------------   
