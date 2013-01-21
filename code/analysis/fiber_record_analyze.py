@@ -18,6 +18,11 @@ class FiberAnalyze( object ):
         """
         Initialize the FiberAnalyze class using options object from OptionsParser.
         """
+        # attributes to set for hdf5 loading
+        self.subject_id = None
+        self.exp_date = None
+        self.exp_type = None
+
         # values from option parser
         self.smoothness = options.smoothness
         self.plot_type = options.plot_type
@@ -48,54 +53,62 @@ class FiberAnalyze( object ):
         self.fluor_channel = 0
         self.trigger_channel = 3
         
-    def load( self ):
+    def load( self, file_type="npz" ):
         """
-        Load time series and events from NPZ file. 
+        Load time series and events from NPZ or HDF5 file. 
         """
-        print self.input_path
-        self.data = np.load( self.input_path )['data']
-        self.time_stamps = np.load( self.input_path )['time_stamps']
+        self.time_tuples = None
+        if file_type == "npz":
+            self.data = np.load( self.input_path )['data']
+            self.time_stamps = np.load( self.input_path )['time_stamps']
+            
+            # normalized fluor data, which is in arbitrary units
+            self.fluor_data = self.data[:,self.fluor_channel]
+            if self.fluor_normalization == "deltaF":
+                median = np.median(self.fluor_data)
+                self.fluor_data = (self.fluor_data-median)/median #dF/F
+            else:
+                self.fluor_data -= np.min(self.fluor_data)
+                self.fluor_data /= np.max(self.fluor_data)
 
-        # normalized fluor data, which is in arbitrary units
-        self.fluor_data = self.data[:,self.fluor_channel]
-        if self.fluor_normalization == "deltaF":
-            median = np.median(self.fluor_data)
-            self.fluor_data = (self.fluor_data-median)/median #dF/F
-        else:
-            self.fluor_data -= np.min(self.fluor_data)
-            self.fluor_data /= np.max(self.fluor_data)
-        
-        # normalize triggers to fluor data
-        if self.trigger_path is None:
-            self.trigger_data = self.data[:,self.trigger_channel]
-            self.time_tuples = None
-        else:
-            try:
-                self.time_tuples = self.load_trigger_data(self.s_file, self.e_file)
-                time_vec = np.asarray(self.time_tuples).flatten()
-                time_vec = np.append(time_vec,np.inf)
-                self.trigger_data = np.zeros(len(self.fluor_data))
-                j = 0
-                for i in xrange(len(self.trigger_data)):
-                    if self.time_stamps[i] < time_vec[j]:
-                        self.trigger_data[i] = np.mod(j,2)
-                    else:
-                        j+=1
-                        self.trigger_data[i] = np.mod(j,2)
-            except Exception, e:
-                print "Error loading trigger data:"
-                print "\t-->",e
-        
-        self.trigger_data /= np.max(self.trigger_data)
-        self.trigger_data -= np.min(self.trigger_data)
-        self.trigger_data *= -1
-        self.trigger_data += 1
-        if self.fluor_normalization == "deltaF":
-            self.trigger_data *= 1.5*np.max(self.fluor_data)
+            # normalize triggers to fluor data
+            if self.trigger_path is None:
+                self.trigger_data = self.data[:,self.trigger_channel]
+            else:
+                try:
+                    self.time_tuples = self.load_trigger_data(self.s_file, self.e_file)
+                    time_vec = np.asarray(self.time_tuples).flatten()
+                    time_vec = np.append(time_vec,np.inf)
+                    self.trigger_data = np.zeros(len(self.fluor_data))
+                    j = 0
+                    for i in xrange(len(self.trigger_data)):
+                        if self.time_stamps[i] < time_vec[j]:
+                            self.trigger_data[i] = np.mod(j,2)
+                        else:
+                            j+=1
+                            self.trigger_data[i] = np.mod(j,2)
+                except Exception, e:
+                    print "Error loading trigger data:"
+                    print "\t-->",e
 
+            self.trigger_data /= np.max(self.trigger_data)
+            self.trigger_data -= np.min(self.trigger_data)
+            self.trigger_data *= -1
+            self.trigger_data += 1
+            if self.fluor_normalization == "deltaF":
+                self.trigger_data *= 1.5*np.max(self.fluor_data)
+
+        elif file_type == "hdf5":
+            h5_file = h5py.File( self.input_path, 'r' )
+            self.data = np.asarray( h5_file[self.subject_id][self.exp_date][self.exp_type]['time_series_arr'] )
+            self.time_tuples = np.asarray( h5_file[self.subject_id][self.exp_date][self.exp_type]['event_tuples'] )
+            self.time_stamps = self.data[:,0]
+            self.trigger_data = self.data[:,1]
+            self.fluor_data = self.data[:,2]
+            
         # if time range is specified, crop data    
-        if options.time_range != None:
-            tlist = options.time_range.split(':')
+        if self.time_range != None:
+            tlist = self.time_range.split(':')
             if tlist[0] == '-1':
                 self.t_start = 0
             if tlist[1] == '-1':
@@ -224,6 +237,7 @@ class FiberAnalyze( object ):
                 print "\t---> Creating subsubgroup:", prefix.split("-")[2]
                 run_type = date.create_group(prefix.split("-")[2])
                 dset = run_type.create_dataset("time_series_arr", data=out_arr)
+                dset = run_type.create_dataset("event_tuples", data=self.time_tuples)
                 dset.attrs["time_series_arr_names"] = ("time_stamp", "trigger_data", "fluor_data")
                 dset.attrs["original_file_name"] = prefix
             except Exception, e:
@@ -234,9 +248,9 @@ class FiberAnalyze( object ):
             if self.save_and_exit:
                 sys.exit(0)
         else:
-            raise NotImplemented("The entered output_type has not been implemented.")                
+            raise NotImplemented("The entered output_type has not been implemented.")               
 
-    def next_event_vs_intensity( self, intensity_measure="peak", next_event_measure="onset"):
+    def plot_next_event_vs_intensity( self, intensity_measure="peak", next_event_measure="onset", window=[1, 3], out_path=None, plotit=True):
         """
         Generate a plot of next event onset delay (onset) or event length (length) as a function
         of an intensity measure that can be one of
@@ -244,46 +258,55 @@ class FiberAnalyze( object ):
           -- integrated intensity of last event (integrated)
           -- integrated intensity over history window (window)
         """
-        # !!! UNDER CONSTRUCTION !!!
+        start_times = self.get_event_times("rising")
+        end_times = self.get_event_times("falling")
+        if start_times == -1:
+            raise ValueError("Event times seem to have failed to load.")
+
         # get intensity values
         if intensity_measure == "peak":
-            intensity = self.get_peaks()
+            intensity = np.zeros(len(start_times))
+            for i in xrange(len(start_times)):
+                peak = self.get_peak(start_times[i]-window[0], start_times[i]+window[1]) #end_times[i])
+                intensity[i] = peak
         elif intensity_measure == "integrated":
-            intensity = self.get_AUC()
+            intensity = self.get_areas_under_curve( start_times, window, normalize=False)
         elif intensity_measure == "window":
-            intensity = self.get_windowed_AUC()
+            window[1] = 0
+            intensity = self.get_areas_under_curve( start_times, window, normalize=False)
         else:
-            raise ValueError("Entered intensity_measure not implemented.")
-
+            raise ValueError("The entered intensity_measure is not one of peak, integrated, or window.")
         # get next event values
         if next_event_measure == "onset":
-            self.next_vals = self.get_next_onsets()
+            next_vals = np.zeros(len(start_times)-1)
+            for i in xrange(len(next_vals)):
+                next_vals[i] = start_times[i+1] - end_times[i]
         elif next_event_measure == "length":
-            self.next_vals = self.get_next_length()
+            next_vals = np.zeros(len(start_times)-1)
+            for i in xrange(len(next_vals)):
+                next_vals[i] = end_times[i+1] - start_times[i+1]
         else:
             raise ValueError("Entered next_event_measure not implemented.")
 
-        #Plot the area vs the time of each event
-        pl.clf()
-        ymax = 1.1*np.max(areas) + 0.1
-        ymin = 1.1*np.min(areas) - 0.1
-        pl.stem( event_times, areas, linefmt='k-', markerfmt='ko', basefmt='k-')
-#        pl.ylim([0,ymax])
-        pl.ylim([ymin,ymax])
-        pl.xlim([0, np.max(self.time_stamps)])
-
-
-                pl.ylabel('Sharpness of peak: ' r'$\frac{\sum\delta F/F}{\max(peak)}}$' + ' with window of ' + "{0:.2f}".format(self.time_stamps[window_size[1]]) + ' s')
-
-        pl.xlabel('Time in trial (seconds)')
-        pl.title(out_path)
-
-        if out_path is None:
-            pl.show()
+        # lag intensities relative to events (except in history window case)
+        if intensity_measure == "window":
+            intensity = intensity[1::]
         else:
-           pl.savefig(os.path.join(out_path,"next_event_vs_intensity.pdf"))
-           # !!! UNDER CONSTRUCTION !!!
+            intensity = intensity[0:-1]
 
+        if plotit:
+            #Plot the area vs the time of each event
+            pl.clf()
+            pl.loglog(intensity, next_vals, 'ro')
+            pl.ylabel('Next event value')
+            pl.xlabel('Intensity')
+
+            if out_path is None:
+                pl.show()
+            else:
+                pl.savefig(os.path.join(out_path,"next_event_vs_intensity.pdf"))
+        else:
+            return intensity, next_vals
 
     def event_vs_baseline_barplot( self, out_path=None ):
         """
@@ -434,16 +457,15 @@ class FiberAnalyze( object ):
           #  pl.savefig(os.path.join(out_path,'peak_finding'))
             pl.savefig(out_path + "peak_finding.pdf")
 
-
-    def get_time_chunks_around_events(self, event_times, window_size):
+    def get_time_chunks_around_events(self, event_times, window):
         """
         Extracts chunks of fluorescence data around each event in 
         event_times, with before and after event durations
-        specified in window_size as [before, after] (in seconds).
+        specified in window as [before, after] (in seconds).
         """
 
-        window_indices = [self.convert_seconds_to_index( window_size[0]),
-                          self.convert_seconds_to_index( window_size[1])]
+        window_indices = [self.convert_seconds_to_index( window[0]),
+                          self.convert_seconds_to_index( window[1])]
 
         time_chunks = []
         for e in event_times:
@@ -456,13 +478,12 @@ class FiberAnalyze( object ):
                 print "Unable to extract window:", [(e-window_indices[0]),(e+window_indices[1])]
         return time_chunks
 
-
-    def plot_perievent_hist( self, event_times, window_size, out_path=None ):
+    def plot_perievent_hist( self, event_times, window, out_path=None ):
         """
         Peri-event time histogram for given event times.
         Plots the time series and their median over a time window around
         each event in event_times, with before and after event durations
-        specified in window_size as [before, after] (in seconds).
+        specified in window as [before, after] (in seconds).
         """
         # new figure
         pl.clf()
@@ -470,10 +491,10 @@ class FiberAnalyze( object ):
         ax = fig.add_subplot(111)
 
         # get blocks of time series for window around each event time
-        time_chunks = self.get_time_chunks_around_events(event_times, window_size)
+        time_chunks = self.get_time_chunks_around_events(event_times, window)
 
-        window_indices = [ self.convert_seconds_to_index(window_size[0]),
-                           self.convert_seconds_to_index(window_size[1]) ]
+        window_indices = [ self.convert_seconds_to_index(window[0]),
+                           self.convert_seconds_to_index(window[1]) ]
 
         # plot each time window, colored by order
         time_arr = np.asarray(time_chunks).T
@@ -510,8 +531,7 @@ class FiberAnalyze( object ):
             #pl.savefig(os.path.join(out_path,'perievent_tseries'))
             pl.savefig(out_path + "perievent_tseries.pdf")
 
-
-    def plot_peritrigger_edge( self, window_size, edge="rising", out_path=None ):
+    def plot_peritrigger_edge( self, window, edge="rising", out_path=None ):
         """
         Wrapper for plot_perievent histograms specialized for
         loaded event data that comes as a list of pairs of
@@ -519,7 +539,7 @@ class FiberAnalyze( object ):
         """
         event_times = self.get_event_times(edge)
         if event_times != -1:
-            self.plot_perievent_hist( event_times, window_size, out_path=out_path )
+            self.plot_perievent_hist( event_times, window, out_path=out_path )
         else:
             print "No event times loaded. Cannot plot perievent."        
 
@@ -535,7 +555,6 @@ class FiberAnalyze( object ):
         n = rawsignal.size
         timestep = np.max(self.time_stamps[1:] - self.time_stamps[:-1])
         self.fft_freq = np.fft.fftfreq(n, d=timestep)
-
 
     def get_event_times( self, edge="rising"):
         """
@@ -554,7 +573,7 @@ class FiberAnalyze( object ):
                 else:
                     raise ValueError("Edge type must be 'rising' or 'falling'.")
             return event_times
-        else:
+        else:            
             print "No event times loaded. Cannot find edges."        
             return -1
 
@@ -576,14 +595,14 @@ class FiberAnalyze( object ):
         """
         pass
 
-    def get_areas_under_curve( self, start_times, window_size, normalize=False):
+    def get_areas_under_curve( self, start_times, window, normalize=False):
         """
         Returns a vector of the area under the fluorescence curve within the provided
         window [before, after] (in seconds), that surrounds each start_time.
         Normalize determines whether to divide the area by the maximum fluorescence
         value of the window
         """
-        time_chunks = self.get_time_chunks_around_events(start_times, window_size)
+        time_chunks = self.get_time_chunks_around_events(start_times, window)
         
         areas = []
         for chunk in time_chunks:
@@ -598,10 +617,10 @@ class FiberAnalyze( object ):
         return areas
             
 
-    def plot_area_under_curve( self, start_times, end_times, window_size, normalize=False, out_path=None):
+    def plot_area_under_curve( self, start_times, end_times, window, normalize=False, out_path=None):
         """
         Plots of area under curve for each event_time 
-        with before and after event durationsspecified in window_size as 
+        with before and after event durationsspecified in window as 
         [before, after] (in seconds).
         -- choosing the window around the event onset is still somewhat arbitrary, 
         we need to discuss how to choose this well...
@@ -611,11 +630,10 @@ class FiberAnalyze( object ):
         # by the maximum fluorescence value in the window following
         # each event
 
-        areas = self.get_areas_under_curve(start_times, window_size)
+        areas = self.get_areas_under_curve(start_times, window)
 
-
-        window_indices = [ self.convert_seconds_to_index(window_size[0]),
-                           self.convert_seconds_to_index(window_size[1]) ]
+        window_indices = [ self.convert_seconds_to_index(window[0]),
+                           self.convert_seconds_to_index(window[1]) ]
         #Plot the area vs the time of each event
         pl.clf()
         ymax = 1.1*np.max(areas) + 0.1
@@ -641,24 +659,23 @@ class FiberAnalyze( object ):
         else:
             if normalize:
                 pl.savefig(out_path + "plot_area_under_curve_normal" + str(int(10*self.time_stamps[window_indices[1]])) + "s.pdf")
-                np.savez(out_path + "normalized_area_under_peaks_" + str(int(10*self.time_stamps[window_indices[1]])) + "s.npz", scores=areas, event_times=start_times, end_times=end_times, window_size=self.time_stamps[window_indices[1]])
+                np.savez(out_path + "normalized_area_under_peaks_" + str(int(10*self.time_stamps[window_indices[1]])) + "s.npz", scores=areas, event_times=start_times, end_times=end_times, window=self.time_stamps[window_indices[1]])
                 # Assume not using windows longer than a few seconds. Thus save the file so as to display one decimal point
             else:
                 pl.savefig(out_path + "plot_area_under_curve_non_normal" + str(int(10*self.time_stamps[window_indices[1]])) + "s.pdf")
-                np.savez(out_path + "non-normalized_area_under_peaks_" + str(int(10*self.time_stamps[window_indices[1]]))+ "s.npz", scores=areas, event_times=start_times, end_times=end_times, window_size=self.time_stamps[window_indices[1]])
+                np.savez(out_path + "non-normalized_area_under_peaks_" + str(int(10*self.time_stamps[window_indices[1]]))+ "s.npz", scores=areas, event_times=start_times, end_times=end_times, window=self.time_stamps[window_indices[1]])
 
 
-    def plot_area_under_curve_wrapper( self, window_size, edge="rising", normalize=True, out_path=None):
+    def plot_area_under_curve_wrapper( self, window, edge="rising", normalize=True, out_path=None):
         """
         Wrapper for plot_area_under_curve vs. time plots specialized for
         loaded event data that comes as a list of pairs of
         event start and end times (in seconds)
         """
-
         start_times = self.get_event_times("rising")
         end_times = self.get_event_times("falling")
         if start_times != -1:
-            self.plot_area_under_curve( start_times, end_times, window_size, normalize, out_path=out_path )
+            self.plot_area_under_curve( start_times, end_times, window, normalize, out_path=out_path )
         else:
             print "No event times loaded. Cannot plot perievent."  
 
@@ -670,8 +687,11 @@ class FiberAnalyze( object ):
         """
         start_time_index = self.convert_seconds_to_index(start_time)
         end_time_index = self.convert_seconds_to_index(end_time)
-        return np.max(self.fluor_data[start_time_index : end_time_index])
-
+        try:
+            range_max = np.max(self.fluor_data[start_time_index : end_time_index])
+        except:
+            range_max = 0
+        return range_max
 
     def plot_peaks_vs_time( self, out_path=None ):
         """
@@ -687,7 +707,6 @@ class FiberAnalyze( object ):
             for i in range(len(start_times)):
                 peak = self.get_peak(start_times[i], end_times[i])
                 peaks[i] = peak
-
 
             pl.figure()
 
@@ -796,15 +815,17 @@ def test_FiberAnalyze(options):
     """
     FA = FiberAnalyze( options )
     FA.load()
+    FA.plot_next_event_vs_intensity(intensity_measure="integrated", next_event_measure="length", window=[1, 3], out_path=None)
+
 #    FA.wavelet_plot()
 #    FA.notch_filter(10.0, 10.3)
     #FA.plot_periodogram(plot_type="log",out_path = options.output_path)
    # FA.plot_basic_tseries(out_path = options.output_path)
 #    FA.event_vs_baseline_barplot(out_path = options.output_path)
 
-    FA.plot_peritrigger_edge(window_size=[1, 3],out_path = options.output_path)
-    FA.plot_area_under_curve_wrapper( window_size=[0, 3], edge="rising", normalize=False, out_path = options.output_path)
-    FA.plot_peaks_vs_time(out_path = options.output_path)
+#    FA.plot_peritrigger_edge(window=[1, 3],out_path = options.output_path)
+#    FA.plot_area_under_curve_wrapper( window=[0, 3], edge="rising", normalize=False, out_path = options.output_path)
+#    FA.plot_peaks_vs_time(out_path = options.output_path)
 
     #peak_inds, peak_vals, peak_times = FA.get_peaks()
     #FA.plot_peak_data()
