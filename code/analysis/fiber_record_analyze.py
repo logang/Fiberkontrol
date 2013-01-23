@@ -36,7 +36,6 @@ class FiberAnalyze( object ):
         else:
             self.input_path = options.input_path
             self.output_path = options.output_path
-            print self.output_path
             self.trigger_path = options.trigger_path
 
         self.save_txt = options.save_txt
@@ -133,7 +132,7 @@ class FiberAnalyze( object ):
         self.fft = None #place holder for fft of rawsignal, if calculated
         self.fft_freq = None #place holder for frequency labels of fft
         self.filt_fluor_data = None #place holder for filtered rawsignal, if calculated
-        print "\t--> Finished loading data."
+        #print "\t--> Finished loading data."
 
         if self.save_txt:
             self.save_time_series(self.output_path)

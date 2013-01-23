@@ -42,7 +42,7 @@ if __name__ == "__main__":
     (options, args) = parser.parse_args()
 
     # --- Plot data --- #
-    exp_type = 'homecagenovel'
+    exp_type = 'homecagesocial'
     time_window = [0,1] # [before,after] event in seconds 
 
     fig = pl.figure()
@@ -66,24 +66,35 @@ if __name__ == "__main__":
             # fit a robust regression
             if len(onset_next_vals) > 0:
                 X = np.vstack( (np.log(peak_intensity), np.ones((len(onset_next_vals),))) )
-#                rlm_model = sm.RLM(np.log(onset_next_vals), X.TA, M=sm.robust.norms.TukeyBiweight(c=1.0))
-#                rlm_results = rlm_model.fit()
+#                rlm_model = sm.RLM(np.log(onset_next_vals), X.T, M=sm.robust.norms.TukeyBiweight())
+#                lm_results = rlm_model.fit()
                 lm_model = sm.OLS(np.log(onset_next_vals), X.T)
                 lm_results = lm_model.fit()
-                print "Coefficients:",lm_results.params
-                print "R-squared", lm_results.rsquared
+                print "-------------------------------------"
+                print animal_id, dates
                 try:
-                    print "R-squared Adjusted:", lm_results.rsquared_adj
+                    print "\t--> Slope:",lm_results.params[0]
+#                    print "\t--> Intercept:",lm_results.params[1]
+#                    print "\t--> Confidence Interval for Slope:", lm_results.conf_int()[0,:]
+                    print "\t--> P-value for Slope:", lm_results.pvalues[0]
+#                    print "\t--> Confidence Interval for Intercept:", lm_results.conf_int()[1,:]
+#                    print "\t--> P-value Interval for Intercept:", lm_results.pvalues[1]
+                    print "\t--> R-squared", lm_results.rsquared
                 except:
-                    print "Can not calculate adjusted R-squared."
+                    pass
+                try:
+                    print "\t--> R-squared Adjusted:", lm_results.rsquared_adj
+                except:
+                    print "\t--> Could not calculate adjusted R-squared."
                 yhat = lm_results.fittedvalues
 
 #                fig = pl.figure()
 #                ax = fig.add_subplot(1,1,1)
 #                ax.loglog(peak_intensity,onset_next_vals,'o')
 
-                ax.plot(np.log(peak_intensity), np.log(onset_next_vals),'o',color=cm.jet(float(i)/10.))
-                ax.plot(np.log(peak_intensity), yhat, '-', color=cm.jet(float(i)/10.) )
+#                ax.plot(np.log(peak_intensity), np.log(onset_next_vals),'o',color=cm.jet(float(i)/10.))
+                ax.plot(peak_intensity, onset_next_vals,'o',color=cm.jet(float(i)/10.))
+#                ax.plot(np.log(peak_intensity), yhat, '-', color=cm.jet(float(i)/10.) )
 
 #                pl.show()
                 i+=1 # increment color counter
