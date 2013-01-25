@@ -58,6 +58,9 @@ class FiberAnalyze( object ):
 
         # normalized fluor data, which is in arbitrary units
         self.fluor_data = self.data[:,self.fluor_channel]
+
+    
+
         if self.fluor_normalization == "deltaF":
             median = np.median(self.fluor_data)
             self.fluor_data = (self.fluor_data-median)/median #dF/F
@@ -691,11 +694,6 @@ class FiberAnalyze( object ):
                 peaks[i] = peak
 
 
-            pl.figure()
-
-            #w = self.fit_exponential(start_times, peaks + 1)
-            xp, pxp, x0, y0, c, k, r2 = self.fit_exponential(start_times, peaks + 1)
-            
             fig = pl.figure()
             ax = fig.add_subplot(111)
             print np.max(peaks) + .3
@@ -704,29 +702,31 @@ class FiberAnalyze( object ):
             else:
                 ax.set_ylim([0, 1.1])
 
-            ax.plot(xp, pxp-1)
             ax.set_xlim([100, 500])
-
-            #Lame way to fit exponential to data - this may need work
-            #A = np.array([start_times, np.ones(len(start_times))])
-            #w = np.linalg.lstsq(A.T, np.log(peaks + 1))[0]
-            #pl.plot(start_times, np.exp(w[1]*np.array(start_times) + w[0])-1, 'r-')
-
             ax.plot(start_times, peaks, 'o')
             pl.xlabel('Time [s]')
             pl.ylabel('Fluorescence [dF/F]')
             pl.title('Peak fluorescence of interaction event vs. event start time')
-            ax.text(min(200, np.min(start_times)), np.max(peaks) + 0.20, "y = c*exp(-k*(x-x0)) + y0")
-            ax.text(min(200, np.min(start_times)), np.max(peaks) + 0.15, "k = " + "{0:.2f}".format(k) + ", c = " + "{0:.2f}".format(c) + 
+
+
+            try:
+                xp, pxp, x0, y0, c, k, r2 = self.fit_exponential(start_times, peaks + 1)
+                ax.plot(xp, pxp-1)
+                ax.text(min(200, np.min(start_times)), np.max(peaks) + 0.20, "y = c*exp(-k*(x-x0)) + y0")
+                ax.text(min(200, np.min(start_times)), np.max(peaks) + 0.15, "k = " + "{0:.2f}".format(k) + ", c = " + "{0:.2f}".format(c) + 
                                                 ", x0 = " + "{0:.2f}".format(x0) + ", y0 = " + "{0:.2f}".format(y0) )
-            ax.text(min(200, np.min(start_times)), np.max(peaks) + 0.1, "r^2 = " + str(r2))
+                ax.text(min(200, np.min(start_times)), np.max(peaks) + 0.1, "r^2 = " + str(r2))
+            except:
+                print "Exponential Curve fit did not work"
+
+
 
             if out_path is None:
                 pl.title("No output path given")
                 pl.show()
             else:
                 pl.savefig(out_path + "plot_peaks_vs_time.pdf")
-                np.savez(out_path + "peaks_vs_time.npz", scores=k, event_times=start_times, end_times=end_times, window_size=0)
+                np.savez(out_path + "peaks_vs_time.npz", scores=peaks, event_times=start_times, end_times=end_times, window_size=0)
 
         else:
             print "No event times loaded. Cannot plot peaks_vs_time."  
@@ -825,8 +825,8 @@ def test_FiberAnalyze(options):
 #    FA.event_vs_baseline_barplot(out_path = options.output_path)
 
     #FA.plot_peritrigger_edge(window_size=[1, 3],out_path = options.output_path)
-    #FA.plot_area_under_curve_wrapper( window_size=[0, 3], edge="rising", normalize=False, out_path = options.output_path)
-    FA.plot_peaks_vs_time(out_path = options.output_path)
+    FA.plot_area_under_curve_wrapper( window_size=[0, 1], edge="rising", normalize=False, out_path = options.output_path)
+    #FA.plot_peaks_vs_time(out_path = options.output_path)
 
     #peak_inds, peak_vals, peak_times = FA.get_peaks()
     #FA.plot_peak_data()
