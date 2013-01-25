@@ -133,6 +133,9 @@ class PairAnalyze( object ):
 			event_scores = []
 			event_lengths = []
 
+			trial_labels = []
+			time_from_first_event = []
+
 			for f in scores:
 				if(just_first):
 					event_scores.append(f[0])
@@ -160,6 +163,30 @@ class PairAnalyze( object ):
 							event_ends.append(f[i])
 				else:
 						event_ends.append(f)
+
+			for i in range(len(start_times)):
+				f = start_times[i]
+				if np.shape(f) != ():
+					if(just_first):
+						trial_labels.append(i)
+					else:
+						for j in range(len(f)):
+							trial_labels.append(i)
+				else:
+					trial_labels.append(i)
+
+			for i in range(len(start_times)):
+				f = start_times[i]
+				if np.shape(f) != ():
+					if(just_first):
+						time_from_first_event.append(0)
+					else:
+						for j in range(len(f)):
+							time_from_first_event.append(f[j] - f[0])
+				else:
+					time_from_first_event.append(0)
+
+
 
 
 			event_lengths = np.array(event_ends) - np.array(event_starts)
@@ -201,6 +228,22 @@ class PairAnalyze( object ):
 				plt.savefig(out_path + title + "_event_duration_hist.pdf")
 			else:
 				plt.show()
+
+			event_intervals = np.array(event_starts[1:]) - np.array(event_starts[0:-1])
+
+			time_from_first_event = [time_from_first_event[i] for i in range(len(event_intervals)) if event_intervals[i]>0]
+			trial_labels = [trial_labels[i] for i in range(len(event_intervals)) if event_intervals[i]>0]
+
+			event_intervals = event_intervals[event_intervals > 0]
+			print len(time_from_first_event), len(event_intervals)
+			plt.figure()
+			p = plt.scatter(np.log(time_from_first_event), np.log(np.array(event_intervals)), c=trial_labels)
+			plt.xlabel('log time of event t since first event in a trial [s]')
+			plt.ylabel('log interval between event t and t+1 [s]')
+			if title is not None:
+				plt.title(title)
+			plt.show()
+
 
 
 			# print plt.cm.jet(np.arange(len(length_times)))
@@ -266,14 +309,19 @@ class PairAnalyze( object ):
 
 
 
-		def AverageScores(self, scores, start_times, title=None, score_type=None, index=-1, out_path=None, bucket='number'):
+		def GroupScoresByBout(self, scores, start_times, index=-1):
 			"""
-			Combines interaction bouts across multiple trials based on
-			which number bout it is within a trial.
-			If bucket='number', simply use the bout number.
-			Plots the average score for each bout.
-			"""
+			Input: scores = [[scores from trial 1], [scores from trial 2], [scores from trial 3]...]
+						 start_times = [[event times from trial 1], [event times from trial 2], [event times from trial 3]...]
+						 index: if you wish to use only a single bout number of the specified index
 
+			Returns: 
+						 scores_per_bout = [[scores from the first bout across trials], [scores from the second bout across trials]...]
+						 all_bouts = [scores from first trial, scores from second trial, scores from third trial] (all in on array)
+						 all_bout_indices = [the indices to match the above array]
+						 all_bout_times = [the times to match the data points in all_bouts]
+						 all_bout_labels = [the trial number of each data point in all_bouts]
+			 """
 
 			scores_per_bout = []
 			all_bouts = []
@@ -297,6 +345,10 @@ class PairAnalyze( object ):
 						else:
 							scores_per_bout[i].append(f[i])
 
+			return (scores_per_bout, all_bouts, all_bout_indices, all_bout_times, all_bout_labels)
+
+
+		def SummarizeBouts(self, scores_per_bout):
 
 			bout_avgs = np.zeros(len(scores_per_bout))
 			bout_stderr = np.zeros(len(scores_per_bout))
@@ -304,9 +356,19 @@ class PairAnalyze( object ):
 				bout_avgs[i] = np.mean(scores_per_bout[i])
 				bout_stderr[i] = np.sqrt(np.var(scores_per_bout[i])/len(scores_per_bout[i]))
 
-			print np.max(np.max(all_bout_times))
-			print len(np.multiply(all_bout_times,	len(all_bout_indices)))
-			print len(all_bouts)
+			return (bout_avgs, bout_stderr)
+
+		def AverageScores(self, scores, start_times, title=None, score_type=None, index=-1, out_path=None, bucket='number'):
+			"""
+			Combines interaction bouts across multiple trials based on
+			which number bout it is within a trial.
+			If bucket='number', simply use the bout number.
+			Plots the average score for each bout.
+			"""
+
+			scores_per_bout, all_bouts, all_bout_indices, all_bout_times, all_bout_labels = self.GroupScoresByBout(scores, start_times, index)
+
+			bout_avgs, bout_stderr = self.SummarizeBouts(scores_per_bout)
 
 			bout_numbers = range(1, len(bout_avgs) +1)
 			fig = plt.figure()	
@@ -320,24 +382,22 @@ class PairAnalyze( object ):
 			if title is not None:
 				plt.title(title)
 
-	#		try
-			text_x = np.min(bout_numbers) + 3
-			text_y = np.max(bout_avgs) 
-			xp, pxp, x0, y0, c, k, r2 = self.fit_exponential(bout_numbers, bout_avgs + 1)
-			ax.plot(xp, pxp-1)
-			ax.text(min(200, text_x), text_y + 0.25, "y = c*exp(-k*(x-x0)) + y0")
-			ax.text(min(200, text_x), text_y + 0.20, "k = " + "{0:.2f}".format(k) + ", c = " + "{0:.2f}".format(c) + 
-																			", x0 = " + "{0:.2f}".format(x0) + ", y0 = " + "{0:.2f}".format(y0) )
-			ax.text(min(200, text_x), text_y + 0.15, "r^2 = " + str(r2))
-		#	except:
-		#			print "Exponential Curve fit did not work"
-
+			try:
+				text_x = np.min(bout_numbers) + 3
+				text_y = np.max(bout_avgs) 
+				xp, pxp, x0, y0, c, k, r2 = self.fit_exponential(bout_numbers, bout_avgs + 1)
+				ax.plot(xp, pxp-1)
+				ax.text(min(200, text_x), text_y + 0.25, "y = c*exp(-k*(x-x0)) + y0")
+				ax.text(min(200, text_x), text_y + 0.20, "k = " + "{0:.2f}".format(k) + ", c = " + "{0:.2f}".format(c) + 
+																				", x0 = " + "{0:.2f}".format(x0) + ", y0 = " + "{0:.2f}".format(y0) )
+				ax.text(min(200, text_x), text_y + 0.15, "r^2 = " + str(r2))
+			except:
+					print "Exponential Curve fit did not work"
 
 			if out_path is not None:
 				plt.savefig(out_path + title + "_" + score_type + "_average_vs_bout_number.pdf")
 			else:
 				plt.show()
-
 
 			fig = plt.figure()	
 			ax = fig.add_subplot(111)
@@ -415,6 +475,97 @@ class PairAnalyze( object ):
 				plt.show()			
 
 
+		def CombinedAverage(self, n_scores, n_start_times, s_scores, s_start_times, 
+										titlen=None, titles=None, score_type=None, out_path=None):
+
+			n_scores_per_bout, n_all_bouts, n_all_bout_indices, n_all_bout_times, n_all_bout_labels= self.GroupScoresByBout(n_scores, n_start_times)
+			s_scores_per_bout, s_all_bouts, s_all_bout_indices, s_all_bout_times, s_all_bout_labels= self.GroupScoresByBout(s_scores, s_start_times)
+
+
+			n_bout_avgs, n_bout_stderr = self.SummarizeBouts(n_scores_per_bout)
+			s_bout_avgs, s_bout_stderr = self.SummarizeBouts(s_scores_per_bout)
+
+
+			n_bout_numbers = range(1, len(n_bout_avgs) +1)
+			s_bout_numbers = range(1, len(s_bout_avgs) +1)
+
+
+
+			##PLOTTING##
+			fig = plt.figure()	
+			ax = fig.add_subplot(111)
+			ax.errorbar(n_bout_numbers, n_bout_avgs, yerr=1.96*n_bout_stderr, fmt='ob')
+			ax.errorbar(s_bout_numbers, s_bout_avgs, yerr=1.96*s_bout_stderr, fmt='^g')
+			plt.xlabel('Bout number')
+			plt.ylabel('Average ' + score_type + ' across all trials [dF/F]')
+			ax.set_ylim([min(np.min(s_bout_avgs), min(0, np.min(n_bout_avgs))), 0.7])
+			if titlen is not None and titles is not None:
+				plt.title("")
+
+			# try:
+
+			n_xp, n_pxp, n_x0, n_y0, n_c, n_k, n_r2 = self.fit_exponential(n_bout_numbers, n_bout_avgs + 1)
+			s_xp, s_pxp, s_x0, s_y0, s_c, s_k, s_r2 = self.fit_exponential(s_bout_numbers, s_bout_avgs + 1)
+
+
+			text_x = max(np.min(s_bout_numbers), np.min(n_bout_numbers) + 3)
+			text_y = max(np.max(n_bout_avgs), np.max(s_bout_avgs))
+			nplot, = plt.plot(n_xp, n_pxp-1, 'b', linewidth=2)
+			splot, = plt.plot(s_xp, s_pxp-1, 'g', linewidth=2)
+			plt.legend([nplot, splot], ["Novel object: decay rate = " + "{0:.2f}".format(n_k) + r", $r^2 = $" + "{0:.2f}".format(n_r2), 
+																"Social interaction: decay rate = " + "{0:.2f}".format(s_k) + r", $r^2 = $" + "{0:.2f}".format(s_r2)])
+			# ax.text(min(200, text_x), text_y + 0.25, "y = c*exp(-k*(x-x0)) + y0")
+			# ax.text(min(200, text_x), text_y + 0.20, "novel k = " + "{0:.2f}".format(n_k) + ", r^2 = " + "{0:.2f}".format(n_r2))
+			# ax.text(min(200, text_x), text_y + 0.15, "social k = " + "{0:.2f}".format(s_k) + ", r^2 = " + "{0:.2f}".format(s_r2))
+			# except:
+			# 		print "Exponential Curve fit did not work"
+
+			if out_path is not None:
+				plt.savefig(out_path + titles + "_" + titlen + "combined_average_vs_bout_number.pdf")
+			else:
+				plt.show()
+			pass
+
+
+
+			##TIME SINCE FIRST EVENT PLOT, NOT FROM AVERAGES###
+			fig = plt.figure()	
+			ax = fig.add_subplot(111)
+			ax.scatter(n_all_bout_times, n_all_bouts, c='b', linewidth=.1, marker='o', alpha=0.8)
+			ax.scatter(s_all_bout_times, s_all_bouts, c='g', linewidth=.1, marker='^', alpha=0.8)
+
+			plt.xlabel('Time since first bout [s]')
+			plt.ylabel(score_type + ' for every bout across all trials [dF/F]')
+			ax.set_ylim([min(0, max(np.min(n_all_bouts), np.min(s_all_bouts))), 1])
+			ax.set_xlim([-20, max(np.max(n_all_bout_times), np.max(s_all_bout_times))])
+			if titles is not None and titlen is not None:
+				plt.title("")
+
+
+			text_x = max(np.max(n_all_bout_times), np.max(s_all_bout_times)) + 100
+			text_y = max(np.min(n_all_bouts), np.min(s_all_bouts)) - 0.3
+
+			n_xp, n_pxp, n_x0, n_y0, n_c, n_k, n_r2 = self.fit_exponential(n_all_bout_times, np.array(n_all_bouts) + 1)
+			s_xp, s_pxp, s_x0, s_y0, s_c, s_k, s_r2 = self.fit_exponential(s_all_bout_times, np.array(s_all_bouts) + 1)
+
+
+			nplot, = ax.plot(n_xp, n_pxp-1, linewidth=2.0, color='b')
+			splot, = ax.plot(s_xp, s_pxp-1, linewidth=2.0, color='g')
+			plt.legend([nplot, splot], ["Novel object: decay rate = " + "{0:.2f}".format(n_k) + r", $r^2 = $" + "{0:.2f}".format(n_r2), 
+																"Social interaction: decay rate = " + "{0:.2f}".format(s_k) + r", $r^2 = $" + "{0:.2f}".format(s_r2)])
+
+			# ax.text(min(200, text_x), text_y + 0.25, "y = c*exp(-k*(x-x0)) + y0")
+			# ax.text(min(200, text_x), text_y + 0.20, "k = " + "{0:.2f}".format(k) + ", c = " + "{0:.2f}".format(c) + 
+			# 																", x0 = " + "{0:.2f}".format(x0) + ", y0 = " + "{0:.2f}".format(y0) )
+			# ax.text(min(200, text_x), text_y + 0.15, "r^2 = " + str(r2))
+
+			if out_path is not None:
+				plt.savefig(out_path + titlen + "_" + titles + "_combined_" + score_type + "_vs_time.pdf")
+			else:
+				plt.show()
+
+
+
 def test_PairAnalyze(options):
 	"""
 	Test the PairAnalyze class.
@@ -427,14 +578,17 @@ def test_PairAnalyze(options):
 #	PA.CompareEvent(0)
 #	PA.CompareEvent(0, "wilcoxon" )
 #	print "Novel interaction time:"
-#	PA.EventLength_vs_Score(PA.n_scores, PA.n_start_times, PA.n_end_times, PA.n_length_times, just_first=False, title="Novel", out_path=PA.output_path)
+	PA.EventLength_vs_Score(PA.n_scores, PA.n_start_times, PA.n_end_times, PA.n_length_times, just_first=False, title="Novel", out_path=PA.output_path)
 #	print "Social interaction time:"
-#	PA.EventLength_vs_Score(PA.s_scores, PA.s_start_times, PA.s_end_times, PA.s_length_times, just_first=False, title="Social", out_path=PA.output_path)
+	PA.EventLength_vs_Score(PA.s_scores, PA.s_start_times, PA.s_end_times, PA.s_length_times, just_first=False, title="Social", out_path=PA.output_path)
 
-	#PA.AverageScores(PA.n_scores, PA.n_start_times, title='Novel', score_type='Area', out_path=PA.output_path)
-	#PA.AverageScores(PA.s_scores, PA.s_start_times, title='Social', score_type='Area', out_path=PA.output_path)
-	PA.ScoreHistogram(PA.n_scores, title='Novel', score_type='Peak', out_path=PA.output_path)
-	PA.ScoreHistogram(PA.s_scores, title='Social', score_type='Peak', out_path=PA.output_path)
+	#	PA.CombinedAverage(PA.n_scores, PA.n_start_times, PA.s_scores, PA.s_start_times, titlen='novel', titles='social', score_type='area under curve', out_path=PA.output_path + 'area_')
+	PA.CombinedAverage(PA.n_scores, PA.n_start_times, PA.s_scores, PA.s_start_times, titlen='novel', titles='social', score_type='peak height', out_path=PA.output_path + 'peak_')
+
+#	PA.AverageScores(PA.n_scores, PA.n_start_times, title='Novel', score_type='area', out_path=PA.output_path)
+#	PA.AverageScores(PA.s_scores, PA.s_start_times, title='Social', score_type='area', out_path=PA.output_path)
+	#PA.ScoreHistogram(PA.n_scores, title='Novel', score_type='Peak', out_path=PA.output_path)
+	#PA.ScoreHistogram(PA.s_scores, title='Social', score_type='Peak', out_path=PA.output_path)
 
 
 
