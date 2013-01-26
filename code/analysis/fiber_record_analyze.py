@@ -477,16 +477,18 @@ class FiberAnalyze( object ):
 
         window_indices = [self.convert_seconds_to_index( window[0]),
                           self.convert_seconds_to_index( window[1])]
+        print "window indices", window_indices
+        print "event_times", np.shape(event_times)
 
         time_chunks = []
         for e in event_times:
-            try:
-                e_idx = np.where(e<self.time_stamps)[0][0]
-                chunk = self.fluor_data[range((e_idx-window_indices[0]),(e_idx+window_indices[1]))]
+           # try:
+            e_idx = np.where(e<self.time_stamps)[0][0]
+            chunk = self.fluor_data[range((e_idx-window_indices[0]),(e_idx+window_indices[1]))]
                 #print [range((e_idx-window_indices[0]),(e_idx+window_indices[1]))]
-                time_chunks.append(chunk)
-            except:
-                print "Unable to extract window:", [(e-window_indices[0]),(e+window_indices[1])]
+            time_chunks.append(chunk)
+            #except:
+             #   print "Unable to extract window:", [(e-window_indices[0]),(e+window_indices[1])]
         return time_chunks
 
     def plot_perievent_hist( self, event_times, window, out_path=None ):
@@ -500,6 +502,9 @@ class FiberAnalyze( object ):
         pl.clf()
         fig = pl.figure()
         ax = fig.add_subplot(111)
+
+        print "event_times", np.shape(event_times)
+        print "window", window
 
         # get blocks of time series for window around each event time
         time_chunks = self.get_time_chunks_around_events(event_times, window)
@@ -551,11 +556,11 @@ class FiberAnalyze( object ):
         type can be "homecage" or "sucrose"
         """
         if type == "sucrose":
-            event_times = self.get_sucrose_event_times(nseconds=15)
+            event_times, end_times = self.get_sucrose_event_times(nseconds=15)
         elif type == "homecage":
             event_times = self.get_event_times(edge)
 
-        if event_times != -1:
+        if event_times[0] != -1:
             self.plot_perievent_hist( event_times, window, out_path=out_path )
         else:
             print "No event times loaded. Cannot plot perievent."        
@@ -1093,12 +1098,12 @@ def test_FiberAnalyze(options):
 
   #  FA.plot_area_under_curve_wrapper( window_size=[0, 1], edge="rising", normalize=False, out_path = options.output_path)
     #FA.plot_peaks_vs_time(out_path = options.output_path)
-  #  FA.plot_peritrigger_edge(window=[1, 3], type="sucrose", out_path = options.output_path)
+    FA.plot_peritrigger_edge(window=[10, 25], type="sucrose", out_path = options.output_path)
 #    FA.plot_area_under_curve_wrapper( window=[0, 3], edge="rising", normalize=False, out_path = options.output_path)
 #    FA.plot_peaks_vs_time(out_path = options.output_path)
    
 
-    FA.plot_peaks_vs_time(type="sucrose", out_path = options.output_path)
+  #  FA.plot_peaks_vs_time(type="sucrose", out_path = options.output_path)
 
    # FA.debleach(out_path = options.output_path) #you want to use --fluor-normalization = 'raw' when debleaching!!!
 

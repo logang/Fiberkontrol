@@ -529,6 +529,8 @@ class PairAnalyze( object ):
 				splot, = plt.plot(s_xp, s_pxp-1, 'g', linewidth=2)
 				plt.legend([nplot, splot], ["Novel object: decay rate = " + "{0:.2f}".format(n_k) + r", $r^2 = $" + "{0:.2f}".format(n_r2), 
 																"Social interaction: decay rate = " + "{0:.2f}".format(s_k) + r", $r^2 = $" + "{0:.2f}".format(s_r2)])
+			else:
+				plt.legend([nplot], ["Sucrose response: decay rate = " + "{0:.2f}".format(n_k) + r", $r^2 = $" + "{0:.2f}".format(n_r2)])
 			# ax.text(min(200, text_x), text_y + 0.25, "y = c*exp(-k*(x-x0)) + y0")
 			# ax.text(min(200, text_x), text_y + 0.20, "novel k = " + "{0:.2f}".format(n_k) + ", r^2 = " + "{0:.2f}".format(n_r2))
 			# ax.text(min(200, text_x), text_y + 0.15, "social k = " + "{0:.2f}".format(s_k) + ", r^2 = " + "{0:.2f}".format(s_r2))
@@ -579,6 +581,8 @@ class PairAnalyze( object ):
 				splot, = ax.plot(s_xp, s_pxp-1, linewidth=2.0, color='g')
 				plt.legend([nplot, splot], ["Novel object: decay rate = " + "{0:.2f}".format(n_k) + r", $r^2 = $" + "{0:.2f}".format(n_r2), 
 																"Social interaction: decay rate = " + "{0:.2f}".format(s_k) + r", $r^2 = $" + "{0:.2f}".format(s_r2)])
+			else:
+				plt.legend([nplot], ["Sucrose response: decay rate = " + "{0:.4f}".format(n_k) + r", $r^2 = $" + "{0:.2f}".format(n_r2)])
 
 			# ax.text(min(200, text_x), text_y + 0.25, "y = c*exp(-k*(x-x0)) + y0")
 			# ax.text(min(200, text_x), text_y + 0.20, "k = " + "{0:.2f}".format(k) + ", c = " + "{0:.2f}".format(c) + 
