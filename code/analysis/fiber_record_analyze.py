@@ -81,6 +81,7 @@ class FiberAnalyze( object ):
             # normalize triggers to fluor data
             if self.trigger_path is None:
                 self.trigger_data = self.data[:,self.trigger_channel]
+                print "trigger data loaded"
             else:
                 try:
                     self.time_tuples = self.load_trigger_data(self.s_file, self.e_file)
@@ -158,6 +159,7 @@ class FiberAnalyze( object ):
 
         # get appropriate time values for x-axis
         time_vals = self.time_stamps[range(len(self.fluor_data))]
+        print np.shape(time_vals)
 
         # make filled blocks for trigger onset/offset
         ymax = 1.1*np.max(self.fluor_data)
@@ -582,7 +584,83 @@ class FiberAnalyze( object ):
             return event_times
         else:            
             print "No event times loaded. Cannot find edges."        
-            return -1
+            return [-1]
+
+    def get_lick_density_vs_time( self, nseconds, out_path=None):
+        """
+        For each time point, plot the number of licks occuring
+        in the nseconds after that time point.
+        """
+
+        nindex = self.convert_seconds_to_index(nseconds)
+        mask = np.ones(nindex)
+        self.trigger_data = np.floor(self.trigger_data)
+
+        time_vals = self.time_stamps[range(len(self.trigger_data))]
+        density = np.convolve(self.trigger_data, mask)
+        density = density[nindex-1:]
+
+        print "density calculated"
+        return density
+
+        # print "nindex:", nindex
+        # print "shape(density)", np.shape(density[nindex-1:])
+        # print "shape(time)", np.shape(time_vals)
+        # pl.plot(time_vals, density[nindex-1:])
+        # pl.fill(time_vals, 100*self.trigger_data, facecolor='r', alpha=0.5)
+        # pl.ylabel('Density of licks calculated over window of ' + str(nseconds))
+        # pl.xlabel('Time [s]')
+        # pl.title('Density of licks')
+        # if out_path is not None:
+        #     pl.savefig(out_path + "lick_density.png")
+        # else:
+        #     pl.show()
+
+    def get_sucrose_event_times( self, nseconds, density=None, edge="rising"):
+        """
+        Extracts a list of the times (in seconds) corresponding
+        to sucrose lick epochs. Epochs are determined by first calculating
+        the density of licks (using a window of nseconds).
+        The start of a licking epoch is then determined by calculating
+        the location of the rising edges of this density plot.
+        The end of a licking epoch can be determined by calculating
+        the time at which this density returns to zero minus nseconds
+        """
+
+        nindex = self.convert_seconds_to_index(nseconds)
+        mask = np.ones(nindex)
+
+        self.trigger_data = np.floor(self.trigger_data) #make sure that no licks is represented by 0
+        time_vals = self.time_stamps[range(len(self.trigger_data))]
+        if density is None:
+            density = np.convolve(self.trigger_data, mask)
+            density = density[nindex-1:]
+
+
+        dmed = np.median(density)
+        print dmed
+        event_times = np.zeros(0)
+        if edge == "rising":
+            for i in range(2, len(density)):
+                if np.round(density[i-1]) == np.round(dmed) and density[i] > dmed:
+                    event_times = np.append(event_times, time_vals[i+nindex]-.013) #Hardcode 0.013, the length of the lickometer signal
+        elif edge == "falling":
+            for i in range(nindex, len(density)-2):
+                if np.round(density[i+1]) == np.round(dmed) and density[i] > dmed:
+                    event_times = np.append(event_times, time_vals[i])
+        else:
+            print "Incorrect edge type"
+
+        print event_times
+    
+       # pl.plot(time_vals, density)
+       # pl.fill(time_vals, 100*self.trigger_data, facecolor='r', alpha=0.5)
+       # pl.show()
+
+        return event_times
+
+
+
 
     def convert_seconds_to_index( self, time_in_seconds):
         return np.where( self.time_stamps >= time_in_seconds)[0][0]
@@ -629,8 +707,9 @@ class FiberAnalyze( object ):
         Plots of area under curve for each event_time 
         with before and after event durationsspecified in window as 
         [before, after] (in seconds).
-        -- choosing the window around the event onset is still somewhat arbitrary, 
-        we need to discuss how to choose this well...
+        -- we decided to use a 1s window because it captures the median length
+        of both social and novel object interaction events
+
         """
         
         #change the normalization depending on whether you wish to divide (normalize)
@@ -686,6 +765,21 @@ class FiberAnalyze( object ):
         else:
             print "No event times loaded. Cannot plot perievent."  
 
+    def get_sucrose_peak(self, start_time, end_time):
+        """
+        Return the maximum fluorescence value found between
+        start_time and end_time (in seconds)
+        May eventually account for single licks and possibly for looking at a window
+        beyond the length of time of a single lick
+        """
+        start_time_index = self.convert_seconds_to_index(start_time)
+        end_time_index = self.convert_seconds_to_index(end_time)
+        print "start ", start_time, " end ", end_time
+
+        if start_time_index < end_time_index:
+            return np.max(self.fluor_data[start_time_index : end_time_index])
+        else:
+            return 0
 
     def get_peak( self, start_time, end_time ):
         """
@@ -747,30 +841,49 @@ class FiberAnalyze( object ):
 
         return maxvalues
 
-    def plot_peaks_vs_time( self, out_path=None ):
+    def plot_peaks_vs_time( self, type="homecage", sucrose_nseconds=10, out_path=None ):
         """
         Plot the maximum fluorescence value within each interaction event vs the start time
         of the event
+        type can be "homecage", for novel object and social, where event times were hand scored
+        or "sucrose", where event times are from the lickometer
+        sucrose_nseconds controls the minimum spacing between lick epochs
         """
 
-        start_times = self.get_event_times("rising")
-        end_times = self.get_event_times("falling")
-        if start_times != -1:
+        if type == "homecage":
+            start_times = self.get_event_times("rising")
+            end_times = self.get_event_times("falling")
+        elif type == "sucrose":
+            density = self.get_lick_density_vs_time(sucrose_nseconds)
+            start_times = self.get_sucrose_event_times(sucrose_nseconds, density=density, edge="rising")
+            end_times = self.get_sucrose_event_times(sucrose_nseconds, density=density, edge="falling")
+        else:
+            print "Incorrect behavior type specified in plot_peaks_vs_time"
 
+        if start_times[0] != -1:
             peaks = np.zeros(len(start_times))
             for i in range(len(start_times)):
-                peak = self.get_peak(start_times[i], end_times[i])
+                if type == "sucrose":
+                    peak = self.get_sucrose_peak(start_times[i], end_times[i])
+                else:
+                    peak = self.get_peak(start_times[i], end_times[i])
                 peaks[i] = peak
 
             fig = pl.figure()
             ax = fig.add_subplot(111)
             print np.max(peaks) + .3
-            if np.max(peaks) > 0.8:
-                ax.set_ylim([0, 1.3])
+            if type == "sucrose":
+                ax.set_ylim([0, np.max(peaks) + 0.1])
             else:
-                ax.set_ylim([0, 1.1])
+                if np.max(peaks) > 0.8:
+                    ax.set_ylim([0, 1.3])
+                else:
+                    ax.set_ylim([0, 1.1])
 
-            ax.set_xlim([100, 500])
+            if type == "homecage":
+                ax.set_xlim([100, 500])
+            else:
+                ax.set_xlim([np.min(start_times), np.max(start_times)])
             ax.plot(start_times, peaks, 'o')
             pl.xlabel('Time [s]')
             pl.ylabel('Fluorescence [dF/F]')
@@ -886,20 +999,23 @@ def test_FiberAnalyze(options):
     """
     FA = FiberAnalyze( options )
     FA.load()
-    FA.plot_next_event_vs_intensity(intensity_measure="peak", next_event_measure="onset", window=[0, 1], out_path=None)
+#    FA.plot_next_event_vs_intensity(intensity_measure="peak", next_event_measure="onset", window=[0, 1], out_path=None)
 
 #    FA.wavelet_plot()
 #    FA.notch_filter(10.0, 10.3)
   #  FA.plot_periodogram(plot_type="log",out_path = options.output_path)
   #  FA.plot_basic_tseries(out_path = options.output_path)
+  #  FA.plot_lick_density_vs_time(1, out_path = options.output_path)
+   # FA.get_sucrose_event_times(5, "falling")
 #    FA.event_vs_baseline_barplot(out_path = options.output_path)
 
     #FA.plot_peritrigger_edge(window_size=[1, 3],out_path = options.output_path)
-    FA.plot_area_under_curve_wrapper( window_size=[0, 1], edge="rising", normalize=False, out_path = options.output_path)
+  #  FA.plot_area_under_curve_wrapper( window_size=[0, 1], edge="rising", normalize=False, out_path = options.output_path)
     #FA.plot_peaks_vs_time(out_path = options.output_path)
 #    FA.plot_peritrigger_edge(window=[1, 3],out_path = options.output_path)
 #    FA.plot_area_under_curve_wrapper( window=[0, 3], edge="rising", normalize=False, out_path = options.output_path)
 #    FA.plot_peaks_vs_time(out_path = options.output_path)
+    FA.plot_peaks_vs_time(type="sucrose", out_path = options.output_path)
 
     #peak_inds, peak_vals, peak_times = FA.get_peaks()
     #FA.plot_peak_data()
