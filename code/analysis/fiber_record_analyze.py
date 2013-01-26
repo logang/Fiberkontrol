@@ -503,6 +503,7 @@ class FiberAnalyze( object ):
 
         # get blocks of time series for window around each event time
         time_chunks = self.get_time_chunks_around_events(event_times, window)
+        print "time_chunks", np.shape(time_chunks)
 
         window_indices = [ self.convert_seconds_to_index(window[0]),
                            self.convert_seconds_to_index(window[1]) ]
@@ -609,15 +610,15 @@ class FiberAnalyze( object ):
 
         print "density calculated"
 
-        print "nindex:", nindex
-        print "shape(density)", np.shape(density[nindex-1:])
-        print "shape(time)", np.shape(time_vals)
-        pl.plot(time_vals, density)
-        pl.fill(time_vals, 100*self.trigger_data, facecolor='r', alpha=0.5)
-        pl.ylabel('Density of licks calculated over window of ' + str(nseconds))
-        pl.xlabel('Time [s]')
-        pl.title('Density of licks')
-        pl.show()
+        # print "nindex:", nindex
+        # print "shape(density)", np.shape(density[nindex-1:])
+        # print "shape(time)", np.shape(time_vals)
+        # pl.plot(time_vals, density)
+        # pl.fill(time_vals, 100*self.trigger_data, facecolor='r', alpha=0.5)
+        # pl.ylabel('Density of licks calculated over window of ' + str(nseconds))
+        # pl.xlabel('Time [s]')
+        # pl.title('Density of licks')
+        # pl.show()
 
         return density
 
@@ -640,8 +641,6 @@ class FiberAnalyze( object ):
         nindex = self.convert_seconds_to_index(nseconds)
         mask = np.ones(nindex)
 
-        pl.plot(self.trigger_data)
-        pl.show()
 
         self.trigger_data = np.floor(self.trigger_data) #make sure that no licks is represented by 0
         time_vals = self.time_stamps[range(len(self.trigger_data))]
@@ -672,9 +671,9 @@ class FiberAnalyze( object ):
         print "start_times ", filt_start_times
         print "end_times ", filt_end_times
     
-        pl.plot(time_vals, density)
-        pl.fill(time_vals, 100*self.trigger_data, facecolor='r', alpha=0.5)
-        pl.show()
+        # pl.plot(time_vals, density)
+        # pl.fill(time_vals, 100*self.trigger_data, facecolor='r', alpha=0.5)
+        # pl.show()
 
         return (filt_start_times, filt_end_times)
 
@@ -956,7 +955,7 @@ class FiberAnalyze( object ):
             ax = fig.add_subplot(111)
             print np.max(peaks) + .3
             if type == "sucrose":
-                ax.set_ylim([0, np.max(peaks) + 0.4])
+                ax.set_ylim([0, np.max(peaks) + 0.4*np.max(peaks)])
             else:
                 if np.max(peaks) > 0.8:
                     ax.set_ylim([0, 1.3])
@@ -976,10 +975,10 @@ class FiberAnalyze( object ):
             try:
                 xp, pxp, x0, y0, c, k, r2, yxp = self.fit_exponential(start_times, peaks + 1)
                 ax.plot(xp, pxp-1)
-                ax.text(min(200, np.min(start_times)), np.max(peaks) + 0.20, "y = c*exp(-k*(x-x0)) + y0")
-                ax.text(min(200, np.min(start_times)), np.max(peaks) + 0.15, "k = " + "{0:.2f}".format(k) + ", c = " + "{0:.2f}".format(c) + 
+                ax.text(min(200, np.min(start_times)), np.max(peaks) + 0.20*np.max(peaks), "y = c*exp(-k*(x-x0)) + y0")
+                ax.text(min(200, np.min(start_times)), np.max(peaks) + 0.15*np.max(peaks), "k = " + "{0:.2f}".format(k) + ", c = " + "{0:.2f}".format(c) + 
                                                 ", x0 = " + "{0:.2f}".format(x0) + ", y0 = " + "{0:.2f}".format(y0) )
-                ax.text(min(200, np.min(start_times)), np.max(peaks) + 0.1, "r^2 = " + str(r2))
+                ax.text(min(200, np.min(start_times)), np.max(peaks) + 0.1*np.max(peaks), "r^2 = " + str(r2))
             except:
                 print "Exponential Curve fit did not work"
 
@@ -1094,12 +1093,12 @@ def test_FiberAnalyze(options):
 
   #  FA.plot_area_under_curve_wrapper( window_size=[0, 1], edge="rising", normalize=False, out_path = options.output_path)
     #FA.plot_peaks_vs_time(out_path = options.output_path)
-    FA.plot_peritrigger_edge(window=[1, 3], type="sucrose", out_path = options.output_path)
+  #  FA.plot_peritrigger_edge(window=[1, 3], type="sucrose", out_path = options.output_path)
 #    FA.plot_area_under_curve_wrapper( window=[0, 3], edge="rising", normalize=False, out_path = options.output_path)
 #    FA.plot_peaks_vs_time(out_path = options.output_path)
    
 
-  #  FA.plot_peaks_vs_time(type="sucrose", out_path = options.output_path)
+    FA.plot_peaks_vs_time(type="sucrose", out_path = options.output_path)
 
    # FA.debleach(out_path = options.output_path) #you want to use --fluor-normalization = 'raw' when debleaching!!!
 
