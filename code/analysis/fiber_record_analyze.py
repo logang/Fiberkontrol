@@ -61,6 +61,7 @@ class FiberAnalyze( object ):
         if file_type == "npz":
             self.data = np.load( self.input_path )['data']
             self.time_stamps = np.load( self.input_path )['time_stamps']
+            print "np.shape(self.data)", np.max(self.data[:, 0]), np.max(self.data[:, 1]), np.max(self.data[:, 2]), np.max(self.data[:, 3])
             
             # normalized fluor data, which is in arbitrary units
             self.fluor_data = self.data[:,self.fluor_channel]
@@ -75,6 +76,7 @@ class FiberAnalyze( object ):
             else:
                 raise ValueError( self.fluor_normalization, "is not a valid entry for --fluor-normalization.")
             # make smallest value positive.
+
             self.fluor_data -= np.min(self.fluor_data)
             self.fluor_data +=0.0000001 # keep strictly positive
 
@@ -540,13 +542,18 @@ class FiberAnalyze( object ):
             #pl.savefig(os.path.join(out_path,'perievent_tseries'))
             pl.savefig(out_path + "perievent_tseries.pdf")
 
-    def plot_peritrigger_edge( self, window, edge="rising", out_path=None ):
+    def plot_peritrigger_edge( self, window, edge="rising", type="homecage", out_path=None ):
         """
         Wrapper for plot_perievent histograms specialized for
         loaded event data that comes as a list of pairs of
         event start and end times.
+        type can be "homecage" or "sucrose"
         """
-        event_times = self.get_event_times(edge)
+        if type == "sucrose":
+            event_times = self.get_sucrose_event_times(nseconds=15)
+        elif type == "homecage":
+            event_times = self.get_event_times(edge)
+
         if event_times != -1:
             self.plot_perievent_hist( event_times, window, out_path=out_path )
         else:
@@ -601,16 +608,19 @@ class FiberAnalyze( object ):
         density = density[nindex-1:]
 
         print "density calculated"
+
+        print "nindex:", nindex
+        print "shape(density)", np.shape(density[nindex-1:])
+        print "shape(time)", np.shape(time_vals)
+        pl.plot(time_vals, density)
+        pl.fill(time_vals, 100*self.trigger_data, facecolor='r', alpha=0.5)
+        pl.ylabel('Density of licks calculated over window of ' + str(nseconds))
+        pl.xlabel('Time [s]')
+        pl.title('Density of licks')
+        pl.show()
+
         return density
 
-        # print "nindex:", nindex
-        # print "shape(density)", np.shape(density[nindex-1:])
-        # print "shape(time)", np.shape(time_vals)
-        # pl.plot(time_vals, density[nindex-1:])
-        # pl.fill(time_vals, 100*self.trigger_data, facecolor='r', alpha=0.5)
-        # pl.ylabel('Density of licks calculated over window of ' + str(nseconds))
-        # pl.xlabel('Time [s]')
-        # pl.title('Density of licks')
         # if out_path is not None:
         #     pl.savefig(out_path + "lick_density.png")
         # else:
@@ -630,34 +640,43 @@ class FiberAnalyze( object ):
         nindex = self.convert_seconds_to_index(nseconds)
         mask = np.ones(nindex)
 
+        pl.plot(self.trigger_data)
+        pl.show()
+
         self.trigger_data = np.floor(self.trigger_data) #make sure that no licks is represented by 0
         time_vals = self.time_stamps[range(len(self.trigger_data))]
         if density is None:
             density = np.convolve(self.trigger_data, mask)
-            density = density[nindex-1:]
+            density = density[nindex-1:] 
 
 
         dmed = np.median(density)
         print dmed
-        event_times = np.zeros(0)
-        if edge == "rising":
-            for i in range(2, len(density)):
-                if np.round(density[i-1]) == np.round(dmed) and density[i] > dmed:
-                    event_times = np.append(event_times, time_vals[i+nindex]-.013) #Hardcode 0.013, the length of the lickometer signal
-        elif edge == "falling":
-            for i in range(nindex, len(density)-2):
-                if np.round(density[i+1]) == np.round(dmed) and density[i] > dmed:
-                    event_times = np.append(event_times, time_vals[i])
-        else:
-            print "Incorrect edge type"
+        start_times = np.zeros(0)
+        end_times = np.zeros(0)
+        for i in range(nindex, len(density)-2):
+            if np.round(density[i-1]) == np.round(dmed) and density[i] > dmed:
+                start_times = np.append(start_times, time_vals[i+nindex]) #?Should I subtract -0.013, the length of the lickometer signal
+            if np.round(density[i+1]) == np.round(dmed) and density[i] > dmed:
+                end_times = np.append(end_times, time_vals[i])
 
-        print event_times
+        #filter out all of the single licks
+        filt_start_times = np.zeros(0)
+        filt_end_times = np.zeros(0)
+        for i in range(len(start_times)):
+            if start_times[i] + 5 < end_times[i]: #only use licking epochs that last at least longer than 5 seconds ????
+                filt_start_times = np.append(filt_start_times, start_times[i])
+                filt_end_times = np.append(filt_end_times, end_times[i])
+
+
+        print "start_times ", filt_start_times
+        print "end_times ", filt_end_times
     
-       # pl.plot(time_vals, density)
-       # pl.fill(time_vals, 100*self.trigger_data, facecolor='r', alpha=0.5)
-       # pl.show()
+        pl.plot(time_vals, density)
+        pl.fill(time_vals, 100*self.trigger_data, facecolor='r', alpha=0.5)
+        pl.show()
 
-        return event_times
+        return (filt_start_times, filt_end_times)
 
 
 
@@ -665,12 +684,51 @@ class FiberAnalyze( object ):
     def convert_seconds_to_index( self, time_in_seconds):
         return np.where( self.time_stamps >= time_in_seconds)[0][0]
 
-    def debleach( self ):
+    def debleach( self, out_path=None ):
         """
         Remove trend from data due to photobleaching.
         Is this necessary?
         """
-        pass
+        
+        fluor_data = self.fluor_data
+        time_stamps = self.time_stamps[range(len(self.fluor_data))]
+
+        trigger_data = self.trigger_data
+
+        print np.shape(fluor_data), np.shape(time_stamps), np.shape(trigger_data)
+
+        xp, pxp, x0, y0, c, k, r2, yxp = self.fit_exponential(time_stamps, fluor_data)
+        w, r2lin, yxplin = self.fit_linear(time_stamps, fluor_data)
+        if r2lin > r2:
+            flat_fluor_data = fluor_data - yxplin
+            r2 = r2lin
+        else:
+            flat_fluor_data = fluor_data - yxp
+
+        flat_fluor_data = flat_fluor_data - min(flat_fluor_data) + 0.000001
+
+
+        pl.plot(time_stamps, fluor_data)
+        pl.plot(time_stamps, yxp, 'r')
+        pl.plot(time_stamps, flat_fluor_data)
+        pl.xlabel('Time [s]')
+        pl.ylabel('Raw fluorescence (a.u.)')
+        pl.title('Debleaching the fluorescence curve')
+
+
+        out_arr = np.zeros((len(flat_fluor_data),4))
+        out_arr[:,0] = flat_fluor_data
+
+        trigger_data = -1*(trigger_data/np.max(trigger_data) - 1)
+        out_arr[:,3] = trigger_data #these numbers are hardcoded above
+
+        if out_path is None:
+                pl.title("No output path given")
+                #pl.show()
+        else:
+            pl.savefig(out_path + "_debleached.png")
+            np.savez(out_path + "_debleached.npz", data=out_arr, time_stamps=time_stamps)
+
 
     def plot_peak_statistics( self, peak_times, peak_vals ):
         """
@@ -776,10 +834,11 @@ class FiberAnalyze( object ):
         end_time_index = self.convert_seconds_to_index(end_time)
         print "start ", start_time, " end ", end_time
 
-        if start_time_index < end_time_index:
-            return np.max(self.fluor_data[start_time_index : end_time_index])
-        else:
-            return 0
+        if start_time != end_time:
+            if start_time_index < end_time_index:
+                return np.max(self.fluor_data[start_time_index : end_time_index])
+            else:
+                return 0
 
     def get_peak( self, start_time, end_time ):
         """
@@ -803,45 +862,64 @@ class FiberAnalyze( object ):
     def eNegX_residuals(self, p, x, y):
         return y - self.eNegX(p, x)
 
-    def fit_exponential(self, x, y):
+    def fit_exponential(self, x, y, num_points=100):
         # Because we are optimizing over a nonlinear function
         # choose a number of possible starting values of (x0, y0, c, k)
         # and use the results from whichever produces the smallest 
         # residual
-        kguess = [0, 0.1, 0.5, 1.0, 100, 500, 1000]
+        # num_points gives the number of points in the returned curve, pxp
+
+        kguess = [0, 0.1, 0.5, 1.0, 10, 100, 500, 1000]
+        yguess = [0, 1]
         max_r2 = -1
         maxvalues = ()
         for kg in kguess:
-            p_guess=(np.min(x), 0, 1, kg)
-            p, cov, infodict, mesg, ier = sp.optimize.leastsq(
-                self.eNegX_residuals, p_guess, args=(x, y), full_output=1)
+            print "kg", kg
+            for yg in yguess:
+                print "yg", yg
+                p_guess=(np.min(x), yg, 1, kg)
+                p, cov, infodict, mesg, ier = sp.optimize.leastsq(
+                    self.eNegX_residuals, p_guess, args=(x, y), full_output=1)
 
-            x0,y0,c,k=p 
-            print('''Reference data:\  
-                    x0 = {x0}
-                    y0 = {y0}
-                    c = {c}
-                    k = {k}
-                    '''.format(x0=x0,y0=y0,c=c,k=k))
+                x0,y0,c,k=p 
+                print('''Reference data:\  
+                        x0 = {x0}
+                        y0 = {y0}
+                        c = {c}
+                        k = {k}
+                        '''.format(x0=x0,y0=y0,c=c,k=k))
 
-            numPoints = np.floor((np.max(x) - np.min(x))*100)
-            xp = np.linspace(np.min(x), np.max(x), numPoints)
-            #pxp = np.exp(-1*xp)
-            pxp = self.eNegX(p, xp)
-            yxp = self.eNegX(p, x)
+                numPoints = np.floor((np.max(x) - np.min(x))*num_points)
+                xp = np.linspace(np.min(x), np.max(x), numPoints)
+                #pxp = np.exp(-1*xp)
+                pxp = self.eNegX(p, xp)
+                yxp = self.eNegX(p, x)
 
-            sstot = np.sum(np.multiply(y - np.mean(y), y - np.mean(y)))
-            sserr = np.sum(np.multiply(y - yxp, y - yxp))
-            r2 = 1 - sserr/sstot
-            if max_r2 == -1:
-                maxvalues = (xp, pxp, x0, y0, c, k, r2)
-            if r2 > max_r2:
-                max_r2 = r2
-                maxvalues = (xp, pxp, x0, y0, c, k, r2)
+                sstot = np.sum(np.multiply(y - np.mean(y), y - np.mean(y)))
+                sserr = np.sum(np.multiply(y - yxp, y - yxp))
+                r2 = 1 - sserr/sstot
+                print "max_r2", max_r2
+                if max_r2 == -1:
+                    maxvalues = (xp, pxp, x0, y0, c, k, r2, yxp)
+                if r2 > max_r2:
+                    max_r2 = r2
+                    maxvalues = (xp, pxp, x0, y0, c, k, r2, yxp)
 
         return maxvalues
 
-    def plot_peaks_vs_time( self, type="homecage", sucrose_nseconds=10, out_path=None ):
+    def fit_linear(self, x, y):
+        A = np.array([x, np.ones(len(x))])
+        w = np.linalg.lstsq(A.T, y)[0]
+        yxp = w[0]*x + w[1]
+
+        sstot = np.sum(np.multiply(y - np.mean(y), y - np.mean(y)))
+        sserr = np.sum(np.multiply(y - yxp, y - yxp))
+        r2lin = 1 - sserr/sstot
+        print "r2lin", r2lin
+        
+        return (w, r2lin, yxp)
+
+    def plot_peaks_vs_time( self, type="homecage", sucrose_nseconds=15, out_path=None ):
         """
         Plot the maximum fluorescence value within each interaction event vs the start time
         of the event
@@ -855,11 +933,14 @@ class FiberAnalyze( object ):
             end_times = self.get_event_times("falling")
         elif type == "sucrose":
             density = self.get_lick_density_vs_time(sucrose_nseconds)
-            start_times = self.get_sucrose_event_times(sucrose_nseconds, density=density, edge="rising")
-            end_times = self.get_sucrose_event_times(sucrose_nseconds, density=density, edge="falling")
+            start_times, end_times = self.get_sucrose_event_times(sucrose_nseconds, density=density)
+
+            #start_times = self.get_sucrose_event_times(sucrose_nseconds, density=density, edge="rising")
+            #end_times = self.get_sucrose_event_times(sucrose_nseconds, density=density, edge="falling")
         else:
             print "Incorrect behavior type specified in plot_peaks_vs_time"
 
+        filt_start_times = []
         if start_times[0] != -1:
             peaks = np.zeros(len(start_times))
             for i in range(len(start_times)):
@@ -867,13 +948,15 @@ class FiberAnalyze( object ):
                     peak = self.get_sucrose_peak(start_times[i], end_times[i])
                 else:
                     peak = self.get_peak(start_times[i], end_times[i])
-                peaks[i] = peak
+                if peak != 0:
+                    peaks[i] = peak
+
 
             fig = pl.figure()
             ax = fig.add_subplot(111)
             print np.max(peaks) + .3
             if type == "sucrose":
-                ax.set_ylim([0, np.max(peaks) + 0.1])
+                ax.set_ylim([0, np.max(peaks) + 0.4])
             else:
                 if np.max(peaks) > 0.8:
                     ax.set_ylim([0, 1.3])
@@ -883,7 +966,7 @@ class FiberAnalyze( object ):
             if type == "homecage":
                 ax.set_xlim([100, 500])
             else:
-                ax.set_xlim([np.min(start_times), np.max(start_times)])
+                ax.set_xlim([0, 1.1*np.max(start_times)])
             ax.plot(start_times, peaks, 'o')
             pl.xlabel('Time [s]')
             pl.ylabel('Fluorescence [dF/F]')
@@ -891,7 +974,7 @@ class FiberAnalyze( object ):
 
 
             try:
-                xp, pxp, x0, y0, c, k, r2 = self.fit_exponential(start_times, peaks + 1)
+                xp, pxp, x0, y0, c, k, r2, yxp = self.fit_exponential(start_times, peaks + 1)
                 ax.plot(xp, pxp-1)
                 ax.text(min(200, np.min(start_times)), np.max(peaks) + 0.20, "y = c*exp(-k*(x-x0)) + y0")
                 ax.text(min(200, np.min(start_times)), np.max(peaks) + 0.15, "k = " + "{0:.2f}".format(k) + ", c = " + "{0:.2f}".format(c) + 
@@ -1004,18 +1087,21 @@ def test_FiberAnalyze(options):
 #    FA.wavelet_plot()
 #    FA.notch_filter(10.0, 10.3)
   #  FA.plot_periodogram(plot_type="log",out_path = options.output_path)
-  #  FA.plot_basic_tseries(out_path = options.output_path)
+   # FA.plot_basic_tseries(out_path = options.output_path)
   #  FA.plot_lick_density_vs_time(1, out_path = options.output_path)
    # FA.get_sucrose_event_times(5, "falling")
 #    FA.event_vs_baseline_barplot(out_path = options.output_path)
 
-    #FA.plot_peritrigger_edge(window_size=[1, 3],out_path = options.output_path)
   #  FA.plot_area_under_curve_wrapper( window_size=[0, 1], edge="rising", normalize=False, out_path = options.output_path)
     #FA.plot_peaks_vs_time(out_path = options.output_path)
-#    FA.plot_peritrigger_edge(window=[1, 3],out_path = options.output_path)
+    FA.plot_peritrigger_edge(window=[1, 3], type="sucrose", out_path = options.output_path)
 #    FA.plot_area_under_curve_wrapper( window=[0, 3], edge="rising", normalize=False, out_path = options.output_path)
 #    FA.plot_peaks_vs_time(out_path = options.output_path)
-    FA.plot_peaks_vs_time(type="sucrose", out_path = options.output_path)
+   
+
+  #  FA.plot_peaks_vs_time(type="sucrose", out_path = options.output_path)
+
+   # FA.debleach(out_path = options.output_path) #you want to use --fluor-normalization = 'raw' when debleaching!!!
 
     #peak_inds, peak_vals, peak_times = FA.get_peaks()
     #FA.plot_peak_data()
