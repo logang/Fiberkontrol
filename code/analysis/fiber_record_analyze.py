@@ -71,8 +71,6 @@ class FiberAnalyze( object ):
                 median = np.median(self.fluor_data)
                 self.fluor_data = (self.fluor_data-median)/median #dF/F
                 print "median: ", np.median(self.fluor_data)
-
-
             elif self.fluor_normalization == "standardize":
                 self.fluor_data -= np.min(self.fluor_data)
                 self.fluor_data /= np.max(self.fluor_data)
@@ -158,11 +156,12 @@ class FiberAnalyze( object ):
         self.e_vals = np.load(e_filename)['arr_0']
         return zip(self.s_vals,self.e_vals)
 
-    def plot_basic_tseries( self, out_path=None, window=None ):
+    def plot_basic_tseries( self, out_path=None, window=None, resolution=30 ):
         """
         Generate a plot showing the raw calcium time series, with triggers
         corresponding to events (e.g. licking for sucrose) superimposed.
         Here the window indicates which segment of the entire time series to plot
+        Make the resolution parameter smaller when plotting zoomed in views of the time series.
         """
         # clear figure
         pl.clf()
@@ -170,26 +169,37 @@ class FiberAnalyze( object ):
         # get appropriate time values for x-axis
         time_vals = self.time_stamps[range(len(self.fluor_data))]
         fluor_data = self.fluor_data
+        print "np.shape(fluor_data)", np.shape(fluor_data)
+        print fluor_data
+        print "np.max", np.max(fluor_data)
         trigger_data = self.trigger_data
 
         if window is not None:
             window_indices = [self.convert_seconds_to_index( window[0]),
                               self.convert_seconds_to_index( window[1])]
-            time_vals = time_vals[window_indices[0]:window_indices[1]]
+            time_vals = time_vals[window_indices[0]:window_indices[1]] 
             fluor_data = fluor_data[window_indices[0]:window_indices[1]]
             trigger_data = trigger_data[window_indices[0]:window_indices[1]]
 
+        trigger_low = min(trigger_data) + 1
+        trigger_high_locations = [time_vals[i] for i in range(len(trigger_data)) if trigger_data[i] > trigger_low]
+        print trigger_high_locations
 
         print "median: ", np.median(self.fluor_data)
 
         # make filled blocks for trigger onset/offset
         ymax = 1.1*np.max(fluor_data)
         ymin = 1.1*np.min(fluor_data)
-        pl.fill( time_vals, 2*trigger_data - 2, color='r', alpha=0.3 )
-        pl.plot( time_vals, fluor_data, 'k-')
+        ymax = 3.0
+        ymin = -1
+       # pl.fill( time_vals[::2], 10*trigger_data[::2] - 2, color='r', alpha=0.3 )
+        pl.vlines(trigger_high_locations, -20, 20, edgecolor='r', linewidth=0.5, facecolor='r', alpha=0.3 )
+        pl.plot( time_vals[::resolution], fluor_data[::resolution], 'k-') #Only plot some of the points to non-noticeably decrease plot file size
         pl.ylim([ymin,ymax])
+        if window is not None:
+            pl.xlim([window[0], window[1]])
         if self.fluor_normalization == "deltaF":
-            pl.ylabel(r'$\delta F/F$')
+            pl.ylabel('deltaF/F')
         else:
             pl.ylabel('Fluorescence Intensity (a.u.)')
         pl.xlabel('Time since recording onset (seconds)')
@@ -200,6 +210,10 @@ class FiberAnalyze( object ):
            # pl.savefig(os.path.join(out_path,"basic_time_series.pdf"))
             pl.savefig(out_path + "basic_time_series.pdf")
             pl.savefig(out_path + "basic_time_series.png")
+         #   pl.savefig(out_path + "basic_time_series.svg")
+         #   pl.savefig(out_path + "basic_time_series.tiff")
+
+
 
     def save_time_series( self, save_path='.', output_type="txt", h5_filename=None ):
         """
@@ -412,7 +426,129 @@ class FiberAnalyze( object ):
         self.filt_fluor_data = notch_filt_y
         return notch_filt_y
 
-    def plot_periodogram( self, out_path = None, plot_type="log", window_len = 20):
+    def get_chunks_not_during_events(self, fluor_data, event_times, end_times):
+        """
+        Returns a time series from which all event periods have been removed
+        """
+        time_chunks = np.zeros(0)
+        time_stamp_chunks = np.zeros(0)
+
+        for i in range(len(event_times)):
+            e = event_times[i]
+            if i == 0:
+                n = 0
+            else:
+                n = event_times[i-1]
+           # try:
+            e_idx = np.where(e<self.time_stamps)[0][0]
+            n_idx = np.where(n<self.time_stamps)[0][0]
+
+            chunk = fluor_data[range((n_idx),(e_idx))]
+                #print [range((e_idx-window_indices[0]),(e_idx+window_indices[1]))]
+            time_chunks = np.append(time_chunks, chunk)
+            time_stamp_chunks = np.append(time_stamp_chunks, self.time_stamps[range((n_idx),(e_idx))])
+
+        print time_chunks
+            #except:
+             #   print "Unable to extract window:", [(e-window_indices[0]),(e+window_indices[1])]
+        return (time_chunks, time_stamp_chunks)
+
+    def analyze_spectrum( self, type="sucrose", peak_index=None, out_path=None ):
+        """
+        Compares the spectrum during lick epochs vs not during lick epochs
+        -->Still in progress
+        """
+
+        if type == "sucrose":
+            if self.event_start_times is None:
+                event_times, end_times = self.get_sucrose_event_times()
+                self.event_start_times = event_times
+                self.event_end_times = end_times
+            else:
+                event_times = self.event_start_times
+                end_times = self.event_end_times
+        elif type == "homecage":
+            event_times = self.get_event_times(edge)
+
+
+        event_lengths = np.array(end_times) - np.array(event_times)
+        window = [0, np.max(event_lengths) + 10] #10 is right now an arbitrary buffer (not seconds but indices)
+        time_chunks = self.get_time_chunks_around_events(self.fluor_data, event_times, window)
+
+        window_indices = [self.convert_seconds_to_index( window[0]),
+                              self.convert_seconds_to_index( window[1])]
+
+        time_arr = np.asarray(time_chunks).T
+        x = self.time_stamps[0:time_arr.shape[0]]-self.time_stamps[window_indices[0]]
+
+        if peak_index is None:
+            for i in range(len(event_times)):
+                self.plot_chunk_periodogram(x, time_arr[:, i], out_path=out_path)
+        else:
+            self.plot_chunk_periodogram(x, time_arr[:, peak_index], out_path=out_path, peak_index=peak_index)
+
+
+        no_events_chunk, no_events_times = self.get_chunks_not_during_events(self.fluor_data, event_times, end_times)
+        self.plot_chunk_periodogram(no_events_times, no_events_chunk, out_path=out_path)
+
+
+
+
+
+
+
+
+    def plot_chunk_periodogram( self, time_stamps, data, out_path=None, plot_type="log", window_len=20, peak_index=None, title=None):
+        """
+        Given a time series or section of a time series, plot the frequency content 
+        """
+
+        fft = sp.fft(data)
+        fft = fft[:]
+
+        n = data.size
+        timestep = np.max(time_stamps[1:] - time_stamps[:-1])
+        fft_freq = np.fft.fftfreq(n, d=timestep)
+
+        Y = np.abs(fft)**2
+        freq = fft_freq
+
+        s = np.r_[Y[window_len-1:0:-1],Y,Y[-1:-window_len:-1]] #periodic boundary
+        w = np.bartlett(window_len)
+        Y = np.convolve(w/w.sum(), s, mode='valid')
+
+        num_values = int(min(len(Y), len(freq))*.5) #Cut off negative frequencies
+        #start_freq = 0.25*(num_values/100) #i.e. start at 0.25 Hz
+        start_freq = 0#(num_values/100) #i.e. start at 0.25 Hz
+        freq_vals = freq[range(num_values)]
+        Y = Y[range(num_values)]
+
+        pl.plot( freq_vals[start_freq:num_values], np.log(Y[start_freq:num_values]), 'k-')
+        pl.ylabel('Log(Spectral Density) (a.u.)')
+        pl.xlabel('Frequency (Hz)')
+        pl.title(self.input_path)
+        #pl.axis([1, 100, 0, 1.1*np.log(np.max(Y[start_freq:num_values]))])
+        pl.axis([0, 100, -5, 10])
+        
+        if out_path is None:
+            pl.show()
+        else:
+            print "Saving periodogram..."
+            if title is not None:
+                pl.savefig(out_path + "periodogram_" + title + ".pdf")
+                pl.savefig(out_path + "periodogram_" + title + ".png")
+
+            if peak_index is None:
+                pl.savefig(out_path + "periodogram.pdf")
+                pl.savefig(out_path + "periodogram.png")
+            else:
+                pl.savefig(out_path + "periodogram_" + peak_index + ".pdf")
+                pl.savefig(out_path + "periodogram_" + peak_index + ".png")
+
+        return (freq_vals, Y)
+
+
+    def plot_full_periodogram( self, out_path = None, plot_type="log", window_len = 20):
         """
         Plot periodogram of fluoroscence data.
         """
@@ -650,9 +786,6 @@ class FiberAnalyze( object ):
         smoothed_curve = np.convolve(smoothed_gradient, diff_mask)
 
         #Now plot it to see if it worked...
-
-        ###TO DO>>>>>>>>
-
         if type == "sucrose":
             if self.event_start_times is None:
                 event_times, end_times = self.get_sucrose_event_times()
@@ -672,9 +805,6 @@ class FiberAnalyze( object ):
 
         window_indices = [ self.convert_seconds_to_index(window[0]),
                            self.convert_seconds_to_index(window[1]) ]
-
-
-                # plot each time window, colored by order
 
 
         time_arr = np.asarray(fluor_chunks).T
@@ -755,8 +885,6 @@ class FiberAnalyze( object ):
         time_vals = self.time_stamps[range(len(self.trigger_data))]
         density = np.convolve(self.trigger_data, mask)
         density = density[nindex-1:]
-
-        print "density calculated"
 
         # print "nindex:", nindex
         # print "shape(density)", np.shape(density[nindex-1:])
@@ -846,10 +974,10 @@ class FiberAnalyze( object ):
         xp, pxp, x0, y0, c, k, r2, yxp = self.fit_exponential(time_stamps, fluor_data)
         w, r2lin, yxplin = self.fit_linear(time_stamps, fluor_data)
         if r2lin > r2:
-            flat_fluor_data = fluor_data - yxplin
+            flat_fluor_data = fluor_data - yxplin + fluor_data[0]
             r2 = r2lin
         else:
-            flat_fluor_data = fluor_data - yxp
+            flat_fluor_data = fluor_data - yxp + fluor_data[0]
 
         flat_fluor_data = flat_fluor_data - min(flat_fluor_data) + 0.000001
 
@@ -998,6 +1126,53 @@ class FiberAnalyze( object ):
         else:
             return 0
 
+    def invGamX(self, p, x):
+        a, b = p
+        #y = pow(b, a)/sp.special.gamma(a)*pow(x, -a-1)*np.exp(-b/x)
+        y = sp.stats.invgamma.pdf(x, a, scale=b)
+        return y
+
+    def invGamX_residuals(self, p, x, y):
+        return y - self.invGamX(p, x)
+
+    def fit_invGam(self, x, y, num_point=100):
+        aguess = [0, 1]
+        bguess = [0, 0.1, 0.5, 1.0, 10, 100, 500, 1000]
+        max_r2 = -1
+        maxvalues = ()
+        for ag in aguess:
+            print "ag", ag
+            for bg in bguess:
+                print "bg", bg
+                p_guess=(ag, bg)
+                p, cov, infodict, mesg, ier = sp.optimize.leastsq(
+                    self.invGamX_residuals, p_guess, args=(x, y), full_output=1)
+
+                a, b = p 
+                print('''Reference data:\  
+                        a {a}
+                        b = {b}
+                        '''.format(a=a,b=b))
+
+                numPoints = np.floor((np.max(x) - np.min(x))*num_points)
+                xp = np.linspace(np.min(x), np.max(x), numPoints)
+                #pxp = np.exp(-1*xp)
+                pxp = self.invGamX(p, xp)
+                yxp = self.invGamX(p, x)
+
+                sstot = np.sum(np.multiply(y - np.mean(y), y - np.mean(y)))
+                sserr = np.sum(np.multiply(y - yxp, y - yxp))
+                r2 = 1 - sserr/sstot
+                print "max_r2", max_r2
+                if max_r2 == -1:
+                    maxvalues = (xp, pxp, a, b, r2, yxp)
+                if r2 > max_r2:
+                    max_r2 = r2
+                    maxvalues = (xp, pxp, a, b, r2, yxp)
+
+        return maxvalues
+
+
     def eNegX(self, p, x):
         x0, y0, c, k=p
         #Set c=1 to normalize all of the trials, since we
@@ -1007,6 +1182,8 @@ class FiberAnalyze( object ):
 
     def eNegX_residuals(self, p, x, y):
         return y - self.eNegX(p, x)
+
+    
 
     def fit_exponential(self, x, y, num_points=100):
         # Because we are optimizing over a nonlinear function
@@ -1070,7 +1247,7 @@ class FiberAnalyze( object ):
 
 
         event_lengths = np.array(end_times) - np.array(event_times)
-        window = [-1, np.max(event_lengths) + 10] #10 is right now an arbitrary buffer
+        window = [0, np.max(event_lengths) + 10] #10 is right now an arbitrary buffer
         time_chunks = self.get_time_chunks_around_events(self.fluor_data, event_times, window)
 
         window_indices = [self.convert_seconds_to_index( window[0]),
@@ -1079,13 +1256,12 @@ class FiberAnalyze( object ):
         time_arr = np.asarray(time_chunks).T
         x = self.time_stamps[0:time_arr.shape[0]]-self.time_stamps[window_indices[0]]
 
-
-        #self.fit_lognorm(x, time_arr[:, peak_index])
         if peak_index is None:
             for i in range(len(event_times)):
-                self.fit_invgamma(x, time_arr[:, i], out_path, peak_index)
+                self.fit_invgamma(x, time_arr[:, i], out_path, i)
         else:
             self.fit_invgamma(x, time_arr[:, peak_index], out_path, peak_index)
+           
 
 
     def fit_invgamma(self, x, y, out_path=None, peak_index=0):
@@ -1108,8 +1284,6 @@ class FiberAnalyze( object ):
         a_parameters = [0.01]#, 0.1, 0.5, 1, 2, 5]
         for b in b_parameters:
                 fit_alpha,fit_loc,fit_beta=ss.invgamma.fit(y, loc=0, scale=b)
-               # print "fits: ", (fit_alpha,fit_loc,fit_beta)
-
                 rv = ss.invgamma(fit_alpha, fit_loc, fit_beta)
                 yxp = rv.pdf(x)
 
@@ -1117,8 +1291,8 @@ class FiberAnalyze( object ):
                 sstot = np.sum(np.multiply(y - np.mean(y), y - np.mean(y)))
                 sserr = np.sum(np.multiply(y[1:] - yxp[1:], y[1:] - yxp[1:]))
                 r2 = 1 - sserr/sstot
-
                 #print  "sstot: ", sstot, "sserr: ", sserr, "r2: ", r2
+
                 if max_r2 == -1:
                     maxvalues = (fit_alpha, fit_loc, fit_beta)
                 if r2 > max_r2:
@@ -1134,70 +1308,13 @@ class FiberAnalyze( object ):
         pl.title('Inverse gamma distribution model of calcium dynamics')
         pl.xlabel('Time since onset of licking epoch (seconds)')
         pl.ylabel('Fluorescence (normalized deltaF/F)')
-        pl.legend([fitplot], [ r"$\alpha$ = " + "{0:.2f}".format(maxvalues[0]) + r", $\beta $= " + "{0:.2f}".format(maxvalues[2]) +  r", $r^2 = $" + "{0:.2f}".format(max_r2)])
+        pl.legend([fitplot], [ r"$\alpha$ = " + "{0:.2f}".format(maxvalues[0]) + r", $\beta $= " + "{0:.2f}".format(maxvalues[2]) +  
+                                r", $r^2 = $" + "{0:.2f}".format(max_r2)])
         if out_path is None:
             pl.show()
         else:
             pl.savefig(out_path + "inv_gamma_spike_" + str(peak_index) +  ".pdf")
             pl.savefig(out_path + "inv_gamma_spike_" + str(peak_index) +  ".png")
-
-
-            # pl.plot(x,5*rv.pdf(0.5*x), 'r')
-            # pl.plot(x,5*rv.pdf(0.4*x), 'g')
-            # pl.plot(x,5*rv.pdf(3*x), 'y')
-
-
-
-    def fit_gamma(self, x, y):
-        print "fitting gamma"
-        
-        mask = np.ones(1000)
-        yorig = y
-      #  y = np.convolve(y, mask)
-      #  y = y[len(mask)-1:]/len(mask)
-
-        x = x - x[0]
-        y = y/(np.sum(y)*(x[1]-x[0]))
-        print np.sum(y)*(x[1]-x[0])
-
-        max_r2 = -1
-        maxvalues = ()
-
-        a_parameters = [0.1, 1, 1.5, 2, 2.5, 3, 5, 10, 100, 500, 1000]
-        b_parameters = [0.01, 0.1, 0.5, 1, 2, 5]
-        for a in a_parameters:
-            for b in b_parameters:
-                logy = np.log(y - np.min(y) + 0.000001)
-                print np.exp(np.mean(logy))
-                fit_alpha,fit_loc,fit_beta=ss.gamma.fit(y)#, shape=b*np.std(logy), scale=a*np.exp(np.mean(y)))
-                print(fit_alpha,fit_loc,fit_beta)
-
-                rv = ss.gamma(fit_alpha, fit_loc, fit_beta)
-                yxp = rv.pdf(x)
-
-                sstot = np.sum(np.multiply(y - np.mean(y), y - np.mean(y)))
-                sserr = np.sum(np.multiply(y - yxp, y - yxp))
-                r2 = 1 - sserr/sstot
-
-                print  "sstot: ", sstot, "sserr: ", sserr, "r2: ", r2
-                if max_r2 == -1:
-                    maxvalues = (fit_alpha, fit_loc, fit_beta)
-                if r2 > max_r2:
-                    max_r2 = r2
-                    maxvalues = (fit_alpha, fit_loc, fit_beta)
-
-            print "maxvalues", maxvalues
-            rv = ss.gamma(maxvalues[0], maxvalues[1], maxvalues[2])
-            pl.figure()
-            pl.plot(x, yorig/(np.sum(yorig)*(x[1]-x[0])), 'b')
-            pl.plot(x, y, 'k')
-            pl.plot(x,rv.pdf(x), 'r')
-
-            # pl.plot(x,5*rv.pdf(0.5*x), 'r')
-            # pl.plot(x,5*rv.pdf(0.4*x), 'g')
-            # pl.plot(x,5*rv.pdf(3*x), 'y')
-
-        pl.show()
 
 
     def fit_lognorm(self, x, y):
@@ -1245,10 +1362,6 @@ class FiberAnalyze( object ):
             pl.plot(x, y, 'k')
             pl.plot(x,rv.pdf(x), 'r')
 
-            # pl.plot(x,5*rv.pdf(0.5*x), 'r')
-            # pl.plot(x,5*rv.pdf(0.4*x), 'g')
-            # pl.plot(x,5*rv.pdf(3*x), 'y')
-
         pl.show()
 
     def fit_linear(self, x, y):
@@ -1283,11 +1396,6 @@ class FiberAnalyze( object ):
             else:
                 start_times = self.event_start_times
                 end_times = self.event_end_times
-
-            
-
-            #start_times = self.get_sucrose_event_times(sucrose_nseconds, density=density, edge="rising")
-            #end_times = self.get_sucrose_event_times(sucrose_nseconds, density=density, edge="falling")
         else:
             print "Incorrect behavior type specified in plot_peaks_vs_time"
 
@@ -1438,11 +1546,19 @@ def test_FiberAnalyze(options):
 #    FA.wavelet_plot()
 #    FA.notch_filter(10.0, 10.3)
   #  FA.plot_periodogram(plot_type="log",out_path = options.output_path)
-#    FA.plot_basic_tseries(out_path = options.output_path, window=[0, FA.time_stamps[-1]])
-  #  FA.plot_basic_tseries(out_path = options.output_path, window=[60, FA.time_stamps[-1]])
-  #  FA.plot_basic_tseries(out_path = options.output_path + '_licks_1000_1390_', window=[1000, 1390])
-  #     FA.plot_basic_tseries(out_path = options.output_path + '_licks_1090_1160_', window=[1090, 1160])
-#    FA.plot_basic_tseries(out_path = options.output_path + '_licks_800_1300_', window=[800, 1300])
+  #  FA.plot_basic_tseries(out_path = options.output_path)#, window=[0, FA.time_stamps[-1]])
+#    FA.plot_basic_tseries(out_path = options.output_path, window=[60, FA.time_stamps[-1]])
+#    FA.plot_basic_tseries(out_path = options.output_path + '_licks_1000_1390_', window=[1000, 1390])
+#    FA.plot_basic_tseries(out_path = options.output_path + '_licks_1090_1160_', window=[1090, 1160])
+   # FA.plot_basic_tseries(out_path = options.output_path + '_licks_700_1200_', window=[700, 1200])
+   # FA.plot_basic_tseries(out_path = options.output_path + '_licks_1300_1600_', window=[1300, 1600])
+  #  FA.plot_basic_tseries(out_path = options.output_path + '_licks_120_250_', window=[120, 250])
+  #  FA.plot_basic_tseries(out_path = options.output_path + '_licks_700_1200_', window=[800, 1300])
+  ###  FA.plot_basic_tseries(out_path = options.output_path + '_licks_0_4100_', window=[0, 4100])
+    FA.plot_basic_tseries(out_path = options.output_path + '_licks_0_4100_', window=[0, FA.time_stamps[len(FA.fluor_data)-1]])
+  ###  FA.plot_basic_tseries(out_path = options.output_path + '_licks_0_2300_', window=[0, 2300])
+
+
   
   #  FA.plot_lick_density_vs_time(1, out_path = options.output_path)
    # FA.get_sucrose_event_times(5, "falling")
@@ -1460,13 +1576,15 @@ def test_FiberAnalyze(options):
 
   #  FA.plot_peaks_vs_time(type="sucrose", out_path = options.output_path)
 
-   # FA.debleach(out_path = options.output_path) #you want to use --fluor-normalization = 'raw' when debleaching!!!
+  #  FA.debleach(out_path = options.output_path) #you want to use --fluor-normalization = 'raw' when debleaching!!!
 
   #  peak_inds, peak_vals, peak_times = FA.get_peaks()
   #  FA.plot_peak_data()
 
 ###    FA.get_peaks_convolve(3, out_path = options.output_path)
-    FA.fit_peak( type="sucrose", out_path=options.output_path)
+  ##  FA.fit_peak( type="sucrose", out_path=options.output_path)
+###    FA.analyze_spectrum(type="sucrose", peak_index=None, out_path=None )
+
 
 
 #-----------------------------------------------------------------------------------------
