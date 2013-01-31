@@ -42,6 +42,7 @@ class FiberAnalyze( object ):
         self.save_txt = options.save_txt
         self.save_to_h5 = options.save_to_h5
         self.save_and_exit = options.save_and_exit
+        self.save_debleach = options.save_debleach
         
         if self.trigger_path is not None:
             self.s_file = options.trigger_path + '_s.npz'
@@ -122,16 +123,22 @@ class FiberAnalyze( object ):
         # if time range is specified, crop data    
         if self.time_range != None:
             tlist = self.time_range.split(':')
+            print tlist
             if tlist[0] == '-1':
                 self.t_start = 0
+            else:
+                self.t_start = int(self.convert_seconds_to_index(int(tlist[0])))
             if tlist[1] == '-1':
                 self.t_end = len(self.fluor_data)
+            else:
+                self.t_end   = int(self.convert_seconds_to_index(int(tlist[1])))
+
 
             if len(tlist) != 2:
                 print 'Error parsing --time-range argument.  Be sure to use <start-time>:<end-time> syntax.'
                 sys.exit(1)
-            self.t_start = int(tlist[0])
-            self.t_end   = int(tlist[1])
+
+            
             self.fluor_data = self.fluor_data[self.t_start:self.t_end]
             self.trigger_data = self.trigger_data[self.t_start:self.t_end]
             self.time_stamps = self.time_stamps[self.t_start:self.t_end]
@@ -147,6 +154,8 @@ class FiberAnalyze( object ):
             self.save_time_series(self.output_path)
         if self.save_to_h5 is not None:
             self.save_time_series(self.output_path, output_type="h5", h5_filename=self.save_to_h5)
+        if self.save_debleach:
+            self.debleach(self.output_path)
 
     def load_trigger_data( self, s_filename, e_filename ):
         """
@@ -193,11 +202,13 @@ class FiberAnalyze( object ):
         ymax = 3.0
         ymin = -1
        # pl.fill( time_vals[::2], 10*trigger_data[::2] - 2, color='r', alpha=0.3 )
-        pl.vlines(trigger_high_locations, -20, 20, edgecolor='r', linewidth=0.5, facecolor='r', alpha=0.3 )
+        pl.vlines(trigger_high_locations, -20, 20, edgecolor='r', linewidth=0.5, facecolor='r' )
         pl.plot( time_vals[::resolution], fluor_data[::resolution], 'k-') #Only plot some of the points to non-noticeably decrease plot file size
         pl.ylim([ymin,ymax])
         if window is not None:
             pl.xlim([window[0], window[1]])
+        else:
+            pl.xlim([min(self.time_stamps), max(self.time_stamps)])
         if self.fluor_normalization == "deltaF":
             pl.ylabel('deltaF/F')
         else:
@@ -396,7 +407,7 @@ class FiberAnalyze( object ):
         """
         print "get_peaks"
        # peak_widths = np.array([100,250,500,750,1000])
-        peak_widths = np.array([1000, 2000])
+        peak_widths = np.array([2000])
         self.peak_inds = signal.find_peaks_cwt(self.fluor_data, widths=peak_widths, wavelet=None, max_distances=None, gap_thresh=None, min_length=None, min_snr=5, noise_perc=50)
         self.peak_vals = self.fluor_data[self.peak_inds]
         self.peak_times = self.time_stamps[self.peak_inds]
@@ -850,10 +861,10 @@ class FiberAnalyze( object ):
         # show plot now or save of an output path was specified
         if out_path is None:
             pl.show()
-        else:
-            print "Saving peri-event time series..."
+        #else:
+          #  print "Saving peri-event time series..."
             #pl.savefig(os.path.join(out_path,'perievent_tseries'))
-            pl.savefig(out_path + "smoothed_perievent_tseries.png")
+          #  pl.savefig(out_path + "smoothed_perievent_tseries.png")
 
 
        ##TO DO >>>>>>>>
@@ -903,7 +914,7 @@ class FiberAnalyze( object ):
         # else:
         #     pl.show()
 
-    def get_sucrose_event_times( self, nseconds=5, density=None, edge="rising"):
+    def get_sucrose_event_times( self, nseconds=15, density=None, edge="rising"):
         """
         Extracts a list of the times (in seconds) corresponding
         to sucrose lick epochs. Epochs are determined by first calculating
@@ -960,9 +971,11 @@ class FiberAnalyze( object ):
 
     def debleach( self, out_path=None ):
         """
-        Remove trend from data due to photobleaching.
-        Is this necessary?
+        Remove trend from data due to photobleaching by fitting the time serie with an exponential curve
+        and then subtracting the difference between the curve and the median value of the time series. 
         """
+
+        print "debleaching"
         
         fluor_data = self.fluor_data
         time_stamps = self.time_stamps[range(len(self.fluor_data))]
@@ -974,12 +987,12 @@ class FiberAnalyze( object ):
         xp, pxp, x0, y0, c, k, r2, yxp = self.fit_exponential(time_stamps, fluor_data)
         w, r2lin, yxplin = self.fit_linear(time_stamps, fluor_data)
         if r2lin > r2:
-            flat_fluor_data = fluor_data - yxplin + fluor_data[0]
+            flat_fluor_data = fluor_data - yxplin + np.median(fluor_data)
             r2 = r2lin
         else:
-            flat_fluor_data = fluor_data - yxp + fluor_data[0]
+            flat_fluor_data = fluor_data - yxp + np.median(fluor_data)
 
-        flat_fluor_data = flat_fluor_data - min(flat_fluor_data) + 0.000001
+        #flat_fluor_data = flat_fluor_data - min(flat_fluor_data) + 0.000001
 
 
         pl.plot(time_stamps, fluor_data)
@@ -1002,6 +1015,10 @@ class FiberAnalyze( object ):
         else:
             pl.savefig(out_path + "_debleached.png")
             np.savez(out_path + "_debleached.npz", data=out_arr, time_stamps=time_stamps)
+            print out_path + "_debleached.npz"
+
+        if self.save_and_exit:
+            sys.exit(0)
 
 
     def plot_peak_statistics( self, peak_times, peak_vals ):
@@ -1541,6 +1558,34 @@ def test_FiberAnalyze(options):
     """
     FA = FiberAnalyze( options )
     FA.load()
+
+    if FA.plot_type == 'tseries':
+        if FA.time_range is None:
+            FA.plot_basic_tseries(out_path = options.output_path + "_full_")
+        else:
+            start = int(FA.time_range.split(':')[0])
+            end = int(FA.time_range.split(':')[1])
+            if end == -1:
+                end = max(FA.time_stamps)
+            if start == -1:
+                start = min(FA.time_stamps)
+
+            if end - start < 100:
+                res = 1
+            elif end - start < 500 and end - start > 100:
+                res = 10
+            elif end - start > 500 and end - start < 1000:
+                res = 30
+            else:
+                res = 40
+
+            FA.plot_basic_tseries(out_path = options.output_path + "_" + str(int(FA.time_range.split(':')[0])) + "_" + str(int(FA.time_range.split(':')[1])) +"_",
+                                 resolution=res)
+            print start
+            print end
+            print res
+
+
 #    FA.plot_next_event_vs_intensity(intensity_measure="peak", next_event_measure="onset", window=[0, 1], out_path=None)
 
 #    FA.wavelet_plot()
@@ -1555,7 +1600,8 @@ def test_FiberAnalyze(options):
   #  FA.plot_basic_tseries(out_path = options.output_path + '_licks_120_250_', window=[120, 250])
   #  FA.plot_basic_tseries(out_path = options.output_path + '_licks_700_1200_', window=[800, 1300])
   ###  FA.plot_basic_tseries(out_path = options.output_path + '_licks_0_4100_', window=[0, 4100])
-    FA.plot_basic_tseries(out_path = options.output_path + '_licks_0_4100_', window=[0, FA.time_stamps[len(FA.fluor_data)-1]])
+  
+  #  FA.plot_basic_tseries(out_path = options.output_path + '_licks_0_4100_', window=[0, FA.time_stamps[len(FA.fluor_data)-1]])
   ###  FA.plot_basic_tseries(out_path = options.output_path + '_licks_0_2300_', window=[0, 2300])
 
 
@@ -1567,8 +1613,9 @@ def test_FiberAnalyze(options):
   #  FA.plot_area_under_curve_wrapper( window_size=[0, 1], edge="rising", normalize=False, out_path = options.output_path)
     #FA.plot_peaks_vs_time(out_path = options.output_path)
  #   FA.plot_peritrigger_edge(window=[10, 25], type="sucrose", out_path = options.output_path + '_10_25_')
- #   FA.plot_peritrigger_edge(window=[5, 15], type="sucrose", out_path = options.output_path + '_5_15_')
- #   FA.plot_peritrigger_edge(window=[2, 5], type="sucrose", out_path = options.output_path + '_2_5_')
+ 
+ ###   FA.plot_peritrigger_edge(window=[5, 5], type="sucrose", out_path = options.output_path + '_5_5_')
+ ##   #FA.plot_peritrigger_edge(window=[30, 30], type="sucrose", out_path = options.output_path + '_30_30_')
 
 #    FA.plot_area_under_curve_wrapper( window=[0, 3], edge="rising", normalize=False, out_path = options.output_path)
 #    FA.plot_peaks_vs_time(out_path = options.output_path)
@@ -1578,10 +1625,10 @@ def test_FiberAnalyze(options):
 
   #  FA.debleach(out_path = options.output_path) #you want to use --fluor-normalization = 'raw' when debleaching!!!
 
-  #  peak_inds, peak_vals, peak_times = FA.get_peaks()
+    peak_inds, peak_vals, peak_times = FA.get_peaks()
   #  FA.plot_peak_data()
 
-###    FA.get_peaks_convolve(3, out_path = options.output_path)
+  #  FA.get_peaks_convolve(3, out_path = options.output_path)
   ##  FA.fit_peak( type="sucrose", out_path=options.output_path)
 ###    FA.analyze_spectrum(type="sucrose", peak_index=None, out_path=None )
 
@@ -1609,7 +1656,7 @@ if __name__ == "__main__":
                       help="Normalization of fluorescence trace. Can be a.u. between [0,1]: 'stardardize' or deltaF/F: 'deltaF' or 'raw'.")
     parser.add_option('-s', "--smoothness", default = None, dest="smoothness",
                       help="Should the time series be smoothed, and how much.")
-    parser.add_option('-x', "--selectfiles", default = False, dest = "selectfiles",
+    parser.add_option('-x', "--selectfiles", action="store_true", default = False, dest = "selectfiles",
                        help="Should you select filepaths in a pop window instead of in the command line.")
     parser.add_option("", "--save-txt", action="store_true", default=False, dest="save_txt",
                       help="Save data matrix out to a text file.")
@@ -1617,6 +1664,11 @@ if __name__ == "__main__":
                       help="Save data matrix to a dataset in an hdf5 file.")
     parser.add_option("", "--save-and-exit", action="store_true", default=False, dest="save_and_exit",
                       help="Exit immediately after saving data out.")
+    parser.add_option("", "--save-debleach", action="store_true", default=False, dest="save_debleach",
+                      help="Debleach fluorescence time series by fitting with an exponential curve.")
+
+    ##To Implement: parser.add_option("", "--exp-type", dest="exp_type", default=None,
+    #                   help="Specify either 'homecagenovel', 'homecagesocial', or 'sucrose'.")
 
     (options, args) = parser.parse_args()
     
