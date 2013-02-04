@@ -29,6 +29,7 @@ class FiberAnalyze( object ):
         self.plot_type = options.plot_type
         self.time_range = options.time_range
         self.fluor_normalization = options.fluor_normalization
+        self.filter_freqs = options.filter_freqs
 
         if options.selectfiles:
             self.input_path = tkFileDialog.askopenfilename()
@@ -87,7 +88,7 @@ class FiberAnalyze( object ):
             # normalize triggers to fluor data
             if self.trigger_path is None:
                 self.trigger_data = self.data[:,self.trigger_channel]
-                print "trigger data loaded"
+                print "trigger data loaded ", max(self.trigger_data)
             else:
                 try:
                     self.time_tuples = self.load_trigger_data(self.s_file, self.e_file)
@@ -150,6 +151,15 @@ class FiberAnalyze( object ):
         self.event_start_times = None #place holder event_times that may be calculated by get_sucrose_event_times
         self.event_end_times = None
 
+        if self.filter_freqs is not None:
+            freqlist = self.filter_freqs.split(':')
+            print freqlist
+            self.fluor_data = self.notch_filter(freqlist[0], freqlist[1])
+        if self.smoothness is not None:
+            self.fluor_data = self.smooth(int(self.smoothness), window_type='gaussian')
+
+
+
         if self.save_txt:
             self.save_time_series(self.output_path)
         if self.save_to_h5 is not None:
@@ -178,8 +188,6 @@ class FiberAnalyze( object ):
         # get appropriate time values for x-axis
         time_vals = self.time_stamps[range(len(self.fluor_data))]
         fluor_data = self.fluor_data
-        print "np.shape(fluor_data)", np.shape(fluor_data)
-        print fluor_data
         print "np.max", np.max(fluor_data)
         trigger_data = self.trigger_data
 
@@ -190,7 +198,7 @@ class FiberAnalyze( object ):
             fluor_data = fluor_data[window_indices[0]:window_indices[1]]
             trigger_data = trigger_data[window_indices[0]:window_indices[1]]
 
-        trigger_low = min(trigger_data) + 1
+        trigger_low = min(trigger_data) + 0.2
         trigger_high_locations = [time_vals[i] for i in range(len(trigger_data)) if trigger_data[i] > trigger_low]
         print trigger_high_locations
 
@@ -201,7 +209,8 @@ class FiberAnalyze( object ):
         ymin = 1.1*np.min(fluor_data)
         ymax = 3.0
         ymin = -1
-       # pl.fill( time_vals[::2], 10*trigger_data[::2] - 2, color='r', alpha=0.3 )
+#        pl.fill( time_vals[::2], 10*trigger_data[::2] - 2, color='r', alpha=0.3 )
+#        pl.fill( time_vals[::2], trigger_data[::2], color='r', alpha=0.3 )
         pl.vlines(trigger_high_locations, -20, 20, edgecolor='r', linewidth=0.5, facecolor='r' )
         pl.plot( time_vals[::resolution], fluor_data[::resolution], 'k-') #Only plot some of the points to non-noticeably decrease plot file size
         pl.ylim([ymin,ymax])
@@ -288,15 +297,28 @@ class FiberAnalyze( object ):
             else:
                 print "\t---> Loading subgroup:", prefix.split("-")[0]
                 date = subject_num[prefix.split("-")[0]]
-            try:
+
+##Isaac changed this below on 20130202
+            if prefix.split("-")[2] not in list(date):
                 print "\t---> Creating subsubgroup:", prefix.split("-")[2]
                 run_type = date.create_group(prefix.split("-")[2])
+            else:
+                print "\t---> Loading subsubgroup:", prefix.split("-")[2]
+                run_type = date[prefix.split("-")[2]]
+
+            try:
                 dset = run_type.create_dataset("time_series_arr", data=out_arr)
-                dset = run_type.create_dataset("event_tuples", data=self.time_tuples)
+                if np.shape(self.time_tuples) != ():
+                    print "self.time_tuples", np.shape(self.time_tuples)
+                    dset = run_type.create_dataset("event_tuples", data=self.time_tuples)
+                else:
+                    print "NO TIME TUPLES"
+
                 dset.attrs["time_series_arr_names"] = ("time_stamp", "trigger_data", "fluor_data")
                 dset.attrs["original_file_name"] = prefix
             except Exception, e:
                 print "Unable to write data array due to error:", e
+
                 
             h5_file.close() # close the file
             
@@ -401,13 +423,34 @@ class FiberAnalyze( object ):
         self.filt_fluor_data = low_pass_y
         return low_pass_y
 
-    def get_peaks( self ):
+    def smooth(self, num_time_points, window_type='gaussian'):
+        """
+        Convolve a simple averaging window of length num_time_points
+        and type window_type ('gaussian, 'rect')
+        """
+
+        print "smoothing."
+        if window_type == 'gaussian':
+            window = signal.gaussian(100, num_time_points)
+        elif window_type == 'rect':
+            window = np.ones(num_time_points)
+        else:
+            window = np.ones(num_times_points)
+
+        smoothed_fluor_data = np.convolve(self.fluor_data, window, mode='same') #returns an array of the original length
+        print "done smoothing."
+        return smoothed_fluor_data/np.sum(window)
+
+
+    def get_peaks( self, window_in_seconds=1 ):
         """
         Heuristic for finding local peaks in the calcium data. 
         """
         print "get_peaks"
        # peak_widths = np.array([100,250,500,750,1000])
-        peak_widths = np.array([2000])
+        window_in_indices = self.convert_seconds_to_index(window_in_seconds)
+        print "window_in_indices", window_in_indices
+        peak_widths = np.array([window_in_indices])
         self.peak_inds = signal.find_peaks_cwt(self.fluor_data, widths=peak_widths, wavelet=None, max_distances=None, gap_thresh=None, min_length=None, min_snr=5, noise_perc=50)
         self.peak_vals = self.fluor_data[self.peak_inds]
         self.peak_times = self.time_stamps[self.peak_inds]
@@ -426,10 +469,14 @@ class FiberAnalyze( object ):
             self.get_fft()
         bp = self.fft
 
-        for i in range(len(bp)):
-            if self.fft_freq[i]<= high and self.fft_freq[i]>= low:
-                bp[i] = 0
-        self.fft = bp #update fft of the class to the filtered version
+        print "fft calculated."
+
+        bpfilt = np.where(self.fft_freq <=high and self.fft_freq >= low, bp, 0)
+#        for i in range(len(bp)):
+#            if self.fft_freq[i]<= high and self.fft_freq[i]>= low:
+#                bp[i] = 0
+#        self.fft = bp #update fft of the class to the filtered version
+        self.fft=bpfilt
 
         ibp = sp.ifft(bp)
         notch_filt_y = np.real(ibp)
@@ -501,12 +548,6 @@ class FiberAnalyze( object ):
 
         no_events_chunk, no_events_times = self.get_chunks_not_during_events(self.fluor_data, event_times, end_times)
         self.plot_chunk_periodogram(no_events_times, no_events_chunk, out_path=out_path)
-
-
-
-
-
-
 
 
     def plot_chunk_periodogram( self, time_stamps, data, out_path=None, plot_type="log", window_len=20, peak_index=None, title=None):
@@ -742,15 +783,18 @@ class FiberAnalyze( object ):
             print "No event times loaded. Cannot plot perievent."        
 
     def get_fft(self):
+        print "getting fft."
         if self.filt_fluor_data is None:
             rawsignal = self.fluor_data
         else:
             rawsignal = self.filt_fluor_data
         
+        print "calculating fft."
         fft = sp.fft(rawsignal)
         self.fft = fft[:]
 
         n = rawsignal.size
+        print "rawsignal.size", n
         timestep = np.max(self.time_stamps[1:] - self.time_stamps[:-1])
         self.fft_freq = np.fft.fftfreq(n, d=timestep)
 
@@ -928,16 +972,20 @@ class FiberAnalyze( object ):
         nindex = self.convert_seconds_to_index(nseconds)
         mask = np.ones(nindex)
 
-
-        self.trigger_data = np.floor(self.trigger_data) #make sure that no licks is represented by 0
+        self.trigger_data = np.floor(2*self.trigger_data) #make sure that no licks is represented by 0
         time_vals = self.time_stamps[range(len(self.trigger_data))]
+        print time_vals
         if density is None:
             density = np.convolve(self.trigger_data, mask)
             density = density[nindex-1:] 
 
 
         dmed = np.median(density)
-        print dmed
+        print "dmed", dmed
+        print "nindex", nindex
+        print "max(trigger_data)", max(self.trigger_data)
+        print "min(trigger_data)", min(self.trigger_data)
+
         start_times = np.zeros(0)
         end_times = np.zeros(0)
         for i in range(nindex, len(density)-2):
@@ -1029,13 +1077,15 @@ class FiberAnalyze( object ):
         """
         pass
 
+
     def get_areas_under_curve( self, start_times, window, normalize=False):
         """
         Returns a vector of the area under the fluorescence curve within the provided
         window [before, after] (in seconds), that surrounds each start_time.
         Normalize determines whether to divide the area by the maximum fluorescence
-        value of the window
+        value of the window (this is more if you want to look at the "shape" of the curve)
         """
+        print "window: ", window
         time_chunks = self.get_time_chunks_around_events(self.fluor_data, start_times, window)
         
         areas = []
@@ -1471,6 +1521,103 @@ class FiberAnalyze( object ):
         else:
             print "No event times loaded. Cannot plot peaks_vs_time."  
 
+    def compare_before_and_after_event(self, window=[5, 5], metric="slice", slice_time=1, out_path=None):
+        """
+        Compares the fluorescence in the periods before and the onset of each bout.
+        Window is provided in seconds.
+        Can measure that fluorescence based on "slice": the fluorescence value at slice_time
+        before and after the onset; "area": the area under the curve in the window before and
+        after the onset; "peak": the peak value in the window before and after the onset.
+
+        """
+
+        print window
+        window_indices = [self.convert_seconds_to_index(window[0]), self.convert_seconds_to_index(window[1]) ]
+        #get event times
+        start_times, end_times = self.get_sucrose_event_times()
+
+        before_start_scores = []
+        after_start_scores = []
+
+        #initialize result arrays
+
+
+        if metric=="area":
+            before_start_scores = self.get_areas_under_curve( start_times, window=[window[0], 0], normalize=False)
+            after_start_scores = self.get_areas_under_curve( start_times, window=[0, window[1]], normalize=False)
+
+        elif metric=="slice":
+            for i in range(len(start_times)):
+                t = start_times[i]
+                ind = self.convert_seconds_to_index(t)
+            
+                slice_ind = self.convert_seconds_to_index(slice_time)
+                before_score = self.fluor_data[max(0, ind - slice_ind)]
+                after_score = self.fluor_data[min(len(self.fluor_data), ind + slice_ind)]
+                before_start_scores.append(before_score)
+                after_start_scores.append(after_score)
+
+        elif metric=="peak":
+            for i in range(len(start_times)):
+                t = start_times[i]
+                print t
+                ind = self.convert_seconds_to_index(t)
+            
+                before_score = np.max(self.fluor_data[max(0, ind - window_indices[0]):ind])
+                after_score = np.max(self.fluor_data[ind:min(len(self.fluor_data), ind + window_indices[1])])
+               #  pl.plot(self.fluor_data[max(0, ind - window_indices[0]):min(len(self.fluor_data), ind + window_indices[1])])
+               #  pl.title('peak')
+               # # pl.show()
+                before_start_scores.append(before_score)
+                after_start_scores.append(after_score)  
+        else:
+            print "metric ' " + metric + " ' has not yet been implemented. Please try 'area', 'slice', or 'peak'."
+
+
+
+        #---------------------------plot----------------------------------------------------------------------------
+        pl.figure()
+        before_plot, = pl.plot(range(len(before_start_scores)), before_start_scores, '-or')
+        after_plot, = pl.plot(range(len(after_start_scores)), after_start_scores, '-og')
+        pl.legend([before_plot, after_plot], [ "Before bout start", "After bout start"])
+        pl.title("Window: [" + str(window[0]) + "s, " + str(window[1]) + "s]")
+        pl.xlabel("Bout number")
+        if metric=="area":
+            pl.ylabel("Area under fluorescence curve [" + self.fluor_normalization + "]")
+        elif metric=="slice":
+            pl.ylabel("Fluorescence value at " + str(slice_time) + "s from bout start [" + self.fluor_normalization + "]")
+        elif metric=="peak":
+            pl.ylabel("Maximum fluorescence value [" + self.fluor_normalization + "]")
+        
+
+        if out_path is None:
+            pl.title("No output path given")
+            pl.show()
+        else:
+            save_path = out_path + "_before_and_after_window_" + str(window[0]) + "s_" + metric
+            if metric == "slice":
+                save_path += "_time_" + str(slice_time) + "s"
+            pdf_save_path = save_path + ".pdf"
+            png_save_path = save_path + ".png"
+            npz_save_path = save_path + ".npz"
+            txt_save_path = save_path + ".txt"
+
+
+            pl.savefig(pdf_save_path)
+            pl.savefig(png_save_path)
+            np.savez(npz_save_path, before=before_start_scores, after=after_start_scores)
+            np.savetxt(txt_save_path, (before_start_scores, after_start_scores))
+
+
+       #---------------------------plot----------------------------------------------------------------------------
+
+
+
+        return (before_start_scores, after_start_scores)
+
+
+
+
 
     def wavelet_plot( self ):
         wavelet=Morlet
@@ -1581,9 +1728,9 @@ def test_FiberAnalyze(options):
 
             FA.plot_basic_tseries(out_path = options.output_path + "_" + str(int(FA.time_range.split(':')[0])) + "_" + str(int(FA.time_range.split(':')[1])) +"_",
                                  resolution=res)
-            print start
-            print end
-            print res
+            print "Start: ", start
+            print "End: ", end
+            print "Res:, ", res
 
 
 #    FA.plot_next_event_vs_intensity(intensity_measure="peak", next_event_measure="onset", window=[0, 1], out_path=None)
@@ -1614,8 +1761,8 @@ def test_FiberAnalyze(options):
     #FA.plot_peaks_vs_time(out_path = options.output_path)
  #   FA.plot_peritrigger_edge(window=[10, 25], type="sucrose", out_path = options.output_path + '_10_25_')
  
- ###   FA.plot_peritrigger_edge(window=[5, 5], type="sucrose", out_path = options.output_path + '_5_5_')
- ##   #FA.plot_peritrigger_edge(window=[30, 30], type="sucrose", out_path = options.output_path + '_30_30_')
+    FA.plot_peritrigger_edge(window=[5, 5], type="sucrose", out_path = options.output_path + '_5_5_')
+    FA.plot_peritrigger_edge(window=[30, 30], type="sucrose", out_path = options.output_path + '_30_30_')
 
 #    FA.plot_area_under_curve_wrapper( window=[0, 3], edge="rising", normalize=False, out_path = options.output_path)
 #    FA.plot_peaks_vs_time(out_path = options.output_path)
@@ -1625,12 +1772,20 @@ def test_FiberAnalyze(options):
 
   #  FA.debleach(out_path = options.output_path) #you want to use --fluor-normalization = 'raw' when debleaching!!!
 
-    peak_inds, peak_vals, peak_times = FA.get_peaks()
+   # peak_inds, peak_vals, peak_times = FA.get_peaks(window_in_seconds)
   #  FA.plot_peak_data()
 
   #  FA.get_peaks_convolve(3, out_path = options.output_path)
   ##  FA.fit_peak( type="sucrose", out_path=options.output_path)
 ###    FA.analyze_spectrum(type="sucrose", peak_index=None, out_path=None )
+
+    FA.compare_before_and_after_event(window=[5, 5], metric="slice", slice_time=1, out_path=options.output_path)
+    FA.compare_before_and_after_event(window=[5, 5], metric="slice", slice_time=2, out_path=options.output_path)
+
+    FA.compare_before_and_after_event(window=[5, 5], metric="area", out_path=options.output_path)
+    FA.compare_before_and_after_event(window=[5, 5], metric="peak", out_path=options.output_path)
+
+
 
 
 
@@ -1650,7 +1805,7 @@ if __name__ == "__main__":
                       help="Specify the input path.")
     parser.add_option("", "--time-range", dest="time_range",default=None,
                       help="Specify a time window over which to analyze the time series in format start:end. -1 chooses the appropriate extremum")
-    parser.add_option('-p', "--plot-type", default = 'tseries', dest="plot_type",
+    parser.add_option('-p', "--plot-type", default = '', dest="plot_type",
                       help="Type of plot to produce.")
     parser.add_option('', "--fluor-normalization", default = 'deltaF', dest="fluor_normalization",
                       help="Normalization of fluorescence trace. Can be a.u. between [0,1]: 'stardardize' or deltaF/F: 'deltaF' or 'raw'.")
@@ -1666,6 +1821,8 @@ if __name__ == "__main__":
                       help="Exit immediately after saving data out.")
     parser.add_option("", "--save-debleach", action="store_true", default=False, dest="save_debleach",
                       help="Debleach fluorescence time series by fitting with an exponential curve.")
+    parser.add_option("", "--filter-freqs", default=None, dest="filter_freqs",
+                      help="Use a notch filter to remove high frequency noise. Format lowfreq:highfreq.")
 
     ##To Implement: parser.add_option("", "--exp-type", dest="exp_type", default=None,
     #                   help="Specify either 'homecagenovel', 'homecagesocial', or 'sucrose'.")
