@@ -657,7 +657,7 @@ def test_PairAnalyze(options):
 	#PA.CombinedAverage(PA.n_scores, PA.n_start_times, PA.s_scores, PA.s_start_times, titlen='novel', titles='social', score_type='peak height', out_path=PA.output_path + 'peak_')
 ##	PA.CombinedAverage(PA.n_scores, PA.n_start_times, None, None, titlen='novel', titles='social', score_type='peak height', out_path=PA.output_path + 'peak_')
 
-	PA.CombinedAverage(PA.n_scores, None, PA.s_scores, None, titlen='Before', titles='After', score_type='value at 2s from event', out_path=PA.output_path + 'peak_')
+	PA.CombinedAverage(PA.n_scores, None, PA.s_scores, None, titlen='Before', titles='After', score_type='value at 1s from event', out_path=PA.output_path + 'peak_')
 
 
 

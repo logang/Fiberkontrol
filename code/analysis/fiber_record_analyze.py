@@ -198,9 +198,12 @@ class FiberAnalyze( object ):
             fluor_data = fluor_data[window_indices[0]:window_indices[1]]
             trigger_data = trigger_data[window_indices[0]:window_indices[1]]
 
+        print "min(trigger_data)", min(trigger_data)
+        print "max(trigger_data)", max(trigger_data)
+
         trigger_low = min(trigger_data) + 0.2
         trigger_high_locations = [time_vals[i] for i in range(len(trigger_data)) if trigger_data[i] > trigger_low]
-        print trigger_high_locations
+      #  print trigger_high_locations
 
         print "median: ", np.median(self.fluor_data)
 
@@ -347,10 +350,10 @@ class FiberAnalyze( object ):
                 peak = self.get_peak(start_times[i]-window[0], start_times[i]+window[1]) # end_times[i])
                 intensity[i] = peak
         elif intensity_measure == "integrated":
-            intensity = self.get_areas_under_curve( start_times, window, normalize=False)
+            intensity = self.get_areas_under_curve( start_times, window, baseline_window=window, normalize=False)
         elif intensity_measure == "window":
             window[1] = 0
-            intensity = self.get_areas_under_curve( start_times, window, normalize=False)
+            intensity = self.get_areas_under_curve( start_times, window, baseline_window=window, normalize=False)
         else:
             raise ValueError("The entered intensity_measure is not one of peak, integrated, or window.")
         # get next event values
@@ -531,7 +534,8 @@ class FiberAnalyze( object ):
 
         event_lengths = np.array(end_times) - np.array(event_times)
         window = [0, np.max(event_lengths) + 10] #10 is right now an arbitrary buffer (not seconds but indices)
-        time_chunks = self.get_time_chunks_around_events(self.fluor_data, event_times, window)
+        baseline_window = [np.max(event_lengths) + 10, np.max(event_lengths) + 10]
+        time_chunks = self.get_time_chunks_around_events(self.fluor_data, event_times, window, baseline_window=baseline_window )
 
         window_indices = [self.convert_seconds_to_index( window[0]),
                               self.convert_seconds_to_index( window[1])]
@@ -678,15 +682,20 @@ class FiberAnalyze( object ):
             pl.savefig(out_path + "peak_finding.png")
 
 
-    def get_time_chunks_around_events(self, data, event_times, window):
+    def get_time_chunks_around_events(self, data, event_times, window, baseline_window=None):
         """
         Extracts chunks of fluorescence data around each event in 
         event_times, with before and after event durations
         specified in window as [before, after] (in seconds).
+        Subtracts the baseline value from each chunk (i.e. sets the minimum value in a chunk to 0)
         """
 
         window_indices = [self.convert_seconds_to_index( window[0]),
                           self.convert_seconds_to_index( window[1])]
+        if baseline_window is not None:
+            baseline_indices = [self.convert_seconds_to_index( baseline_window[0]),
+                                self.convert_seconds_to_index( baseline_window[1])]
+
         print "window indices", window_indices
         print "event_times", np.shape(event_times)
 
@@ -696,7 +705,13 @@ class FiberAnalyze( object ):
             e_idx = np.where(e<self.time_stamps)[0][0]
             chunk = data[range((e_idx-window_indices[0]),(e_idx+window_indices[1]))]
                 #print [range((e_idx-window_indices[0]),(e_idx+window_indices[1]))]
-            time_chunks.append(chunk)
+            if baseline_window is not None:
+                baseline_chunk = data[range((e_idx-baseline_indices[0]),(e_idx+baseline_indices[1]))]
+                baseline = np.min(baseline_chunk)
+            else:
+                baseline = np.min(chunk)
+
+            time_chunks.append(chunk - baseline)
             #except:
              #   print "Unable to extract window:", [(e-window_indices[0]),(e+window_indices[1])]
         return time_chunks
@@ -717,7 +732,7 @@ class FiberAnalyze( object ):
         print "window", window
 
         # get blocks of time series for window around each event time
-        time_chunks = self.get_time_chunks_around_events(self.fluor_data, event_times, window)
+        time_chunks = self.get_time_chunks_around_events(self.fluor_data, event_times, window, baseline_window=window)
         print "time_chunks", np.shape(time_chunks)
 
         window_indices = [ self.convert_seconds_to_index(window[0]),
@@ -853,9 +868,9 @@ class FiberAnalyze( object ):
             event_times = self.get_event_times("rising")
 
         window = [25, 25]
-        fluor_chunks = self.get_time_chunks_around_events(self.fluor_data, event_times, window)
-        grad_chunks = self.get_time_chunks_around_events(smoothed_gradient, event_times, window)
-        curve_chunks = self.get_time_chunks_around_events(smoothed_curve, event_times, window)
+        fluor_chunks = self.get_time_chunks_around_events(self.fluor_data, event_times, window, baseline_window=window)
+        grad_chunks = self.get_time_chunks_around_events(smoothed_gradient, event_times, window, baseline_window=window)
+        curve_chunks = self.get_time_chunks_around_events(smoothed_curve, event_times, window, baseline_window=window)
 
 
         window_indices = [ self.convert_seconds_to_index(window[0]),
@@ -1078,7 +1093,7 @@ class FiberAnalyze( object ):
         pass
 
 
-    def get_areas_under_curve( self, start_times, window, normalize=False):
+    def get_areas_under_curve( self, start_times, window, baseline_window=None, normalize=False):
         """
         Returns a vector of the area under the fluorescence curve within the provided
         window [before, after] (in seconds), that surrounds each start_time.
@@ -1086,7 +1101,7 @@ class FiberAnalyze( object ):
         value of the window (this is more if you want to look at the "shape" of the curve)
         """
         print "window: ", window
-        time_chunks = self.get_time_chunks_around_events(self.fluor_data, start_times, window)
+        time_chunks = self.get_time_chunks_around_events(self.fluor_data, start_times, window, baseline_window)
         
         areas = []
         for chunk in time_chunks:
@@ -1115,7 +1130,7 @@ class FiberAnalyze( object ):
         # by the maximum fluorescence value in the window following
         # each event
 
-        areas = self.get_areas_under_curve(start_times, window)
+        areas = self.get_areas_under_curve(start_times, window, baseline_window=window)
 
         window_indices = [ self.convert_seconds_to_index(window[0]),
                            self.convert_seconds_to_index(window[1]) ]
@@ -1298,6 +1313,11 @@ class FiberAnalyze( object ):
         return maxvalues
 
     def fit_peak(self, peak_index=None, type="sucrose", out_path=None):
+        """
+        Fits each individual peak using an inverse gamma function.
+        Currently works moderately well, however there is an issue 
+        with accurately choosing when the peak actually begins.
+        """
 
         if type == "sucrose":
             if self.event_start_times is None:
@@ -1315,7 +1335,8 @@ class FiberAnalyze( object ):
 
         event_lengths = np.array(end_times) - np.array(event_times)
         window = [0, np.max(event_lengths) + 10] #10 is right now an arbitrary buffer
-        time_chunks = self.get_time_chunks_around_events(self.fluor_data, event_times, window)
+        baseline_window = [np.max(event_lengths) + 10, np.max(event_lengths) + 10]
+        time_chunks = self.get_time_chunks_around_events(self.fluor_data, event_times, window, baseline_window=baseline_window)
 
         window_indices = [self.convert_seconds_to_index( window[0]),
                               self.convert_seconds_to_index( window[1])]
@@ -1543,17 +1564,18 @@ class FiberAnalyze( object ):
 
 
         if metric=="area":
-            before_start_scores = self.get_areas_under_curve( start_times, window=[window[0], 0], normalize=False)
-            after_start_scores = self.get_areas_under_curve( start_times, window=[0, window[1]], normalize=False)
+            before_start_scores = self.get_areas_under_curve( start_times, window=[window[0], 0], baseline_window=window, normalize=False)
+            after_start_scores = self.get_areas_under_curve( start_times, window=[0, window[1]], baseline_window=window, normalize=False)
 
         elif metric=="slice":
             for i in range(len(start_times)):
                 t = start_times[i]
                 ind = self.convert_seconds_to_index(t)
             
+                baseline = np.min(self.fluor_data[max(0, ind - window_indices[0]):min(len(self.fluor_data), ind + window_indices[1])])
                 slice_ind = self.convert_seconds_to_index(slice_time)
-                before_score = self.fluor_data[max(0, ind - slice_ind)]
-                after_score = self.fluor_data[min(len(self.fluor_data), ind + slice_ind)]
+                before_score = self.fluor_data[max(0, ind - slice_ind)] - baseline
+                after_score = self.fluor_data[min(len(self.fluor_data), ind + slice_ind)] - baseline
                 before_start_scores.append(before_score)
                 after_start_scores.append(after_score)
 
@@ -1563,8 +1585,9 @@ class FiberAnalyze( object ):
                 print t
                 ind = self.convert_seconds_to_index(t)
             
-                before_score = np.max(self.fluor_data[max(0, ind - window_indices[0]):ind])
-                after_score = np.max(self.fluor_data[ind:min(len(self.fluor_data), ind + window_indices[1])])
+                baseline = np.min(self.fluor_data[max(0, ind - window_indices[0]):min(len(self.fluor_data), ind + window_indices[1])])
+                before_score = np.max(self.fluor_data[max(0, ind - window_indices[0]):ind]) - baseline
+                after_score = np.max(self.fluor_data[ind:min(len(self.fluor_data), ind + window_indices[1])]) - baseline
                #  pl.plot(self.fluor_data[max(0, ind - window_indices[0]):min(len(self.fluor_data), ind + window_indices[1])])
                #  pl.title('peak')
                # # pl.show()
@@ -1761,8 +1784,9 @@ def test_FiberAnalyze(options):
     #FA.plot_peaks_vs_time(out_path = options.output_path)
  #   FA.plot_peritrigger_edge(window=[10, 25], type="sucrose", out_path = options.output_path + '_10_25_')
  
-    FA.plot_peritrigger_edge(window=[5, 5], type="sucrose", out_path = options.output_path + '_5_5_')
-    FA.plot_peritrigger_edge(window=[30, 30], type="sucrose", out_path = options.output_path + '_30_30_')
+  ###  FA.plot_peritrigger_edge(window=[5, 5], type="sucrose", out_path = options.output_path + '_5_5_')
+  ###  FA.plot_peritrigger_edge(window=[30, 30], type="sucrose", out_path = options.output_path + '_30_30_')
+    FA.plot_peritrigger_edge(window=[30, 30], type="homecage", out_path = options.output_path + '_30_30_')
 
 #    FA.plot_area_under_curve_wrapper( window=[0, 3], edge="rising", normalize=False, out_path = options.output_path)
 #    FA.plot_peaks_vs_time(out_path = options.output_path)
