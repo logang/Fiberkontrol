@@ -3,6 +3,7 @@ import numpy as np
 from scipy import stats
 import matplotlib.pyplot as plt
 import scipy as sp
+import sys
 
 """
 This class is for comparing the effect two different trial conditions (i.e. novel object interaction vs. social interaction)
@@ -23,6 +24,10 @@ class PairAnalyze( object ):
 				self.n_path = options.novel_path #novel_path can represent any
 				self.s_path = options.social_path
 				self.p_path = options.p_path
+				self.score_type = options.score_type
+				self.label = options.label
+				self.num_points = int(options.num_points)
+
 
 		def Load( self ):
 
@@ -54,25 +59,32 @@ class PairAnalyze( object ):
 
 
 				for f in self.p_files:
-					print "len(f['before']", len(f['before'])
-					self.n_scores.append(f['before'][0:min(8, len(f['before']) -1 )])
-					self.s_scores.append(f['after'][0:min(8, len(f['after']) -1 )])
+					print f.keys()
+					try:
+						self.n_scores.append(f['before'][0:min(self.num_points, len(f['before']) -1 )])
+						self.s_scores.append(f['after'][0:min(self.num_points, len(f['after']) -1 )])
+					except:
+						self.n_scores.append(f['scores'][0:min(self.num_points, len(f['scores']) -1 )])
+						self.n_start_times.append(f['event_times'][0:min(self.num_points, len(f['event_times']) -1 )])
+						self.n_end_times.append(f['end_times'][0:min(self.num_points, len(f['end_times']) -1 )])
+						#self.n_windows.append(f['window_size'])
+						self.n_windows.append(f['window'][0:min(self.num_points, len(f['window']) -1 )])
+						self.n_length_times.append(np.array(f['end_times']) - np.array(f['event_times']))
+						try:
+							self.n_aux.append(f['aux'][0:min(self.num_points, len(f['aux']) -1 )])
+						except:
+							aux_included = False
 
-					#self.n_start_times.append(f['event_times'])
-					#self.n_end_times.append(f['end_times'])
-					#self.n_windows.append(f['window_size'])
-					#self.n_length_times.append(np.array(f['end_times']) - np.array(f['event_times']))
-					# try:
-					# 	self.n_aux.append(f['aux'])
-
-					# self.s_start_times.append(f['event_times'])
-					# self.s_end_times.append(f['end_times'])
-					# self.s_windows.append(f['window_size'])
-					# self.s_length_times.append(np.array(f['end_times']) - np.array(f['event_times']))
-					# try:
-					# 	self.s_aux.append(f['aux'])
-					# except:
-					# 	aux_included = False
+						# self.s_scores.append(f['scores'])[0:min(self.num_points, len(f['scores']) -1 )])
+						# self.s_start_times.append(f['event_times'])[0:min(self.num_points, len(f['event_times']) -1 )])
+						# self.s_end_times.append(f['end_times'])[0:min(self.num_points, len(f['end_times']) -1 )])
+						# #self.s_windows.append(f['window_size'])
+						# self.s_windows.append(f['window'])[0:min(self.num_points, len(f['window']) -1 )])
+						# self.s_length_times.append(np.array(f['end_times']) - np.array(f['event_times']))
+						# try:
+						# 	self.s_aux.append(f['aux'])[0:min(self.num_points, len(f['aux']) -1 )])
+						# except:
+						# 	aux_included = False
 
 			elif self.n_path is not None:
 				self.n_files = []
@@ -93,25 +105,61 @@ class PairAnalyze( object ):
 					except:
 						print "FILE DOESN'T WORK: ", infile
 
+				i = 0
 				for f in self.n_files:
-					self.n_scores.append(f['scores'])
-					self.n_start_times.append(f['event_times'])
-					self.n_end_times.append(f['end_times'])
-					self.n_windows.append(f['window_size'])
-					self.n_length_times.append(np.array(f['end_times']) - np.array(f['event_times']))
+					print f.keys()
 					try:
-						self.n_aux.append(f['aux'])
+						print self.num_points, len(f['scores'])-1, min(self.num_points, len(f['scores'])-1 )
+						self.n_scores.append(f['scores'][0:min(self.num_points, len(f['scores']) -1 )])
+						self.n_start_times.append(f['event_times'][0:min(self.num_points, len(f['event_times']) -1 )])
+						self.n_end_times.append(f['end_times'][0:min(self.num_points, len(f['end_times']) -1 )])
+						try:
+							self.n_windows.append(f['window_size'][0:min(self.num_points, len(f['window_size']) -1 )])
+						except:
+							try:
+								self.n_windows.append(f['window'][0:min(self.num_points, len(f['window']) -1 )])
+							except:
+								self.n_windows.append(0)
+						self.n_length_times.append(np.array(f['end_times']) - np.array(f['event_times']))
+					except:
+						try:
+							self.n_scores.append(f['after'][0:min(self.num_points, len(f['after']) -1 )])
+							#self.n_scores.append(f['after'][0:len(f['after']) -1 ])
+						except:
+							print "a. You are using neither the npz file format ['scores', 'event_times', 'end_times', 'window_size'] nor ['before', 'after']"
+							sys.exit(0)
+
+					try:
+						self.n_aux.append(f['aux'][0:min(self.num_points, len(f['aux']) -1 )])
 					except:
 						aux_included = False
 
+					print "len(self.n_scores[i])", len(self.n_scores[i])
+					i += 1
+
 				for f in self.s_files:
-					self.s_scores.append(f['scores'])
-					self.s_start_times.append(f['event_times'])
-					self.s_end_times.append(f['end_times'])
-					self.s_windows.append(f['window_size'])
-					self.s_length_times.append(np.array(f['end_times']) - np.array(f['event_times']))
 					try:
-						self.s_aux.append(f['aux'])
+						self.s_scores.append(f['scores'][0:min(self.num_points, len(f['scores']) -1 )])
+						self.s_start_times.append(f['event_times'][0:min(self.num_points, len(f['event_times']) -1 )])
+						self.s_end_times.append(f['end_times'][0:min(self.num_points, len(f['end_times']) -1 )])
+						try:
+							self.s_windows.append(f['window_size'][0:min(self.num_points, len(f['window_size']) -1 )])
+						except:
+							try:
+								self.s_windows.append(f['window'][0:min(self.num_points, len(f['window']) -1 )])
+							except:
+								self.s_windows.append(0)
+						self.s_length_times.append(np.array(f['end_times']) - np.array(f['event_times']))
+					except:
+						try:
+							self.s_scores.append(f['after'][0:min(self.num_points, len(f['after']) -1 )])
+							#self.s_scores.append(f['after'][0:len(f['after']) -1 ])
+						except:
+							print "b. You are using neither the npz file format ['scores', 'event_times', 'end_times', 'window_size'] nor ['before', 'after']"
+							sys.exit(0)
+
+					try:
+						self.s_aux.append(f['aux'][0:min(self.num_points, len(f['aux']) -1 )])
 					except:
 						aux_included = False
 
@@ -462,7 +510,6 @@ class PairAnalyze( object ):
 				plt.show()
 
 
-
 				#This does not currently work
 			def CompareAllPeaks(self):
 				if (self.peaks_included):
@@ -517,7 +564,6 @@ class PairAnalyze( object ):
 			if s_scores is not None:
 				s_scores_per_bout, s_all_bouts, s_all_bout_indices, s_all_bout_times, s_all_bout_labels= self.GroupScoresByBout(s_scores, s_start_times)
 
-
 			n_bout_avgs, n_bout_stderr = self.SummarizeBouts(n_scores_per_bout)
 			if s_scores is not None:
 				s_bout_avgs, s_bout_stderr = self.SummarizeBouts(s_scores_per_bout)
@@ -564,11 +610,13 @@ class PairAnalyze( object ):
 				splot, = plt.plot(s_xp, s_pxp-1, 'g', linewidth=2)
 				#plt.legend([nplot, splot], ["Novel object: decay rate = " + "{0:.2f}".format(n_k) + r", $r^2 = $" + "{0:.2f}".format(n_r2), 
 				#												"Social interaction: decay rate = " + "{0:.2f}".format(s_k) + r", $r^2 = $" + "{0:.2f}".format(s_r2)])
-				plt.legend([nplot, splot], ["Before: decay rate = " + "{0:.2f}".format(n_k) + r", $r^2 = $" + "{0:.2f}".format(n_r2), 
-																"After: decay rate = " + "{0:.2f}".format(s_k) + r", $r^2 = $" + "{0:.2f}".format(s_r2)])
+				plt.legend([nplot, splot], [titlen+": decay rate = " + "{0:.2f}".format(n_k) + r", $r^2 = $" + "{0:.2f}".format(n_r2), 
+																titles+": decay rate = " + "{0:.2f}".format(s_k) + r", $r^2 = $" + "{0:.2f}".format(s_r2)])
 
 			else:
-				plt.legend([nplot], ["Sucrose response: decay rate = " + "{0:.2f}".format(n_k) + r", $r^2 = $" + "{0:.2f}".format(n_r2)])
+				plt.legend([nplot], [titlen+": decay rate = " + "{0:.2f}".format(n_k) + r", $r^2 = $" + "{0:.2f}".format(n_r2)])
+			
+
 			# ax.text(min(200, text_x), text_y + 0.25, "y = c*exp(-k*(x-x0)) + y0")
 			# ax.text(min(200, text_x), text_y + 0.20, "novel k = " + "{0:.2f}".format(n_k) + ", r^2 = " + "{0:.2f}".format(n_r2))
 			# ax.text(min(200, text_x), text_y + 0.15, "social k = " + "{0:.2f}".format(s_k) + ", r^2 = " + "{0:.2f}".format(s_r2))
@@ -581,6 +629,52 @@ class PairAnalyze( object ):
 			else:
 				plt.show()
 			pass
+
+
+			#-------------Now fit curve to individual trials instead of the averages within a bout-------------------#
+			fig = plt.figure()	
+			ax = fig.add_subplot(111)
+			ax.plot(n_all_bout_indices, n_all_bouts, 'ob')
+			if s_scores is not None:
+				ax.plot(s_all_bout_indices, s_all_bouts, 'og')
+			ax.set_xlim([0, np.max(n_all_bout_indices) + 1])
+
+			n_xp, n_pxp, n_x0, n_y0, n_c, n_k, n_r2 = self.fit_exponential(n_all_bout_indices, np.array(n_all_bouts) + 1)
+
+			if s_scores is not None:
+				s_xp, s_pxp, s_x0, s_y0, s_c, s_k, s_r2 = self.fit_exponential(s_all_bout_indices, np.array(s_all_bouts) + 1)
+				text_x = max(np.min(s_bout_numbers), np.min(n_bout_numbers) + 3)
+				text_y = max(np.max(n_all_bouts), np.max(s_all_bouts))
+			else:
+				text_x = np.min(n_bout_numbers) + 3
+				text_y = np.max(n_all_bouts)	
+			nplot, = plt.plot(n_xp, n_pxp-1, 'b', linewidth=2)
+			if s_scores is not None:
+				splot, = plt.plot(s_xp, s_pxp-1, 'g', linewidth=2)
+				#plt.legend([nplot, splot], ["Novel object: decay rate = " + "{0:.2f}".format(n_k) + r", $r^2 = $" + "{0:.2f}".format(n_r2), 
+				#												"Social interaction: decay rate = " + "{0:.2f}".format(s_k) + r", $r^2 = $" + "{0:.2f}".format(s_r2)])
+				plt.legend([nplot, splot], [titlen +" : decay rate = " + "{0:.2f}".format(n_k) + r", $r^2 = $" + "{0:.2f}".format(n_r2), 
+																titles +": decay rate = " + "{0:.2f}".format(s_k) + r", $r^2 = $" + "{0:.2f}".format(s_r2)])
+
+			else:
+				plt.legend([nplot], ["Sucrose response: decay rate = " + "{0:.2f}".format(n_k) + r", $r^2 = $" + "{0:.2f}".format(n_r2)])
+			# ax.text(min(200, text_x), text_y + 0.25, "y = c*exp(-k*(x-x0)) + y0")
+			# ax.text(min(200, text_x), text_y + 0.20, "novel k = " + "{0:.2f}".format(n_k) + ", r^2 = " + "{0:.2f}".format(n_r2))
+			# ax.text(min(200, text_x), text_y + 0.15, "social k = " + "{0:.2f}".format(s_k) + ", r^2 = " + "{0:.2f}".format(s_r2))
+			# except:
+			# 		print "Exponential Curve fit did not work"
+
+			if out_path is not None:
+				print "saving fig: ", out_path + titles + "_" + titlen + "scatter_vs_bout_number.pdf"
+				plt.savefig(out_path + titles + "_" + titlen + "scatter_vs_bout_number.pdf")
+			else:
+				plt.show()
+			pass
+
+			#-------------End: Now fit curve to individual trials instead of the averages within a bout-------------------#
+
+
+
 
 
 
@@ -657,7 +751,12 @@ def test_PairAnalyze(options):
 	#PA.CombinedAverage(PA.n_scores, PA.n_start_times, PA.s_scores, PA.s_start_times, titlen='novel', titles='social', score_type='peak height', out_path=PA.output_path + 'peak_')
 ##	PA.CombinedAverage(PA.n_scores, PA.n_start_times, None, None, titlen='novel', titles='social', score_type='peak height', out_path=PA.output_path + 'peak_')
 
-	PA.CombinedAverage(PA.n_scores, None, PA.s_scores, None, titlen='Before', titles='After', score_type='value at 1s from event', out_path=PA.output_path + 'peak_')
+	###Use this for Before_After decay plots
+	###PA.CombinedAverage(PA.n_scores, None, PA.s_scores, None, titlen='Before', titles='After', score_type=PA.score_type, out_path=PA.output_path + PA.label)
+	
+	PA.CombinedAverage(PA.s_scores, None, None, None, titlen='Social', titles='', score_type=PA.score_type, out_path=PA.output_path + "_social_")
+	PA.CombinedAverage(PA.n_scores, None, None, None, titlen='Novel', titles='', score_type=PA.score_type, out_path=PA.output_path + "_novel_")	
+	PA.CombinedAverage(PA.n_scores, None, PA.s_scores, None, titlen='Novel', titles='Social', score_type=PA.score_type, out_path=PA.output_path + PA.label)
 
 
 
@@ -682,6 +781,13 @@ if __name__ == "__main__":
                       help="Specify the path to the folder containing the paired scores (such as 'before' and 'after' an event).")
 		parser.add_option("-o", "--output-path", dest="output_path", default=None,
                       help="Specify the ouput path.")
+		parser.add_option("", "--score-type", dest="score_type", default='',
+                      help="Specify the score type ('area under curve', 'peak fluorescence', 'slice at 1s'.")
+		parser.add_option("", "--label", dest="label", default='',
+                  help="Specify a label describing the cohort such as 'novel', 'social', 'sucrose'")
+		parser.add_option("", "--num-points", dest="num_points", default=100,
+              help="Specify the number of bouts to show in the decay plot")
+
 
 		(options, args) = parser.parse_args()
 

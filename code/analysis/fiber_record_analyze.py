@@ -30,6 +30,8 @@ class FiberAnalyze( object ):
         self.time_range = options.time_range
         self.fluor_normalization = options.fluor_normalization
         self.filter_freqs = options.filter_freqs
+        self.exp_type = options.exp_type
+
 
         if options.selectfiles:
             self.input_path = tkFileDialog.askopenfilename()
@@ -77,6 +79,7 @@ class FiberAnalyze( object ):
                 self.fluor_data -= np.min(self.fluor_data)
                 self.fluor_data /= np.max(self.fluor_data)
             elif self.fluor_normalization == "raw":
+                print "Max raw value ", np.max(self.fluor_data)
                 pass
             else:
                 raise ValueError( self.fluor_normalization, "is not a valid entry for --fluor-normalization.")
@@ -106,12 +109,19 @@ class FiberAnalyze( object ):
                     print "Error loading trigger data:"
                     print "\t-->",e
 
-            self.trigger_data /= np.max(self.trigger_data)
+            self.trigger_data *= 3/np.max(self.trigger_data)
             self.trigger_data -= np.min(self.trigger_data)
-            self.trigger_data *= -1
-            self.trigger_data += 1
+            if self.exp_type == 'sucrose':
+                self.trigger_data = np.max(self.trigger_data) - self.trigger_data
+           # self.trigger_data *= -1
+           # self.trigger_data += 1
+
             if self.fluor_normalization == "deltaF":
                 self.trigger_data *= 1.5*np.max(self.fluor_data)
+
+            print "max(self.trigger_data)", np.max(self.trigger_data)
+            print "min(self.trigger_data)", np.min(self.trigger_data)
+
 
         elif file_type == "hdf5":
             h5_file = h5py.File( self.input_path, 'r' )
@@ -143,6 +153,8 @@ class FiberAnalyze( object ):
             self.fluor_data = self.fluor_data[self.t_start:self.t_end]
             self.trigger_data = self.trigger_data[self.t_start:self.t_end]
             self.time_stamps = self.time_stamps[self.t_start:self.t_end]
+
+            print "trigger_data", np.min(self.trigger_data), np.max(self.trigger_data), len(self.trigger_data)
 
         self.fft = None #place holder for fft of rawsignal, if calculated
         self.fft_freq = None #place holder for frequency labels of fft
@@ -514,11 +526,13 @@ class FiberAnalyze( object ):
              #   print "Unable to extract window:", [(e-window_indices[0]),(e+window_indices[1])]
         return (time_chunks, time_stamp_chunks)
 
-    def analyze_spectrum( self, type="sucrose", peak_index=None, out_path=None ):
+    def analyze_spectrum( self, peak_index=None, out_path=None ):
         """
         Compares the spectrum during lick epochs vs not during lick epochs
         -->Still in progress
         """
+
+        type = self.exp_type
 
         if type == "sucrose":
             if self.event_start_times is None:
@@ -528,8 +542,11 @@ class FiberAnalyze( object ):
             else:
                 event_times = self.event_start_times
                 end_times = self.event_end_times
-        elif type == "homecage":
+        elif type == "homecagenovel" or type == "homecagesocial":
             event_times = self.get_event_times(edge)
+        else:
+            print "Experiment type not implemented. use --exp-type flag with 'sucrose', 'homecagenovel', or 'homecagesocial'."
+            sys.exit(0)
 
 
         event_lengths = np.array(end_times) - np.array(event_times)
@@ -703,15 +720,16 @@ class FiberAnalyze( object ):
         for e in event_times:
            # try:
             e_idx = np.where(e<self.time_stamps)[0][0]
-            chunk = data[range((e_idx-window_indices[0]),(e_idx+window_indices[1]))]
-                #print [range((e_idx-window_indices[0]),(e_idx+window_indices[1]))]
-            if baseline_window is not None:
-                baseline_chunk = data[range((e_idx-baseline_indices[0]),(e_idx+baseline_indices[1]))]
-                baseline = np.min(baseline_chunk)
-            else:
-                baseline = np.min(chunk)
+            if (e_idx + window_indices[1] < len(data)-1) and (e_idx - window_indices[0] > 0):
+                chunk = data[range(max(0, (e_idx-window_indices[0])),min(len(data)-1, (e_idx+window_indices[1])))]
+                if baseline_window is not None:
+                    baseline_chunk = data[range(max(0, (e_idx-window_indices[0])), min(len(data)-1, (e_idx+window_indices[1])))]
+                    baseline = np.min(baseline_chunk)
+                else:
+                    baseline = np.min(chunk)
 
-            time_chunks.append(chunk - baseline)
+                print "chunk", np.shape(chunk)
+                time_chunks.append(chunk - baseline)
             #except:
              #   print "Unable to extract window:", [(e-window_indices[0]),(e+window_indices[1])]
         return time_chunks
@@ -740,6 +758,7 @@ class FiberAnalyze( object ):
 
         # plot each time window, colored by order
         time_arr = np.asarray(time_chunks).T
+        print "time_arr", np.shape(time_arr)
         x = self.time_stamps[0:time_arr.shape[0]]-self.time_stamps[window_indices[0]] ###IS THIS RIGHT?
         ymax = np.max(time_arr)
         ymax += 0.1*ymax
@@ -774,13 +793,16 @@ class FiberAnalyze( object ):
             pl.savefig(out_path + "perievent_tseries.pdf")
             pl.savefig(out_path + "perievent_tseries.png")
 
-    def plot_peritrigger_edge( self, window, edge="rising", type="homecage", out_path=None ):
+    def plot_peritrigger_edge( self, window, edge="rising", out_path=None ):
         """
         Wrapper for plot_perievent histograms specialized for
         loaded event data that comes as a list of pairs of
         event start and end times.
         type can be "homecage" or "sucrose"
         """
+
+        type = self.exp_type
+
         if type == "sucrose":
             if self.event_start_times is None:
                 event_times, end_times = self.get_sucrose_event_times()
@@ -789,8 +811,11 @@ class FiberAnalyze( object ):
             else:
                 event_times = self.event_start_times
                 end_times = self.event_end_times
-        elif type == "homecage":
+        elif type == "homecagesocial" or type == "homecagenovel":
             event_times = self.get_event_times(edge)
+        else:
+            print "Experiment type not implemented. use --exp-type flag with 'sucrose', 'homecagenovel', or 'homecagesocial'."
+            sys.exit(0)
 
         if event_times[0] != -1:
             self.plot_perievent_hist( event_times, window, out_path=out_path )
@@ -813,22 +838,28 @@ class FiberAnalyze( object ):
         timestep = np.max(self.time_stamps[1:] - self.time_stamps[:-1])
         self.fft_freq = np.fft.fftfreq(n, d=timestep)
 
-    def get_event_times( self, edge="rising"):
+    def get_event_times( self, edge="rising", nseconds=None):
         """
         Extracts a list of the times (in seconds) corresponding to
         interaction events to be time-locked with the signal
         specialized for loaded event data that comes as a list of 
         pairs of event start and end times.
+        nseconds defines a minimum distance between the end of one event
+        and the start of a previous event. if you do not wish to impose
+        such a restriction, set nseconds=None.
         """
         if self.time_tuples is not None:
             event_times = []
-            for pair in self.time_tuples:
-                if edge == "rising":
-                    event_times.append(pair[0])
-                elif edge == "falling":
-                    event_times.append(pair[1])
-                else:
-                    raise ValueError("Edge type must be 'rising' or 'falling'.")
+            for i in range(len(self.time_tuples)):
+                pair = self.time_tuples[i]
+
+                if i==0 or nseconds is None or (self.time_tuples[i][0] - self.time_tuples[i-1][1] >= nseconds):
+                    if edge == "rising":
+                        event_times.append(pair[0])
+                    elif edge == "falling":
+                        event_times.append(pair[1])
+                    else:
+                        raise ValueError("Edge type must be 'rising' or 'falling'.")
             return event_times
         else:            
             print "No event times loaded. Cannot find edges."        
@@ -855,6 +886,9 @@ class FiberAnalyze( object ):
         diff_mask = np.append(diff_mask, -np.ones(diff_nindex))
         smoothed_curve = np.convolve(smoothed_gradient, diff_mask)
 
+
+        type = self.exp_type
+
         #Now plot it to see if it worked...
         if type == "sucrose":
             if self.event_start_times is None:
@@ -864,8 +898,12 @@ class FiberAnalyze( object ):
             else:
                 event_times = self.event_start_times
                 end_times = self.event_end_times
-        elif type == "homecage":
+        elif type == "homecagesocial" or type == "homecagenovel":
             event_times = self.get_event_times("rising")
+        else:
+            print "Experiment type not implemented. use --exp-type flag with 'sucrose', 'homecagenovel', or 'homecagesocial'."
+            sys.exit(0)
+
 
         window = [25, 25]
         fluor_chunks = self.get_time_chunks_around_events(self.fluor_data, event_times, window, baseline_window=window)
@@ -1126,6 +1164,7 @@ class FiberAnalyze( object ):
 
         """
         
+        print "plot_area_under_curve"
         #change the normalization depending on whether you wish to divide (normalize)
         # by the maximum fluorescence value in the window following
         # each event
@@ -1319,6 +1358,8 @@ class FiberAnalyze( object ):
         with accurately choosing when the peak actually begins.
         """
 
+        type = self.exp_type
+
         if type == "sucrose":
             if self.event_start_times is None:
                 print "getting sucrose event times"
@@ -1329,8 +1370,11 @@ class FiberAnalyze( object ):
             else:
                 event_times = self.event_start_times
                 end_times = self.event_end_times
-        elif type == "homecage":
+        elif type == "homecagesocial" or type == "homecagenovel":
             event_times = self.get_event_times()
+        else:
+            print "Experiment type not implemented. use --exp-type flag with 'sucrose', 'homecagenovel', or 'homecagesocial'."
+            sys.exit(0)
 
 
         event_lengths = np.array(end_times) - np.array(event_times)
@@ -1470,10 +1514,10 @@ class FiberAnalyze( object ):
         of the event
         type can be "homecage", for novel object and social, where event times were hand scored
         or "sucrose", where event times are from the lickometer
-        sucrose_nseconds controls the minimum spacing between lick epochs
         """
+        type = self.exp_type
 
-        if type == "homecage":
+        if type == "homecagesocial" or type == "homecagenovel":
             start_times = self.get_event_times("rising")
             end_times = self.get_event_times("falling")
         elif type == "sucrose":
@@ -1485,7 +1529,9 @@ class FiberAnalyze( object ):
                 start_times = self.event_start_times
                 end_times = self.event_end_times
         else:
-            print "Incorrect behavior type specified in plot_peaks_vs_time"
+            print "Experiment type not implemented. use --exp-type flag with 'sucrose', 'homecagenovel', or 'homecagesocial'."
+            sys.exit(0)
+
 
         filt_start_times = []
         if start_times[0] != -1:
@@ -1493,8 +1539,12 @@ class FiberAnalyze( object ):
             for i in range(len(start_times)):
                 if type == "sucrose":
                     peak = self.get_sucrose_peak(start_times[i], end_times[i])
-                else:
+                elif type == "homecagesocial" or type == "homecagenovel":
                     peak = self.get_peak(start_times[i], end_times[i])
+                else:
+                    print "Experiment type not implemented. use --exp-type flag with 'sucrose', 'homecagenovel', or 'homecagesocial'."
+                    sys.exit(0)
+
                 if peak != 0:
                     peaks[i] = peak
 
@@ -1504,16 +1554,15 @@ class FiberAnalyze( object ):
             print np.max(peaks) + .3
             if type == "sucrose":
                 ax.set_ylim([0, np.max(peaks) + 0.4*np.max(peaks)])
-            else:
+            elif type == "homecagesocial" or type == "homecagenovel":
                 if np.max(peaks) > 0.8:
                     ax.set_ylim([0, 1.3])
                 else:
                     ax.set_ylim([0, 1.1])
-
-            if type == "homecage":
                 ax.set_xlim([100, 500])
             else:
                 ax.set_xlim([0, 1.1*np.max(start_times)])
+           
             ax.plot(start_times, peaks, 'o')
             pl.xlabel('Time [s]')
             pl.ylabel('Fluorescence [dF/F]')
@@ -1555,7 +1604,17 @@ class FiberAnalyze( object ):
         print window
         window_indices = [self.convert_seconds_to_index(window[0]), self.convert_seconds_to_index(window[1]) ]
         #get event times
-        start_times, end_times = self.get_sucrose_event_times()
+
+        type = self.exp_type
+        if type == 'sucrose':
+            start_times, end_times = self.get_sucrose_event_times()
+        elif type == 'homecagesocial' or type == 'homecagenovel':
+            start_times = self.get_event_times("rising")
+            end_times = self.get_event_times("falling")
+        else:
+            print "Experiment type not implemented. use --exp-type flag with 'sucrose', 'homecagenovel', or 'homecagesocial'."
+            sys.exit(0)
+
 
         before_start_scores = []
         after_start_scores = []
@@ -1563,42 +1622,50 @@ class FiberAnalyze( object ):
         #initialize result arrays
 
 
+
         if metric=="area":
             before_start_scores = self.get_areas_under_curve( start_times, window=[window[0], 0], baseline_window=window, normalize=False)
             after_start_scores = self.get_areas_under_curve( start_times, window=[0, window[1]], baseline_window=window, normalize=False)
+
+            num_entries = min(len(before_start_scores), len(after_start_scores)) -1 #in case the event is right at the end of the time series 
+            before_start_scores = before_start_scores[:num_entries]
+            after_start_scores = after_start_scores[:num_entries]
+
+
 
         elif metric=="slice":
             for i in range(len(start_times)):
                 t = start_times[i]
                 ind = self.convert_seconds_to_index(t)
-            
-                baseline = np.min(self.fluor_data[max(0, ind - window_indices[0]):min(len(self.fluor_data), ind + window_indices[1])])
-                slice_ind = self.convert_seconds_to_index(slice_time)
-                before_score = self.fluor_data[max(0, ind - slice_ind)] - baseline
-                after_score = self.fluor_data[min(len(self.fluor_data), ind + slice_ind)] - baseline
-                before_start_scores.append(before_score)
-                after_start_scores.append(after_score)
+                if ind + window_indices[1] < len(self.fluor_data)-1 and ind - window_indices[0] > 0:
+                
+                    baseline = np.min(self.fluor_data[max(0, ind - window_indices[0]):min(len(self.fluor_data), ind + window_indices[1])])
+                    slice_ind = self.convert_seconds_to_index(slice_time)
+                    before_score = self.fluor_data[max(0, ind - slice_ind)] - baseline
+                    after_score = self.fluor_data[min(len(self.fluor_data), ind + slice_ind)] - baseline
+                    before_start_scores.append(before_score)
+                    after_start_scores.append(after_score)
 
         elif metric=="peak":
             for i in range(len(start_times)):
                 t = start_times[i]
-                print t
                 ind = self.convert_seconds_to_index(t)
-            
-                baseline = np.min(self.fluor_data[max(0, ind - window_indices[0]):min(len(self.fluor_data), ind + window_indices[1])])
-                before_score = np.max(self.fluor_data[max(0, ind - window_indices[0]):ind]) - baseline
-                after_score = np.max(self.fluor_data[ind:min(len(self.fluor_data), ind + window_indices[1])]) - baseline
-               #  pl.plot(self.fluor_data[max(0, ind - window_indices[0]):min(len(self.fluor_data), ind + window_indices[1])])
-               #  pl.title('peak')
-               # # pl.show()
-                before_start_scores.append(before_score)
-                after_start_scores.append(after_score)  
+                if ind + window_indices[1] < len(self.fluor_data)-1 and ind - window_indices[0] > 0:
+
+                    baseline = np.min(self.fluor_data[max(0, ind - window_indices[0]):min(len(self.fluor_data), ind + window_indices[1])])
+                    before_score = np.max(self.fluor_data[max(0, ind - window_indices[0]):ind]) - baseline
+                    after_score = np.max(self.fluor_data[ind:min(len(self.fluor_data), ind + window_indices[1])]) - baseline
+                   #  pl.plot(self.fluor_data[max(0, ind - window_indices[0]):min(len(self.fluor_data), ind + window_indices[1])])
+                   #  pl.title('peak')
+                   # # pl.show()
+                    before_start_scores.append(before_score)
+                    after_start_scores.append(after_score)  
         else:
             print "metric ' " + metric + " ' has not yet been implemented. Please try 'area', 'slice', or 'peak'."
 
 
 
-        #---------------------------plot----------------------------------------------------------------------------
+        #---------------------------begin plot----------------------------------------------------------------------------
         pl.figure()
         before_plot, = pl.plot(range(len(before_start_scores)), before_start_scores, '-or')
         after_plot, = pl.plot(range(len(after_start_scores)), after_start_scores, '-og')
@@ -1632,9 +1699,7 @@ class FiberAnalyze( object ):
             np.savetxt(txt_save_path, (before_start_scores, after_start_scores))
 
 
-       #---------------------------plot----------------------------------------------------------------------------
-
-
+       #---------------------------end plot----------------------------------------------------------------------------
 
         return (before_start_scores, after_start_scores)
 
@@ -1761,41 +1826,27 @@ def test_FiberAnalyze(options):
 #    FA.wavelet_plot()
 #    FA.notch_filter(10.0, 10.3)
   #  FA.plot_periodogram(plot_type="log",out_path = options.output_path)
-  #  FA.plot_basic_tseries(out_path = options.output_path)#, window=[0, FA.time_stamps[-1]])
-#    FA.plot_basic_tseries(out_path = options.output_path, window=[60, FA.time_stamps[-1]])
-#    FA.plot_basic_tseries(out_path = options.output_path + '_licks_1000_1390_', window=[1000, 1390])
-#    FA.plot_basic_tseries(out_path = options.output_path + '_licks_1090_1160_', window=[1090, 1160])
-   # FA.plot_basic_tseries(out_path = options.output_path + '_licks_700_1200_', window=[700, 1200])
-   # FA.plot_basic_tseries(out_path = options.output_path + '_licks_1300_1600_', window=[1300, 1600])
-  #  FA.plot_basic_tseries(out_path = options.output_path + '_licks_120_250_', window=[120, 250])
-  #  FA.plot_basic_tseries(out_path = options.output_path + '_licks_700_1200_', window=[800, 1300])
-  ###  FA.plot_basic_tseries(out_path = options.output_path + '_licks_0_4100_', window=[0, 4100])
-  
-  #  FA.plot_basic_tseries(out_path = options.output_path + '_licks_0_4100_', window=[0, FA.time_stamps[len(FA.fluor_data)-1]])
-  ###  FA.plot_basic_tseries(out_path = options.output_path + '_licks_0_2300_', window=[0, 2300])
-
 
   
   #  FA.plot_lick_density_vs_time(1, out_path = options.output_path)
    # FA.get_sucrose_event_times(5, "falling")
 #    FA.event_vs_baseline_barplot(out_path = options.output_path)
 
-  #  FA.plot_area_under_curve_wrapper( window_size=[0, 1], edge="rising", normalize=False, out_path = options.output_path)
-    #FA.plot_peaks_vs_time(out_path = options.output_path)
- #   FA.plot_peritrigger_edge(window=[10, 25], type="sucrose", out_path = options.output_path + '_10_25_')
+    FA.plot_area_under_curve_wrapper( window=[0, 1], edge="rising", normalize=False, out_path = options.output_path)
+    FA.plot_peaks_vs_time(out_path = options.output_path)
  
-  ###  FA.plot_peritrigger_edge(window=[5, 5], type="sucrose", out_path = options.output_path + '_5_5_')
-  ###  FA.plot_peritrigger_edge(window=[30, 30], type="sucrose", out_path = options.output_path + '_30_30_')
-    FA.plot_peritrigger_edge(window=[30, 30], type="homecage", out_path = options.output_path + '_30_30_')
+    FA.plot_peritrigger_edge(window=[1, 3], out_path = options.output_path + '_1_3_')
+    FA.plot_peritrigger_edge(window=[5, 5], out_path = options.output_path + '_5_5_')
+    FA.plot_peritrigger_edge(window=[30, 30], out_path = options.output_path + '_30_30_')
+    FA.plot_peritrigger_edge(window=[10, 30], out_path = options.output_path + '_10_30_')
+  
 
-#    FA.plot_area_under_curve_wrapper( window=[0, 3], edge="rising", normalize=False, out_path = options.output_path)
-#    FA.plot_peaks_vs_time(out_path = options.output_path)
-   
+  #  FA.plot_area_under_curve_wrapper( window=[0, 3], edge="rising", normalize=False, out_path = options.output_path)
+  #  FA.plot_peaks_vs_time(out_path = options.output_path)
+    #Dont use these anymore, use compare_before_and_after_event?
 
   #  FA.plot_peaks_vs_time(type="sucrose", out_path = options.output_path)
-
   #  FA.debleach(out_path = options.output_path) #you want to use --fluor-normalization = 'raw' when debleaching!!!
-
    # peak_inds, peak_vals, peak_times = FA.get_peaks(window_in_seconds)
   #  FA.plot_peak_data()
 
@@ -1803,11 +1854,18 @@ def test_FiberAnalyze(options):
   ##  FA.fit_peak( type="sucrose", out_path=options.output_path)
 ###    FA.analyze_spectrum(type="sucrose", peak_index=None, out_path=None )
 
-    FA.compare_before_and_after_event(window=[5, 5], metric="slice", slice_time=1, out_path=options.output_path)
-    FA.compare_before_and_after_event(window=[5, 5], metric="slice", slice_time=2, out_path=options.output_path)
+    # FA.compare_before_and_after_event(window=[5, 5], metric="slice", slice_time=1, out_path=options.output_path)
+    # FA.compare_before_and_after_event(window=[5, 5], metric="slice", slice_time=2, out_path=options.output_path)
 
-    FA.compare_before_and_after_event(window=[5, 5], metric="area", out_path=options.output_path)
-    FA.compare_before_and_after_event(window=[5, 5], metric="peak", out_path=options.output_path)
+    # FA.compare_before_and_after_event(window=[5, 5], metric="area", out_path=options.output_path)
+    # FA.compare_before_and_after_event(window=[5, 5], metric="peak", out_path=options.output_path)
+
+##    FA.compare_before_and_after_event(window=[3, 3], metric="slice", slice_time=1, out_path=options.output_path)
+##    FA.compare_before_and_after_event(window=[3, 3], metric="slice", slice_time=2, out_path=options.output_path)
+
+ ##   FA.compare_before_and_after_event(window=[3, 3], metric="area", out_path=options.output_path)
+ ##   FA.compare_before_and_after_event(window=[3, 3], metric="peak", out_path=options.output_path)
+
 
 
 
@@ -1847,9 +1905,8 @@ if __name__ == "__main__":
                       help="Debleach fluorescence time series by fitting with an exponential curve.")
     parser.add_option("", "--filter-freqs", default=None, dest="filter_freqs",
                       help="Use a notch filter to remove high frequency noise. Format lowfreq:highfreq.")
-
-    ##To Implement: parser.add_option("", "--exp-type", dest="exp_type", default=None,
-    #                   help="Specify either 'homecagenovel', 'homecagesocial', or 'sucrose'.")
+    parser.add_option("", "--exp-type", dest="exp_type", default=None,
+                       help="Specify either 'homecagenovel', 'homecagesocial', or 'sucrose'.")
 
     (options, args) = parser.parse_args()
     
