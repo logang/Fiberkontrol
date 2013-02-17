@@ -61,7 +61,6 @@ class FiberAnalyze( object ):
         """
         Load time series and events from NPZ or HDF5 file. 
         """
-
         self.time_tuples = None
         if file_type == "npz":
             self.data = np.load( self.input_path )['data']
@@ -83,6 +82,7 @@ class FiberAnalyze( object ):
                 pass
             else:
                 raise ValueError( self.fluor_normalization, "is not a valid entry for --fluor-normalization.")
+
             # make smallest value positive.
             # remove this when actually making deltaF/F plots?
            ## self.fluor_data -= np.min(self.fluor_data)
@@ -130,6 +130,8 @@ class FiberAnalyze( object ):
             self.time_stamps = self.data[:,0]
             self.trigger_data = self.data[:,1]
             self.fluor_data = self.data[:,2]
+
+        return self.fluor_data, self.trigger_data
             
         # if time range is specified, crop data    
         if self.time_range != None:
@@ -673,7 +675,6 @@ class FiberAnalyze( object ):
             print "Saving periodogram..."
           #  pl.savefig(os.path.join(out_path,'periodogram'))
             pl.savefig(out_path + "periodogram.pdf")
-
         
     def plot_peak_data( self, out_path=None ):
         """
@@ -706,15 +707,12 @@ class FiberAnalyze( object ):
         specified in window as [before, after] (in seconds).
         Subtracts the baseline value from each chunk (i.e. sets the minimum value in a chunk to 0)
         """
-
         window_indices = [self.convert_seconds_to_index( window[0]),
                           self.convert_seconds_to_index( window[1])]
+
         if baseline_window is not None:
             baseline_indices = [self.convert_seconds_to_index( baseline_window[0]),
                                 self.convert_seconds_to_index( baseline_window[1])]
-
-        print "window indices", window_indices
-        print "event_times", np.shape(event_times)
 
         time_chunks = []
         for e in event_times:
@@ -734,7 +732,7 @@ class FiberAnalyze( object ):
              #   print "Unable to extract window:", [(e-window_indices[0]),(e+window_indices[1])]
         return time_chunks
 
-    def plot_perievent_hist( self, event_times, window, out_path=None ):
+    def plot_perievent_hist( self, event_times, window, out_path=None, plotit=True, subplot=None ):
         """
         Peri-event time histogram for given event times.
         Plots the time series and their median over a time window around
@@ -742,56 +740,60 @@ class FiberAnalyze( object ):
         specified in window as [before, after] (in seconds).
         """
         # new figure
-        pl.clf()
-        fig = pl.figure()
-        ax = fig.add_subplot(111)
+        if plotit and subplot is None:
+            pl.clf()
+            fig = pl.figure()
+            ax = fig.add_subplot(111)
+        elif subplot is not None:
+            ax = subplot
 
-        print "event_times", np.shape(event_times)
-        print "window", window
+        print "Generating peri-event plot..."
+        print "\t--> Number of bouts:", len(event_times)
+        print "\t--> Window used for peri-event plot:", window
 
         # get blocks of time series for window around each event time
-        time_chunks = self.get_time_chunks_around_events(self.fluor_data, event_times, window, baseline_window=window)
-        print "time_chunks", np.shape(time_chunks)
+        time_chunks = self.get_time_chunks_around_events(event_times, window)
 
+        # get time values from frame indices
         window_indices = [ self.convert_seconds_to_index(window[0]),
                            self.convert_seconds_to_index(window[1]) ]
 
         # plot each time window, colored by order
         time_arr = np.asarray(time_chunks).T
-        print "time_arr", np.shape(time_arr)
         x = self.time_stamps[0:time_arr.shape[0]]-self.time_stamps[window_indices[0]] ###IS THIS RIGHT?
         ymax = np.max(time_arr)
         ymax += 0.1*ymax
         ymin = np.min(time_arr)
         ymin -= 0.1*ymin
         for i in xrange(time_arr.shape[1]):
-            ax.plot(x, time_arr[:,i], color=pl.cm.jet(255-255*i/time_arr.shape[1]), alpha=0.75, linewidth=1)
+            if plotit:
+                ax.plot(x, time_arr[:,i], color=pl.cm.jet(255-255*i/time_arr.shape[1]), alpha=0.75, linewidth=1)
             x.shape = (len(x),1) 
             x_padded = np.vstack([x[0], x, x[-1]])
             time_vec = time_arr[:,i]; time_vec.shape = (len(time_vec),1)
             time_vec_padded = np.vstack([0, time_vec,0]) 
-            pl.fill(x_padded, time_vec_padded, facecolor=pl.cm.jet(255-255*i/time_arr.shape[1]), alpha=0.25 )            
-            #pl.ylim([0,ymax])
-            pl.ylim([ymin, ymax])
+
+            if plotit:
+                pl.fill(x_padded, time_vec_padded, facecolor=pl.cm.jet(255-255*i/time_arr.shape[1]), alpha=0.25 )            
+                pl.ylim([ymin, ymax])
             
-        # add a line for the event onset time
-        pl.axvline(x=0,color='black',linewidth=1,linestyle='--')
+        if plotit:
+            # add a line for the event onset time
+            pl.axvline(x=0,color='black',linewidth=1,linestyle='--')
 
-        # label the plot axes
-        if self.fluor_normalization == "deltaF":
-            pl.ylabel(r'$\delta F/F$')
-        else:
-            pl.ylabel('Fluorescence Intensity (a.u.)')
-        pl.xlabel('Time from onset of licking bout (seconds)')
+            # label the plot axes
+            if self.fluor_normalization == "deltaF":
+                pl.ylabel(r'$\delta F/F$')
+            else:
+                pl.ylabel('Fluorescence Intensity (a.u.)')
+            pl.xlabel('Time from onset of social bout (seconds)')
 
-        # show plot now or save of an output path was specified
-        if out_path is None:
-            pl.show()
-        else:
-            print "Saving peri-event time series..."
-            #pl.savefig(os.path.join(out_path,'perievent_tseries'))
-            pl.savefig(out_path + "perievent_tseries.pdf")
-            pl.savefig(out_path + "perievent_tseries.png")
+            # show plot now or save of an output path was specified
+            if out_path is None and subplot is None:
+                pl.show()
+            elif subplot is None:
+                print "Saving peri-event time series..."
+                pl.savefig(out_path + "perievent_tseries.pdf")
 
     def plot_peritrigger_edge( self, window, edge="rising", out_path=None ):
         """
@@ -1021,7 +1023,6 @@ class FiberAnalyze( object ):
         The end of a licking epoch can be determined by calculating
         the time at which this density returns to zero minus nseconds
         """
-
         nindex = self.convert_seconds_to_index(nseconds)
         mask = np.ones(nindex)
 
@@ -1031,7 +1032,6 @@ class FiberAnalyze( object ):
         if density is None:
             density = np.convolve(self.trigger_data, mask)
             density = density[nindex-1:] 
-
 
         dmed = np.median(density)
         print "dmed", dmed
@@ -1055,7 +1055,6 @@ class FiberAnalyze( object ):
                 filt_start_times = np.append(filt_start_times, start_times[i])
                 filt_end_times = np.append(filt_end_times, end_times[i])
 
-
         print "start_times ", filt_start_times
         print "end_times ", filt_end_times
     
@@ -1065,8 +1064,6 @@ class FiberAnalyze( object ):
 
         return (filt_start_times, filt_end_times)
 
-
-
     def convert_seconds_to_index( self, time_in_seconds):
         return np.where( self.time_stamps >= time_in_seconds)[0][0]
 
@@ -1075,8 +1072,7 @@ class FiberAnalyze( object ):
         Remove trend from data due to photobleaching by fitting the time serie with an exponential curve
         and then subtracting the difference between the curve and the median value of the time series. 
         """
-
-        print "debleaching"
+        print "Debleaching the time series..."
         
         fluor_data = self.fluor_data
         time_stamps = self.time_stamps[range(len(self.fluor_data))]
@@ -1095,14 +1091,12 @@ class FiberAnalyze( object ):
 
         #flat_fluor_data = flat_fluor_data - min(flat_fluor_data) + 0.000001
 
-
         pl.plot(time_stamps, fluor_data)
         pl.plot(time_stamps, yxp, 'r')
         pl.plot(time_stamps, flat_fluor_data)
         pl.xlabel('Time [s]')
         pl.ylabel('Raw fluorescence (a.u.)')
         pl.title('Debleaching the fluorescence curve')
-
 
         out_arr = np.zeros((len(flat_fluor_data),4))
         out_arr[:,0] = flat_fluor_data

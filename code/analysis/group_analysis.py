@@ -7,44 +7,15 @@ from matplotlib import cm
 
 from fiber_record_analyze import FiberAnalyze
 
-#-------------------------------------------------------------------------------------------
+def group_regression_plot(all_data, options, exp_type='homecagesocial', time_window=[-1,1] ):
 
-if __name__ == "__main__":
-    all_data = h5py.File("/Users/logang/Documents/Results/FiberRecording/Cell/all_data_raw.h5",'r')
+    """
+    Plot fits of regression lines on data from home cage or novel social fiber photometry data, with points corresponding to bout and bout number.
 
-    # Parse command line options
-    from optparse import OptionParser
+    TODO: write better description of function. Clean up code. Have figure save to output_path. 
+    """
 
-    parser = OptionParser()
-    parser.add_option("-o", "--output-path", dest="output_path", default=None,
-                      help="Specify the ouput path.")
-    parser.add_option("-t", "--trigger-path", dest="trigger_path", default=None,
-                      help="Specify path to files with trigger times, minus the '_s.npz' and '_e.npz' suffixes.")
-    parser.add_option("-i", "--input-path", dest="input_path",
-                      help="Specify the input path.")
-    parser.add_option("", "--time-range", dest="time_range",default=None,
-                      help="Specify a time window over which to analyze the time series in format start:end. -1 chooses the appropriate extremum")
-    parser.add_option('-p', "--plot-type", default = 'tseries', dest="plot_type",
-                      help="Type of plot to produce.")
-    parser.add_option('', "--fluor_normalization", default = 'deltaF', dest="fluor_normalization",
-                      help="Normalization of fluorescence trace. Can be a.u. between [0,1]: 'stardardize' or deltaF/F: 'deltaF'.")
-    parser.add_option('-s', "--smoothness", default = None, dest="smoothness",
-                      help="Should the time series be smoothed, and how much.")
-    parser.add_option('-x', "--selectfiles", default = False, dest = "selectfiles",
-                       help="Should you select filepaths in a pop window instead of in the command line.")
-    parser.add_option("", "--save-txt", action="store_true", default=False, dest="save_txt",
-                      help="Save data matrix out to a text file.")
-    parser.add_option("", "--save-to-h5", default=None, dest="save_to_h5",
-                      help="Save data matrix to a dataset in an hdf5 file.")
-    parser.add_option("", "--save-and-exit", action="store_true", default=False, dest="save_and_exit",
-                      help="Exit immediately after saving data out.")
-
-    (options, args) = parser.parse_args()
-
-    # --- Plot data --- #
-    exp_type = 'homecagesocial'
-    time_window = [0,1] # [before,after] event in seconds 
-
+    # Create figure
     fig = pl.figure()
     ax = fig.add_subplot(1,1,1)
 
@@ -61,7 +32,7 @@ if __name__ == "__main__":
             FA.load(file_type="hdf5")
 
             # get intensity and next_val values for this animal
-            peak_intensity, onset_next_vals = FA.plot_next_event_vs_intensity(intensity_measure="integrated", next_event_measure="onset", window=time_window, out_path=None, plotit=False)\
+            peak_intensity, onset_next_vals = FA.plot_next_event_vs_intensity(intensity_measure="integrated", next_event_measure="onset", window=time_window, out_path=None, plotit=False)
 
             # fit a robust regression
             if len(onset_next_vals) > 0:
@@ -108,5 +79,99 @@ if __name__ == "__main__":
     pl.ylabel("log time until next interaction")
 #    pl.ylabel("log length of next interaction")
     pl.show()
+
+def group_bout_heatmaps(all_data, options, exp_type, time_window, df_max=5.5):
+    """
+    Save out 'heatmaps' showing time on the x axis, bouts on the y axis, and representing signal
+    intensity with color.
+    """
+    i=0 # color counter
+    for animal_id in all_data.keys():
+        # load data from hdf5 file by animal-date-exp_type
+        animal = all_data[animal_id]
+        for dates in animal.keys():
+            # Create figure
+            fig = pl.figure()
+            ax = fig.add_subplot(2,1,1)
+            
+            date = animal[dates]
+            FA = FiberAnalyze( options )
+            FA.subject_id = animal_id
+            FA.exp_date = dates
+            FA.exp_type = exp_type
+            FA.load(file_type="hdf5")
+
+            event_times = FA.get_event_times("rising")
+            time_arr = np.asarray( FA.get_time_chunks_around_events(event_times, time_window) )
+
+            # Generate a heatmap of activity by bout, with range set between the 5% quantile of
+            # the data and the 'df_max' argument of the function
+            from scipy.stats.mstats import mquantiles
+            baseline = mquantiles( time_arr.flatten(), prob=[0.05])
+            ax.imshow(time_arr, interpolation="nearest",vmin=baseline,vmax=df_max,cmap=pl.cm.afmhot)
+            ax.set_aspect('auto')
+            pl.title("Animal #: "+animal_id+'   Date: '+dates)
+            pl.ylabel('Bout Number')
+            ax.axvline(np.abs(time_window[0])*time_arr.shape[1]/(time_window[1]-time_window[0]),color='white',linewidth=2,linestyle="--")
+
+            ax = fig.add_subplot(2,1,2)
+            FA.plot_perievent_hist(event_times, time_window, out_path=None, plotit=True, subplot=ax )
+            pl.ylim([0,df_max])
+
+            if options.output_path is not None:
+                import os
+                outdir = os.path.join(options.output_path, options.exp_type)
+                if not os.path.isdir(outdir):
+                    os.makedirs(outdir)
+                pl.savefig(outdir+'/'+animal_id+'_'+dates+'.png')
+            else:
+                pl.show()
+
+#-------------------------------------------------------------------------------------------
+
+if __name__ == "__main__":
+    all_data = h5py.File("/Users/logang/Documents/Results/FiberRecording/Cell/all_data_raw.h5",'r')
+
+    # Parse command line options
+    from optparse import OptionParser
+
+    parser = OptionParser()
+    parser.add_option("-o", "--output-path", dest="output_path", default=None,
+                      help="Specify the ouput path.")
+    parser.add_option("-t", "--trigger-path", dest="trigger_path", default=None,
+                      help="Specify path to files with trigger times, minus the '_s.npz' and '_e.npz' suffixes.")
+    parser.add_option("-i", "--input-path", dest="input_path",
+                      help="Specify the input path.")
+    parser.add_option("", "--time-range", dest="time_range",default=None,
+                      help="Specify a time window over which to analyze the time series in format start:end. -1 chooses the appropriate extremum")
+    parser.add_option('-p', "--plot-type", default = 'tseries', dest="plot_type",
+                      help="Type of plot to produce.")
+    parser.add_option('', "--fluor_normalization", default = 'deltaF', dest="fluor_normalization",
+                      help="Normalization of fluorescence trace. Can be a.u. between [0,1]: 'stardardize' or deltaF/F: 'deltaF'.")
+    parser.add_option('-s', "--smoothness", default = None, dest="smoothness",
+                      help="Should the time series be smoothed, and how much.")
+    parser.add_option('-x', "--selectfiles", default = False, dest = "selectfiles",
+                       help="Should you select filepaths in a pop window instead of in the command line.")
+    parser.add_option("", "--save-txt", action="store_true", default=False, dest="save_txt",
+                      help="Save data matrix out to a text file.")
+    parser.add_option("", "--save-to-h5", default=None, dest="save_to_h5",
+                      help="Save data matrix to a dataset in an hdf5 file.")
+    parser.add_option("", "--save-and-exit", action="store_true", default=False, dest="save_and_exit",
+                      help="Exit immediately after saving data out.")
+
+    parser.add_option('', "--exp-type", default = 'homecagesocial', dest="exp_type",
+                      help="Which type of experiment. Current options are 'homecagesocial' and 'homecagenovel'")
+    parser.add_option("", "--time-window", dest="time_window",default='-3:3',
+                      help="Specify a time window for peri-event plots in format start:end.")
+    
+    (options, args) = parser.parse_args()
+
+    # --- Plot data --- #
+
+    # if time range is specified, crop data    
+    time_window = np.array(options.time_window.split(':'), dtype='float32') # [before,after] event in seconds 
+
+#    group_regression_plot(all_data, options, exp_type=exp_type, time_window=time_window)
+    group_bout_heatmaps(all_data, options, exp_type=options.exp_type, time_window=time_window)
 
 #----------------------------------------------------------------------------------------   
