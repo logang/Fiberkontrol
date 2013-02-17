@@ -25,12 +25,13 @@ class FiberAnalyze( object ):
         self.exp_type = None
 
         # values from option parser
-        self.smoothness = options.smoothness
+        self.smoothness = int(options.smoothness)
         self.plot_type = options.plot_type
         self.time_range = options.time_range
         self.fluor_normalization = options.fluor_normalization
         self.filter_freqs = options.filter_freqs
         self.exp_type = options.exp_type
+        self.event_spacing = int(options.event_spacing)
 
         if options.selectfiles:
             self.input_path = tkFileDialog.askopenfilename()
@@ -64,7 +65,6 @@ class FiberAnalyze( object ):
         if file_type == "npz":
             self.data = np.load( self.input_path )['data']
             self.time_stamps = np.load( self.input_path )['time_stamps']
-            print "np.shape(self.data)", np.max(self.data[:, 0]), np.max(self.data[:, 1]), np.max(self.data[:, 2]), np.max(self.data[:, 3])
             
             # normalized fluor data, which is in arbitrary units
             self.fluor_data = self.data[:,self.fluor_channel]
@@ -72,7 +72,7 @@ class FiberAnalyze( object ):
                 print "deltaF"
                 median = np.median(self.fluor_data)
                 self.fluor_data = (self.fluor_data-median)/median #dF/F
-                print "median: ", np.median(self.fluor_data)
+                print "median of fluorescence data: ", np.median(self.fluor_data)
             elif self.fluor_normalization == "standardize":
                 self.fluor_data -= np.min(self.fluor_data)
                 self.fluor_data /= np.max(self.fluor_data)
@@ -118,9 +118,6 @@ class FiberAnalyze( object ):
             if self.fluor_normalization == "deltaF":
                 self.trigger_data *= 1.5*np.max(self.fluor_data)
 
-            print "max(self.trigger_data)", np.max(self.trigger_data)
-            print "min(self.trigger_data)", np.min(self.trigger_data)
-
 
         elif file_type == "hdf5":
             h5_file = h5py.File( self.input_path, 'r' )
@@ -130,7 +127,7 @@ class FiberAnalyze( object ):
             self.trigger_data = self.data[:,1]
             self.fluor_data = self.data[:,2]
 
-        return self.fluor_data, self.trigger_data
+        
             
         # if time range is specified, crop data    
         if self.time_range != None:
@@ -164,14 +161,14 @@ class FiberAnalyze( object ):
         self.event_start_times = None #place holder event_times that may be calculated by get_sucrose_event_times
         self.event_end_times = None
 
+
         if self.filter_freqs is not None:
             freqlist = self.filter_freqs.split(':')
             print freqlist
             self.fluor_data = self.notch_filter(freqlist[0], freqlist[1])
-        if self.smoothness is not None:
+        
+        if self.smoothness != 0:
             self.fluor_data = self.smooth(int(self.smoothness), window_type='gaussian')
-
-
 
         if self.save_txt:
             self.save_time_series(self.output_path)
@@ -179,6 +176,9 @@ class FiberAnalyze( object ):
             self.save_time_series(self.output_path, output_type="h5", h5_filename=self.save_to_h5)
         if self.save_debleach:
             self.debleach(self.output_path)
+
+
+        return self.fluor_data, self.trigger_data
 
     def load_trigger_data( self, s_filename, e_filename ):
         """
@@ -211,8 +211,6 @@ class FiberAnalyze( object ):
             fluor_data = fluor_data[window_indices[0]:window_indices[1]]
             trigger_data = trigger_data[window_indices[0]:window_indices[1]]
 
-        print "min(trigger_data)", min(trigger_data)
-        print "max(trigger_data)", max(trigger_data)
 
         trigger_low = min(trigger_data) + 0.2
         trigger_high_locations = [time_vals[i] for i in range(len(trigger_data)) if trigger_data[i] > trigger_low]
@@ -791,6 +789,7 @@ class FiberAnalyze( object ):
             elif subplot is None:
                 print "Saving peri-event time series..."
                 pl.savefig(out_path + "perievent_tseries.pdf")
+                pl.savefig(out_path + "perievent_tseries.png")
 
     def plot_peritrigger_edge( self, window, edge="rising", out_path=None ):
         """
@@ -837,7 +836,7 @@ class FiberAnalyze( object ):
         timestep = np.max(self.time_stamps[1:] - self.time_stamps[:-1])
         self.fft_freq = np.fft.fftfreq(n, d=timestep)
 
-    def get_event_times( self, edge="rising", nseconds=None):
+    def get_event_times( self, edge="rising", nseconds=0):
         """
         Extracts a list of the times (in seconds) corresponding to
         interaction events to be time-locked with the signal
@@ -847,6 +846,10 @@ class FiberAnalyze( object ):
         and the start of a previous event. if you do not wish to impose
         such a restriction, set nseconds=None.
         """
+        if self.event_spacing is not None:
+            nseconds = self.event_spacing
+
+
         if self.time_tuples is not None:
             event_times = []
             for i in range(len(self.time_tuples)):
@@ -864,16 +867,17 @@ class FiberAnalyze( object ):
             print "No event times loaded. Cannot find edges."        
             return [-1]
 
-    def get_peaks_convolve( self, nseconds, out_path=None, type="sucrose"):
+    def get_peaks_convolve( self, window, out_path=None, type="sucrose"):
         """
         Find peaks based on the difference in signal integrated
         over a window of nseconds before and nseconds after
         each time point
         """
 
-        nindex = self.convert_seconds_to_index(nseconds)
-        mask = np.ones(nindex)
-        mask = np.append(mask, -np.ones(nindex))
+        nindex_after = self.convert_seconds_to_index(window[1])
+        nindex_before = self.convert_seconds_to_index(window[0])
+        mask = np.ones(nindex_after)
+        mask = np.append(mask, -np.ones(nindex_before))
 
         time_vals = self.time_stamps[range(len(self.fluor_data))]
         smoothed_gradient = np.convolve(self.fluor_data, mask)
@@ -979,13 +983,13 @@ class FiberAnalyze( object ):
 
         return smoothed_gradient
 
-    def get_lick_density_vs_time( self, nseconds, out_path=None):
+    def get_lick_density_vs_time( self, window_after, out_path=None):
         """
         For each time point, plot the number of licks occuring
-        in the nseconds after that time point.
+        in the window_after (in seconds) after that time point.
         """
 
-        nindex = self.convert_seconds_to_index(nseconds)
+        nindex = self.convert_seconds_to_index(window_after)
         mask = np.ones(nindex)
         self.trigger_data = np.floor(self.trigger_data)
 
@@ -1020,6 +1024,10 @@ class FiberAnalyze( object ):
         The end of a licking epoch can be determined by calculating
         the time at which this density returns to zero minus nseconds
         """
+
+#        if self.event_spacing is not None:
+#            nseconds = self.event_spacing
+
         nindex = self.convert_seconds_to_index(nseconds)
         mask = np.ones(nindex)
 
@@ -1031,10 +1039,7 @@ class FiberAnalyze( object ):
             density = density[nindex-1:] 
 
         dmed = np.median(density)
-        print "dmed", dmed
-        print "nindex", nindex
-        print "max(trigger_data)", max(self.trigger_data)
-        print "min(trigger_data)", min(self.trigger_data)
+
 
         start_times = np.zeros(0)
         end_times = np.zeros(0)
@@ -1261,10 +1266,10 @@ class FiberAnalyze( object ):
                     self.invGamX_residuals, p_guess, args=(x, y), full_output=1)
 
                 a, b = p 
-                print('''Reference data:\  
-                        a {a}
-                        b = {b}
-                        '''.format(a=a,b=b))
+                # print('''Reference data:\  
+                #         a {a}
+                #         b = {b}
+                #         '''.format(a=a,b=b))
 
                 numPoints = np.floor((np.max(x) - np.min(x))*num_points)
                 xp = np.linspace(np.min(x), np.max(x), numPoints)
@@ -1309,20 +1314,18 @@ class FiberAnalyze( object ):
         max_r2 = -1
         maxvalues = ()
         for kg in kguess:
-            print "kg", kg
             for yg in yguess:
-                print "yg", yg
                 p_guess=(np.min(x), yg, 1, kg)
                 p, cov, infodict, mesg, ier = sp.optimize.leastsq(
                     self.eNegX_residuals, p_guess, args=(x, y), full_output=1)
 
                 x0,y0,c,k=p 
-                print('''Reference data:\  
-                        x0 = {x0}
-                        y0 = {y0}
-                        c = {c}
-                        k = {k}
-                        '''.format(x0=x0,y0=y0,c=c,k=k))
+                # print('''Reference data:\  
+                #         x0 = {x0}
+                #         y0 = {y0}
+                #         c = {c}
+                #         k = {k}
+                #         '''.format(x0=x0,y0=y0,c=c,k=k))
 
                 numPoints = np.floor((np.max(x) - np.min(x))*num_points)
                 xp = np.linspace(np.min(x), np.max(x), numPoints)
@@ -1333,7 +1336,6 @@ class FiberAnalyze( object ):
                 sstot = np.sum(np.multiply(y - np.mean(y), y - np.mean(y)))
                 sserr = np.sum(np.multiply(y - yxp, y - yxp))
                 r2 = 1 - sserr/sstot
-                print "max_r2", max_r2
                 if max_r2 == -1:
                     maxvalues = (xp, pxp, x0, y0, c, k, r2, yxp)
                 if r2 > max_r2:
@@ -1841,7 +1843,7 @@ def test_FiberAnalyze(options):
    # peak_inds, peak_vals, peak_times = FA.get_peaks(window_in_seconds)
   #  FA.plot_peak_data()
 
-  #  FA.get_peaks_convolve(3, out_path = options.output_path)
+  #  FA.get_peaks_convolve([3, 3], out_path = options.output_path)
   ##  FA.fit_peak( type="sucrose", out_path=options.output_path)
 ###    FA.analyze_spectrum(type="sucrose", peak_index=None, out_path=None )
 
@@ -1882,7 +1884,7 @@ if __name__ == "__main__":
                       help="Type of plot to produce.")
     parser.add_option('', "--fluor-normalization", default = 'deltaF', dest="fluor_normalization",
                       help="Normalization of fluorescence trace. Can be a.u. between [0,1]: 'stardardize' or deltaF/F: 'deltaF' or 'raw'.")
-    parser.add_option('-s', "--smoothness", default = None, dest="smoothness",
+    parser.add_option('-s', "--smoothness", default = 0, dest="smoothness",
                       help="Should the time series be smoothed, and how much.")
     parser.add_option('-x', "--selectfiles", action="store_true", default = False, dest = "selectfiles",
                        help="Should you select filepaths in a pop window instead of in the command line.")
@@ -1898,6 +1900,9 @@ if __name__ == "__main__":
                       help="Use a notch filter to remove high frequency noise. Format lowfreq:highfreq.")
     parser.add_option("", "--exp-type", dest="exp_type", default=None,
                        help="Specify either 'homecagenovel', 'homecagesocial', or 'sucrose'.")
+    parser.add_option("", "--event-spacing", dest="event_spacing", default=0,
+                       help="Specify minimum time (in seconds) between the end of one event and the beginning of the next")
+
 
     (options, args) = parser.parse_args()
     

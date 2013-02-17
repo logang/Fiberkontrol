@@ -2,7 +2,7 @@ import h5py
 import numpy as np
 import pylab as pl
 import matplotlib as mpl
-import statsmodels.api as sm
+#import statsmodels.api as sm
 from matplotlib import cm
 
 from fiber_record_analyze import FiberAnalyze
@@ -101,18 +101,22 @@ def group_bout_heatmaps(all_data, options, exp_type, time_window, df_max=3.5):
             FA.exp_type = exp_type
             FA.load(file_type="hdf5")
 
-            event_times = FA.get_event_times("rising")
+            event_times = FA.get_event_times("rising", int(options.event_spacing))
+            print "len(event_times)", len(event_times)
             time_arr = np.asarray( FA.get_time_chunks_around_events(FA.fluor_data, event_times, time_window) )
 
             # Generate a heatmap of activity by bout, with range set between the 5% quantile of
             # the data and the 'df_max' argument of the function
             from scipy.stats.mstats import mquantiles
             baseline = mquantiles( time_arr.flatten(), prob=[0.05])
-            ax.imshow(time_arr, interpolation="nearest",vmin=baseline,vmax=df_max,cmap=pl.cm.afmhot)
+            ax.imshow(time_arr, interpolation="nearest",vmin=baseline,vmax=df_max,cmap=pl.cm.afmhot, 
+                        extent=[-time_window[0], time_window[1], 0, time_arr.shape[0]])
             ax.set_aspect('auto')
             pl.title("Animal #: "+animal_id+'   Date: '+dates)
             pl.ylabel('Bout Number')
-            ax.axvline(np.abs(time_window[0])*time_arr.shape[1]/(time_window[1]-time_window[0]),color='white',linewidth=2,linestyle="--")
+            ax.axvline(0,color='white',linewidth=2,linestyle="--")
+            #ax.axvline(np.abs(time_window[0])*time_arr.shape[1]/(time_window[1]-time_window[0]),color='white',linewidth=2,linestyle="--")
+
 
             ax = fig.add_subplot(2,1,2)
             FA.plot_perievent_hist(event_times, time_window, out_path=None, plotit=True, subplot=ax )
@@ -130,7 +134,6 @@ def group_bout_heatmaps(all_data, options, exp_type, time_window, df_max=3.5):
 #-------------------------------------------------------------------------------------------
 
 if __name__ == "__main__":
-    all_data = h5py.File("/Users/logang/Documents/Results/FiberRecording/Cell/all_data_raw.h5",'r')
 
     # Parse command line options
     from optparse import OptionParser
@@ -148,7 +151,7 @@ if __name__ == "__main__":
                       help="Type of plot to produce.")
     parser.add_option('', "--fluor_normalization", default = 'deltaF', dest="fluor_normalization",
                       help="Normalization of fluorescence trace. Can be a.u. between [0,1]: 'stardardize' or deltaF/F: 'deltaF'.")
-    parser.add_option('-s', "--smoothness", default = None, dest="smoothness",
+    parser.add_option('-s', "--smoothness", default = 0, dest="smoothness",
                       help="Should the time series be smoothed, and how much.")
     parser.add_option('-x', "--selectfiles", default = False, dest = "selectfiles",
                        help="Should you select filepaths in a pop window instead of in the command line.")
@@ -165,12 +168,17 @@ if __name__ == "__main__":
 
     parser.add_option('', "--exp-type", default = 'homecagesocial', dest="exp_type",
                       help="Which type of experiment. Current options are 'homecagesocial' and 'homecagenovel'")
-    parser.add_option("", "--time-window", dest="time_window",default='-3:3',
-                      help="Specify a time window for peri-event plots in format start:end.")
+    parser.add_option("", "--time-window", dest="time_window",default='3:3',
+                      help="Specify a time window for peri-event plots in format before:after.")
+    parser.add_option("", "--event-spacing", dest="event_spacing", default=None,
+                       help="Specify minimum time (in seconds) between the end of one event and the beginning of the next")
     
     (options, args) = parser.parse_args()
 
     # --- Plot data --- #
+
+#    all_data = h5py.File("/Users/logang/Documents/Results/FiberRecording/Cell/all_data_raw.h5",'r')
+    all_data = h5py.File(options.input_path,'r')
 
     # if time range is specified, crop data    
     time_window = np.array(options.time_window.split(':'), dtype='float32') # [before,after] event in seconds 
