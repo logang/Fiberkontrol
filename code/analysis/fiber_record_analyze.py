@@ -32,7 +32,6 @@ class FiberAnalyze( object ):
         self.filter_freqs = options.filter_freqs
         self.exp_type = options.exp_type
 
-
         if options.selectfiles:
             self.input_path = tkFileDialog.askopenfilename()
             self.output_path = self.input_path[:-4] + '_out'
@@ -523,7 +522,6 @@ class FiberAnalyze( object ):
             time_chunks = np.append(time_chunks, chunk)
             time_stamp_chunks = np.append(time_stamp_chunks, self.time_stamps[range((n_idx),(e_idx))])
 
-        print time_chunks
             #except:
              #   print "Unable to extract window:", [(e-window_indices[0]),(e+window_indices[1])]
         return (time_chunks, time_stamp_chunks)
@@ -726,7 +724,6 @@ class FiberAnalyze( object ):
                 else:
                     baseline = np.min(chunk)
 
-                print "chunk", np.shape(chunk)
                 time_chunks.append(chunk - baseline)
             #except:
              #   print "Unable to extract window:", [(e-window_indices[0]),(e+window_indices[1])]
@@ -752,7 +749,7 @@ class FiberAnalyze( object ):
         print "\t--> Window used for peri-event plot:", window
 
         # get blocks of time series for window around each event time
-        time_chunks = self.get_time_chunks_around_events(event_times, window)
+        time_chunks = self.get_time_chunks_around_events(self.fluor_data, event_times, window)
 
         # get time values from frame indices
         window_indices = [ self.convert_seconds_to_index(window[0]),

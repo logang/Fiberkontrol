@@ -80,7 +80,7 @@ def group_regression_plot(all_data, options, exp_type='homecagesocial', time_win
 #    pl.ylabel("log length of next interaction")
     pl.show()
 
-def group_bout_heatmaps(all_data, options, exp_type, time_window, df_max=5.5):
+def group_bout_heatmaps(all_data, options, exp_type, time_window, df_max=3.5):
     """
     Save out 'heatmaps' showing time on the x axis, bouts on the y axis, and representing signal
     intensity with color.
@@ -102,7 +102,7 @@ def group_bout_heatmaps(all_data, options, exp_type, time_window, df_max=5.5):
             FA.load(file_type="hdf5")
 
             event_times = FA.get_event_times("rising")
-            time_arr = np.asarray( FA.get_time_chunks_around_events(event_times, time_window) )
+            time_arr = np.asarray( FA.get_time_chunks_around_events(FA.fluor_data, event_times, time_window) )
 
             # Generate a heatmap of activity by bout, with range set between the 5% quantile of
             # the data and the 'df_max' argument of the function
@@ -158,6 +158,10 @@ if __name__ == "__main__":
                       help="Save data matrix to a dataset in an hdf5 file.")
     parser.add_option("", "--save-and-exit", action="store_true", default=False, dest="save_and_exit",
                       help="Exit immediately after saving data out.")
+    parser.add_option("", "--filter-freqs", default=None, dest="filter_freqs",
+                      help="Use a notch filter to remove high frequency noise. Format lowfreq:highfreq.")
+    parser.add_option("", "--save-debleach", action="store_true", default=False, dest="save_debleach",
+                      help="Debleach fluorescence time series by fitting with an exponential curve.")
 
     parser.add_option('', "--exp-type", default = 'homecagesocial', dest="exp_type",
                       help="Which type of experiment. Current options are 'homecagesocial' and 'homecagenovel'")
