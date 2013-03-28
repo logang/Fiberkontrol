@@ -120,12 +120,19 @@ class FiberAnalyze( object ):
 
 
         elif file_type == "hdf5":
-            h5_file = h5py.File( self.input_path, 'r' )
-            self.data = np.asarray( h5_file[self.subject_id][self.exp_date][self.exp_type]['time_series_arr'] )
-            self.time_tuples = np.asarray( h5_file[self.subject_id][self.exp_date][self.exp_type]['event_tuples'] )
-            self.time_stamps = self.data[:,0]
-            self.trigger_data = self.data[:,1]
-            self.fluor_data = self.data[:,2]
+            try:
+                h5_file = h5py.File( self.input_path, 'r' )
+                self.data = np.asarray( h5_file[self.subject_id][self.exp_date][self.exp_type]['time_series_arr'] )
+                self.time_tuples = np.asarray( h5_file[self.subject_id][self.exp_date][self.exp_type]['event_tuples'] )
+                self.time_stamps = self.data[:,0]
+                self.trigger_data = self.data[:,1]
+                self.fluor_data = self.data[:,2]
+            except Exception, e:
+                print "Unable to open HDF5 file", self.subject_id, self.exp_date, self.exp_type, "due to error:"
+                print e
+                return -1
+
+
 
         
             
@@ -213,8 +220,11 @@ class FiberAnalyze( object ):
 
 
         trigger_low = min(trigger_data) + 0.2
+        print "trigger_low", trigger_low
+        print "trigger_data", trigger_data
         trigger_high_locations = [time_vals[i] for i in range(len(trigger_data)) if trigger_data[i] > trigger_low]
-      #  print trigger_high_locations
+        # Be careful whether event is recorded by trigger high or trigger low (i.e. > or < trigger_low)
+
 
         print "median: ", np.median(self.fluor_data)
 
@@ -1025,8 +1035,8 @@ class FiberAnalyze( object ):
         the time at which this density returns to zero minus nseconds
         """
 
-#        if self.event_spacing is not None:
-#            nseconds = self.event_spacing
+        if self.event_spacing is not None:
+            nseconds = self.event_spacing
 
         nindex = self.convert_seconds_to_index(nseconds)
         mask = np.ones(nindex)
@@ -1825,13 +1835,15 @@ def test_FiberAnalyze(options):
    # FA.get_sucrose_event_times(5, "falling")
 #    FA.event_vs_baseline_barplot(out_path = options.output_path)
 
-    FA.plot_area_under_curve_wrapper( window=[0, 1], edge="rising", normalize=False, out_path = options.output_path)
-    FA.plot_peaks_vs_time(out_path = options.output_path)
+    
+
+    #FA.plot_area_under_curve_wrapper( window=[0, 1], edge="rising", normalize=False, out_path = options.output_path)
+    #FA.plot_peaks_vs_time(out_path = options.output_path)
  
-    FA.plot_peritrigger_edge(window=[1, 3], out_path = options.output_path + '_1_3_')
-    FA.plot_peritrigger_edge(window=[5, 5], out_path = options.output_path + '_5_5_')
-    FA.plot_peritrigger_edge(window=[30, 30], out_path = options.output_path + '_30_30_')
-    FA.plot_peritrigger_edge(window=[10, 30], out_path = options.output_path + '_10_30_')
+  ####  FA.plot_peritrigger_edge(window=[1, 3], out_path = options.output_path + '_1_3_', edge="falling")
+  ####  FA.plot_peritrigger_edge(window=[5, 5], out_path = options.output_path + '_5_5_', edge="falling")
+  ####  FA.plot_peritrigger_edge(window=[30, 30], out_path = options.output_path + '_30_30_', edge="falling")
+  ####  FA.plot_peritrigger_edge(window=[10, 30], out_path = options.output_path + '_10_30_', edge="falling")
   
 
   #  FA.plot_area_under_curve_wrapper( window=[0, 3], edge="rising", normalize=False, out_path = options.output_path)
