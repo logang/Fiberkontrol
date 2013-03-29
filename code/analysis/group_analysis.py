@@ -4,6 +4,8 @@ import pylab as pl
 import matplotlib as mpl
 #import statsmodels.api as sm
 from matplotlib import cm
+import os
+import sys
 
 from fiber_record_analyze import FiberAnalyze
 
@@ -152,29 +154,169 @@ def plot_representative_time_series(options, representative_time_series_specs_fi
 
     for line in f:
         specs = line.split()
-        animal_id = specs[0]
-        date = specs[1]
-        start = specs[2]
-        end = specs[3]
-        exp_type = specs[4]
-        smoothness = specs[5]
+        if specs != []:
+            animal_id = specs[0]
+            date = specs[1]
+            start = specs[2]
+            end = specs[3]
+            exp_type = specs[4]
+            smoothness = specs[5]
 
-        FA = FiberAnalyze( options )
-        FA.subject_id = str(animal_id)
-        FA.exp_date = str(date)
-        FA.exp_type = str(exp_type)
-        FA.smoothness = int(smoothness)
-        FA.time_range = str(start) + ':' + str(end)
-        FA.fluor_normalization = 'deltaF'
+            FA = FiberAnalyze( options )
+            FA.subject_id = str(animal_id)
+            FA.exp_date = str(date)
+            FA.exp_type = str(exp_type)
+            FA.smoothness = int(smoothness)
+            FA.time_range = str(start) + ':' + str(end)
+            FA.fluor_normalization = 'deltaF'
 
-       # print "Test Keys: ", all_data[str(421)][str(20121008)][FA.exp_type].keys()
+           # print "Test Keys: ", all_data[str(421)][str(20121008)][FA.exp_type].keys()
 
 
-        print ""
-        print "--> Plotting: ", FA.subject_id, FA.exp_date, FA.exp_type, FA.smoothness, FA.time_range
-        if(FA.load(file_type="hdf5") != -1):
-            FA.plot_basic_tseries(out_path = options.output_path + '/' + FA.subject_id + "_" + FA.exp_date + "_" + FA.exp_type + "_" + 
-                                     str(int(FA.time_range.split(':')[0])) +  "_" + str(int(FA.time_range.split(':')[1])) +"_" ) 
+            print ""
+            print "--> Plotting: ", FA.subject_id, FA.exp_date, FA.exp_type, FA.smoothness, FA.time_range
+            if(FA.load(file_type="hdf5") != -1):
+                dir = options.output_path + '/' + FA.exp_type
+                if os.path.isdir(dir) is False:
+                    os.makedirs(dir)
+                FA.plot_basic_tseries(out_path = dir + '/' + FA.subject_id + "_" + FA.exp_date + "_" + FA.exp_type + "_" + 
+                                         str(int(FA.time_range.split(':')[0])) +  "_" + str(int(FA.time_range.split(':')[1])) +"_" ) 
+
+
+
+def get_novel_social_pairs(all_data, exp1, exp2):
+    """
+    all_data = an hdf5 file containing all of the time series data
+    exp1 and exp2 = the two experiment types to be compared (i.e. homecagesocial and homecagenovel)
+
+
+    Returns: a dict where the keys are animal_ids
+    and each entry is a dict containing for each exp_type (the keys), 
+    the entry is the date of the best trial of that behavior
+    """
+    pairs = dict()
+
+    for animal_id in all_data.keys():
+        # load data from hdf5 file by animal-date-exp_type
+
+        animal = all_data[animal_id]
+        if animal.attrs['mouse_type'] == 'GC5': #don't use EYFP or GC3
+            pairs[animal_id] = dict()
+            for date in animal.keys(): 
+                #make a list for each experiment type of all dates on which that exp was run
+                for exp_type in animal[date].keys(): 
+                    if exp_type == str(exp1) or exp_type == str(exp2):
+                        if exp_type in pairs[animal_id].keys():
+                            pairs[animal_id][exp_type].append(int(date))
+                        else:
+                            pairs[animal_id][exp_type] = [int(date)]
+
+    #print "Pairs before max filter: ", pairs
+                    
+    #As a heuristic to choose between multiple trials of the same exp_type,
+    # use the one with the latest (largest) date                
+    for animal_id in pairs.keys():
+        if pairs[animal_id].keys() == []:
+            del pairs[animal_id]
+        else:
+            for exp_type in pairs[animal_id].keys():
+                pairs[animal_id][exp_type] = np.max(pairs[animal_id][exp_type])
+
+    print "Pairs after max filter: ", pairs
+
+    return pairs
+
+
+def score_of_chunks(ts_arr, metric='area'):
+    """
+    Given an array of time series chunks, return an array
+    holding a score for each of these chunks
+
+    metric can be 'area' (area under curve) or 'peak' (peak fluorescence value)
+    """
+
+
+
+def compare_start_and_end_of_epoch(all_data, options, time_window=[0,0.25], metric='area', test='ttest'):
+
+    """
+    Calculates the difference between the fluorescence in a window at the beginning
+    and the end of each epoch.
+    Compares these differences between novel object and social behaviors.
+    Plots the average difference vs. epoch number for novel and social (ideally on the same plot)
+    Returns the t-test score comparing novel and social.
+
+    metric can be 'area' (area under curve) or 'peak' (peak fluorescence value)
+    """
+
+    pairs = get_novel_social_pairs(all_data, 'homecagesocial', 'homecagenovel') #can use any function here that returns pairs of data
+
+    sys.exit(1)
+
+    pair_scores = dict() #key: animal_id, entry: a dict storing an array of scores for each trial type (i.e. homecagenovel and homecagesocial)
+    pair_avg_scores = dict() #key: animal_id, entry: a dict storing the average score within a trial for each trial type (i.e. homecagenovel and homecagesocial)
+
+    for animal_id in pairs.keys():
+        pair_scores[animal_id] = dict()
+        pair_avg_scores[animal_id] = dict()
+        for exp_type in pairs[animal_id].keys():
+
+            FA = FiberAnalyze( options )
+            FA.subject_id = animal_id
+            FA.exp_date = pairs[animal_id][exp_type]
+            FA.exp_type = exp_type
+            print FA.subject_id, " ", FA.exp_date, " ", FA.exp_type
+            if(FA.load(file_type="hdf5") != -1):
+
+                start_event_times = FA.get_event_times("rising", int(options.event_spacing))
+                end_event_times = FA.get_event_times("falling", int(options.event_spacing))
+                print "len(end_event_times)", len(end_event_times)
+                print "len(start_event_times)", len(start_event_times)
+
+                #Get an array of time series chunks in a window around each event time
+                start_time_arr = np.asarray( FA.get_time_chunks_around_events(FA.fluor_data, start_event_times, time_window) )
+                end_time_arr = np.asarray( FA.get_time_chunks_around_events(FA.fluor_data, end_event_times, time_window) )
+
+                start_scores = score_of_chunks(start_time_arr, metric)
+                end_scores = score_of_chunks(end_time_arr, metric)
+                scores_diff = end_scores - start_scores
+
+                pair_scores[animal_id][exp_type] = scores_diff
+                pair_avg_scores[animal_id][exp_type] = np.mean(scores_diff)
+
+    # Next, plot all of the pair_scores (vs animal, for now)
+
+
+    # Create two matched arrays (one for novel, one for social) with the avg score for each animal
+    exp_scores = dict() #key: exp_type, entry: array of avg score for each animal
+    for animal_id in pair_avg_scores.keys():
+        for exp_type in pair_avg_scores[animal_id].keys():
+
+            if exp_type in exp_scores.keys():
+                exp_scores[exp_type].append(pair_avg_scores[animal_id][exp_type])
+            else:
+                exp_scores[exp_type] = [pair_avg_scores[animal_id][exp_type]]
+
+    print "Exp_scores", exp_scores
+
+
+    # if test == "ttest":
+    #         [tvalue, pvalue] = stats.ttest_rel(s_score_list, n_score_list)
+    #         print "normalized area tvalue: ", tvalue, " normalized area pvalue: ", pvalue
+    # if test == "wilcoxon":
+    #         [zstatistic, pvalue] = stats.wilcoxon(s_score_list, n_score_list)
+    #         print "normalized area zstatistic: ", zstatistic, " normalized area pvalue: ", pvalue
+
+
+
+#For each mouse, open the novel and social files
+#then use FA.get_time_chunks_around_events to get 
+# the time series around each event (with some spacing parameter enfored?)
+# both around the beginning and falling edges
+# Now write a separate function that compares some time period (can use area or peak) in each of these
+# two sets of chunks (see FA.compare_before_and_after_event())
+# output two matched arrays which you can run through a t test, one entry for each mouse
+
 
 
 #-------------------------------------------------------------------------------------------
@@ -227,12 +369,12 @@ if __name__ == "__main__":
 
 #    all_data = h5py.File("/Users/logang/Documents/Results/FiberRecording/Cell/all_data_raw.h5",'r')
     all_data = h5py.File(options.input_path,'r')
-    print all_data[str(421)][str(20121008)]['sucrose'].keys()
 
     time_window = np.array(options.time_window.split(':'), dtype='float32') # [before,after] event in seconds 
 #    group_regression_plot(all_data, options, exp_type=exp_type, time_window=time_window)
 ##    group_bout_heatmaps(all_data, options, exp_type=options.exp_type, time_window=time_window)
+##    plot_representative_time_series(options, options.representative_time_series_specs_file)
+    compare_start_and_end_of_epoch(all_data, options, time_window=[0,0.25], metric='area', test='ttest')
 
-    plot_representative_time_series(options, options.representative_time_series_specs_file)
 
 #----------------------------------------------------------------------------------------   
