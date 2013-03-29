@@ -56,6 +56,14 @@ class FiberAnalyze( object ):
         # hard coded values
         self.fluor_channel = 0
         self.trigger_channel = 3
+
+
+        self.fft = None #place holder for fft of rawsignal, if calculated
+        self.fft_freq = None #place holder for frequency labels of fft
+        self.filt_fluor_data = None #place holder for filtered rawsignal, if calculated
+        self.event_start_times = None #place holder event_times that may be calculated by get_sucrose_event_times
+        self.event_end_times = None
+
         
     def load( self, file_type="npz" ):
         """
@@ -65,60 +73,9 @@ class FiberAnalyze( object ):
         if file_type == "npz":
             self.data = np.load( self.input_path )['data']
             self.time_stamps = np.load( self.input_path )['time_stamps']
-            
-            # normalized fluor data, which is in arbitrary units
             self.fluor_data = self.data[:,self.fluor_channel]
-            if self.fluor_normalization == "deltaF":
-                print "deltaF"
-                median = np.median(self.fluor_data)
-                self.fluor_data = (self.fluor_data-median)/median #dF/F
-                print "median of fluorescence data: ", np.median(self.fluor_data)
-            elif self.fluor_normalization == "standardize":
-                self.fluor_data -= np.min(self.fluor_data)
-                self.fluor_data /= np.max(self.fluor_data)
-            elif self.fluor_normalization == "raw":
-                print "Max raw value ", np.max(self.fluor_data)
-                pass
-            else:
-                raise ValueError( self.fluor_normalization, "is not a valid entry for --fluor-normalization.")
-
-            # make smallest value positive.
-            # remove this when actually making deltaF/F plots?
-           ## self.fluor_data -= np.min(self.fluor_data)
-           ## self.fluor_data +=0.0000001 # keep strictly positive
-
-            # normalize triggers to fluor data
-            if self.trigger_path is None:
-                self.trigger_data = self.data[:,self.trigger_channel]
-                print "trigger data loaded ", max(self.trigger_data)
-            else:
-                try:
-                    self.time_tuples = self.load_trigger_data(self.s_file, self.e_file)
-                    time_vec = np.asarray(self.time_tuples).flatten()
-                    time_vec = np.append(time_vec,np.inf)
-                    self.trigger_data = np.zeros(len(self.fluor_data))
-                    j = 0
-                    for i in xrange(len(self.trigger_data)):
-                        if self.time_stamps[i] < time_vec[j]:
-                            self.trigger_data[i] = np.mod(j,2)
-                        else:
-                            j+=1
-                            self.trigger_data[i] = np.mod(j,2)
-                except Exception, e:
-                    print "Error loading trigger data:"
-                    print "\t-->",e
-
-            self.trigger_data *= 3/np.max(self.trigger_data)
-            self.trigger_data -= np.min(self.trigger_data)
-            if self.exp_type == 'sucrose':
-                self.trigger_data = np.max(self.trigger_data) - self.trigger_data
-           # self.trigger_data *= -1
-           # self.trigger_data += 1
-
-            if self.fluor_normalization == "deltaF":
-                self.trigger_data *= 1.5*np.max(self.fluor_data)
-
-
+            self.load_trigger_data()
+            
         elif file_type == "hdf5":
             try:
                 h5_file = h5py.File( self.input_path, 'r' )
@@ -126,57 +83,33 @@ class FiberAnalyze( object ):
                 self.time_tuples = np.asarray( h5_file[self.subject_id][self.exp_date][self.exp_type]['event_tuples'] )
                 self.time_stamps = self.data[:,0]
                 self.trigger_data = self.data[:,1]
-                self.fluor_data = self.data[:,2]
+                
+                load_flat = True
+                if (load_flat):
+                    self.fluor_data = np.asarray( h5_file[self.subject_id][self.exp_date][self.exp_type]['flat'] )[:, 0]
+                    print "--> Loading flattened data"
+                else:
+                    self.fluor_data = self.data[:,2] #to use unflattened, original data
             except Exception, e:
                 print "Unable to open HDF5 file", self.subject_id, self.exp_date, self.exp_type, "due to error:"
                 print e
                 return -1
 
+        self.normalize_fluorescence_data()
+        self.crop_data() #crop data to range specified at commmand line
 
-
-        
-            
-        # if time range is specified, crop data    
-        if self.time_range != None:
-            tlist = self.time_range.split(':')
-            print tlist
-            if tlist[0] == '-1':
-                self.t_start = 0
-            else:
-                self.t_start = int(self.convert_seconds_to_index(int(tlist[0])))
-            if tlist[1] == '-1':
-                self.t_end = len(self.fluor_data)
-            else:
-                self.t_end   = int(self.convert_seconds_to_index(int(tlist[1])))
-
-
-            if len(tlist) != 2:
-                print 'Error parsing --time-range argument.  Be sure to use <start-time>:<end-time> syntax.'
-                sys.exit(1)
+        if self.smoothness != 0:
+            print "--> Smoothing data with parameter: ", self.smoothness
+            self.fluor_data = self.smooth(int(self.smoothness), window_type='gaussian')
+        else:
+            print "--> No smoothing parameter specified."
 
             
-            self.fluor_data = self.fluor_data[self.t_start:self.t_end]
-            self.trigger_data = self.trigger_data[self.t_start:self.t_end]
-            self.time_stamps = self.time_stamps[self.t_start:self.t_end]
-
-            print "trigger_data", np.min(self.trigger_data), np.max(self.trigger_data), len(self.trigger_data)
-
-        self.fft = None #place holder for fft of rawsignal, if calculated
-        self.fft_freq = None #place holder for frequency labels of fft
-        self.filt_fluor_data = None #place holder for filtered rawsignal, if calculated
-        #print "\t--> Finished loading data."
-        self.event_start_times = None #place holder event_times that may be calculated by get_sucrose_event_times
-        self.event_end_times = None
-
-
         if self.filter_freqs is not None:
             freqlist = self.filter_freqs.split(':')
             print freqlist
             self.fluor_data = self.notch_filter(freqlist[0], freqlist[1])
         
-        if self.smoothness != 0:
-            self.fluor_data = self.smooth(int(self.smoothness), window_type='gaussian')
-
         if self.save_txt:
             self.save_time_series(self.output_path)
         if self.save_to_h5 is not None:
@@ -184,10 +117,105 @@ class FiberAnalyze( object ):
         if self.save_debleach:
             self.debleach(self.output_path)
 
-
         return self.fluor_data, self.trigger_data
 
-    def load_trigger_data( self, s_filename, e_filename ):
+
+    def crop_data(self):
+        """
+        ---Crop data to specified time range--- 
+        Range is provided as a command line argument 
+        in the format:      <start-time>:<end-time>
+        Default is no cropping, specified by 0:-1
+        """
+        if self.time_range != None:
+            tlist = self.time_range.split(':')
+            print "--> Crop data to range: ", tlist
+            if len(tlist) != 2:
+                print 'Error parsing --time-range argument.  Be sure to use <start-time>:<end-time> syntax.'
+                sys.exit(1)
+            
+            self.t_start = 0 if tlist[0] == '-1' else int(self.convert_seconds_to_index(int(tlist[0])))
+            self.t_end = len(self.fluor_data) if tlist[1] == '-1' else int(self.convert_seconds_to_index(int(tlist[1])))
+            
+            self.fluor_data = self.fluor_data[self.t_start:self.t_end]
+            self.trigger_data = self.trigger_data[self.t_start:self.t_end]
+            self.time_stamps = self.time_stamps[self.t_start:self.t_end]
+        else:
+            print "--> Data not cropped. No range has been specified."
+
+
+    def load_trigger_data(self):
+        """
+        ---Load trigger data---
+        These are the times corresponding to behavioral events 
+        such as licks, or social interactions.
+        For lickometer data, the trigger data is recorded during data
+        acquisition and is included in the previously loaded data file
+        For social  behavior, event times must be loaded
+        from a separate file location: trigger_path
+        """
+
+        if self.trigger_path is None: 
+            self.trigger_data = self.data[:,self.trigger_channel]
+        else:
+            try:
+                self.time_tuples = self.load_event_data(self.s_file, self.e_file)
+                time_vec = np.asarray(self.time_tuples).flatten()
+                time_vec = np.append(time_vec,np.inf)
+                self.trigger_data = np.zeros(len(self.fluor_data))
+                j = 0
+                for i in xrange(len(self.trigger_data)):
+                    if self.time_stamps[i] < time_vec[j]:
+                        self.trigger_data[i] = np.mod(j,2)
+                    else:
+                        j+=1
+                        self.trigger_data[i] = np.mod(j,2)
+            except Exception, e:
+                print "Error loading trigger data:"
+                print "\t-->",e
+
+        self.trigger_data *= 3/np.max(self.trigger_data)
+        self.trigger_data -= np.min(self.trigger_data)
+        if self.exp_type == 'sucrose': #event times are recorded differently by behavior handscoring vs. by lickometer
+            self.trigger_data = np.max(self.trigger_data) - self.trigger_data
+       # self.trigger_data *= -1
+       # self.trigger_data += 1
+
+        if self.fluor_normalization == "deltaF":
+            self.trigger_data *= 1.5*np.max(self.fluor_data)
+
+        print "--> Trigger data loaded"
+
+
+    def normalize_fluorescence_data(self):
+        """
+        Normalize data to either 'deltaF', the standard metric used
+        in publications which shows deviation from the median value
+        of the entire time series, 'standardize', which shifts and scales
+        the time series to be between 0 and 1, and 'raw', which does
+        not alter the time series at all.
+        """
+            
+        if self.fluor_normalization == "deltaF":
+            median = np.median(self.fluor_data)
+            print "--> Normalization: deltaF. Median of raw fluorescent data: ", median
+            self.fluor_data = (self.fluor_data-median)/median #dF/F
+            
+        elif self.fluor_normalization == "standardize":
+            print "--> Normalization: standardized to between 0 and 1. Max of raw fluorescent data: ", np.max(self.fluor_data)
+            self.fluor_data -= np.min(self.fluor_data)
+            self.fluor_data /= np.max(self.fluor_data)
+            self.fluor_data +=0.0000001 # keep strictly positive
+
+        elif self.fluor_normalization == "raw":
+            print "--> Normalization: raw (no normalization). Max of raw fluorescent data: ", np.max(self.fluor_data)
+            pass
+        else:
+            raise ValueError( self.fluor_normalization, "is not a valid entry for --fluor-normalization.")
+
+
+
+    def load_event_data( self, s_filename, e_filename ):
         """
         Load start and end times for coded events. 
         """
@@ -1819,9 +1847,7 @@ def test_FiberAnalyze(options):
 
             FA.plot_basic_tseries(out_path = options.output_path + "_" + str(int(FA.time_range.split(':')[0])) + "_" + str(int(FA.time_range.split(':')[1])) +"_",
                                  resolution=res)
-            print "Start: ", start
-            print "End: ", end
-            print "Res:, ", res
+
 
 
 #    FA.plot_next_event_vs_intensity(intensity_measure="peak", next_event_measure="onset", window=[0, 1], out_path=None)
