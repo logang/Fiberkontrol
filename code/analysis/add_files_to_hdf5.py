@@ -85,7 +85,7 @@ if __name__ == "__main__":
 			try:
 				dset = run_type.create_dataset(str(options.name), data=out_arr)
 				#dset.attrs[str(options.name) + "time_series_arr_names"] = options.name
-				print "\t---> Writing dataset:", options.name
+				print "\t---> Writing dataset:", options.name, dset
 			except Exception, e:
 				print "Unable to write data array due to error:", e
 		except:

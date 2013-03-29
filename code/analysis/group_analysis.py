@@ -99,37 +99,83 @@ def group_bout_heatmaps(all_data, options, exp_type, time_window, df_max=3.5):
             FA.subject_id = animal_id
             FA.exp_date = dates
             FA.exp_type = exp_type
-            FA.load(file_type="hdf5")
+            print animal_id, " ", dates, " ", exp_type
+            if(FA.load(file_type="hdf5") != -1):
+                #event_times = FA.get_event_times("rising", int(options.event_spacing))
+                event_times = FA.get_event_times("falling", int(options.event_spacing))
+                print "len(event_times)", len(event_times)
+                time_arr = np.asarray( FA.get_time_chunks_around_events(FA.fluor_data, event_times, time_window) )
 
-            event_times = FA.get_event_times("rising", int(options.event_spacing))
-            print "len(event_times)", len(event_times)
-            time_arr = np.asarray( FA.get_time_chunks_around_events(FA.fluor_data, event_times, time_window) )
+                # Generate a heatmap of activity by bout, with range set between the 5% quantile of
+                # the data and the 'df_max' argument of the function
+                from scipy.stats.mstats import mquantiles
+                baseline = mquantiles( time_arr.flatten(), prob=[0.05])
+                ax.imshow(time_arr, interpolation="nearest",vmin=baseline,vmax=df_max,cmap=pl.cm.afmhot, 
+                            extent=[-time_window[0], time_window[1], 0, time_arr.shape[0]])
+                ax.set_aspect('auto')
+                pl.title("Animal #: "+animal_id+'   Date: '+dates)
+                pl.ylabel('Bout Number')
+                ax.axvline(0,color='white',linewidth=2,linestyle="--")
+                #ax.axvline(np.abs(time_window[0])*time_arr.shape[1]/(time_window[1]-time_window[0]),color='white',linewidth=2,linestyle="--")
 
-            # Generate a heatmap of activity by bout, with range set between the 5% quantile of
-            # the data and the 'df_max' argument of the function
-            from scipy.stats.mstats import mquantiles
-            baseline = mquantiles( time_arr.flatten(), prob=[0.05])
-            ax.imshow(time_arr, interpolation="nearest",vmin=baseline,vmax=df_max,cmap=pl.cm.afmhot, 
-                        extent=[-time_window[0], time_window[1], 0, time_arr.shape[0]])
-            ax.set_aspect('auto')
-            pl.title("Animal #: "+animal_id+'   Date: '+dates)
-            pl.ylabel('Bout Number')
-            ax.axvline(0,color='white',linewidth=2,linestyle="--")
-            #ax.axvline(np.abs(time_window[0])*time_arr.shape[1]/(time_window[1]-time_window[0]),color='white',linewidth=2,linestyle="--")
+                ax = fig.add_subplot(2,1,2)
+                FA.plot_perievent_hist(event_times, time_window, out_path=None, plotit=True, subplot=ax )
+                pl.ylim([0,df_max])
+
+                if options.output_path is not None:
+                    import os
+                    outdir = os.path.join(options.output_path, options.exp_type)
+                    if not os.path.isdir(outdir):
+                        os.makedirs(outdir)
+                    pl.savefig(outdir+'/'+animal_id+'_'+dates+'.png')
+                    print outdir+'/'+animal_id+'_'+dates+'.png'
+                else:
+                    pl.show()
 
 
-            ax = fig.add_subplot(2,1,2)
-            FA.plot_perievent_hist(event_times, time_window, out_path=None, plotit=True, subplot=ax )
-            pl.ylim([0,df_max])
+def plot_representative_time_series(options, representative_time_series_specs_file):
+    """
+    Save out plots of time series overlaid with bars indicating event times (i.e. sucrose lick or social interaction)
+    for all trials listed in representative_time_series_specs.txt
+    This function can be used to provide multiple levels of detail of the same time series (i.e. to 'zoom' in)
+    The format of representative_time_series_specs.txt is:
 
-            if options.output_path is not None:
-                import os
-                outdir = os.path.join(options.output_path, options.exp_type)
-                if not os.path.isdir(outdir):
-                    os.makedirs(outdir)
-                pl.savefig(outdir+'/'+animal_id+'_'+dates+'.png')
-            else:
-                pl.show()
+    animal#     date        start   end exp_type    smoothness      
+
+    """
+
+#    all_data = h5py.File(options.input_path,'r') #just for testing
+
+    print representative_time_series_specs_file
+    f = open( representative_time_series_specs_file, "r" )
+    f.readline() #skip the first header line
+
+    for line in f:
+        specs = line.split()
+        animal_id = specs[0]
+        date = specs[1]
+        start = specs[2]
+        end = specs[3]
+        exp_type = specs[4]
+        smoothness = specs[5]
+
+        FA = FiberAnalyze( options )
+        FA.subject_id = str(animal_id)
+        FA.exp_date = str(date)
+        FA.exp_type = str(exp_type)
+        FA.smoothness = int(smoothness)
+        FA.time_range = str(start) + ':' + str(end)
+        FA.fluor_normalization = 'deltaF'
+
+       # print "Test Keys: ", all_data[str(421)][str(20121008)][FA.exp_type].keys()
+
+
+        print ""
+        print "--> Plotting: ", FA.subject_id, FA.exp_date, FA.exp_type, FA.smoothness, FA.time_range
+        if(FA.load(file_type="hdf5") != -1):
+            FA.plot_basic_tseries(out_path = options.output_path + '/' + FA.subject_id + "_" + FA.exp_date + "_" + FA.exp_type + "_" + 
+                                     str(int(FA.time_range.split(':')[0])) +  "_" + str(int(FA.time_range.split(':')[1])) +"_" ) 
+
 
 #-------------------------------------------------------------------------------------------
 
@@ -165,13 +211,15 @@ if __name__ == "__main__":
                       help="Use a notch filter to remove high frequency noise. Format lowfreq:highfreq.")
     parser.add_option("", "--save-debleach", action="store_true", default=False, dest="save_debleach",
                       help="Debleach fluorescence time series by fitting with an exponential curve.")
-
     parser.add_option('', "--exp-type", default = 'homecagesocial', dest="exp_type",
                       help="Which type of experiment. Current options are 'homecagesocial' and 'homecagenovel'")
     parser.add_option("", "--time-window", dest="time_window",default='3:3',
                       help="Specify a time window for peri-event plots in format before:after.")
-    parser.add_option("", "--event-spacing", dest="event_spacing", default=None,
+    parser.add_option("", "--event-spacing", dest="event_spacing", default=0,
                        help="Specify minimum time (in seconds) between the end of one event and the beginning of the next")
+    parser.add_option("", "--representative-time-series-specs-file", dest="representative_time_series_specs_file", default='representative_time_series_specs.txt',
+                       help="Specify file of representative trials to plot. File in format: animal# date start_in_secs end_in_secs exp_type smoothness")
+
     
     (options, args) = parser.parse_args()
 
@@ -179,11 +227,12 @@ if __name__ == "__main__":
 
 #    all_data = h5py.File("/Users/logang/Documents/Results/FiberRecording/Cell/all_data_raw.h5",'r')
     all_data = h5py.File(options.input_path,'r')
+    print all_data[str(421)][str(20121008)]['sucrose'].keys()
 
-    # if time range is specified, crop data    
     time_window = np.array(options.time_window.split(':'), dtype='float32') # [before,after] event in seconds 
-
 #    group_regression_plot(all_data, options, exp_type=exp_type, time_window=time_window)
-    group_bout_heatmaps(all_data, options, exp_type=options.exp_type, time_window=time_window)
+##    group_bout_heatmaps(all_data, options, exp_type=options.exp_type, time_window=time_window)
+
+    plot_representative_time_series(options, options.representative_time_series_specs_file)
 
 #----------------------------------------------------------------------------------------   

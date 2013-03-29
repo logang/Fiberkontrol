@@ -19,7 +19,8 @@ class FiberAnalyze( object ):
         """
         Initialize the FiberAnalyze class using options object from OptionsParser.
         """
-        # attributes to set for hdf5 loading
+        # attributes to set for hdf5 loading. Can use these to specify individual trials when using the FiberAnalyze class
+        # in another program
         self.subject_id = None
         self.exp_date = None
         self.exp_type = None
@@ -71,29 +72,40 @@ class FiberAnalyze( object ):
         """
         self.time_tuples = None
         if file_type == "npz":
+            print ""
+            print "--> Loading: ", self.input_path
             self.data = np.load( self.input_path )['data']
             self.time_stamps = np.load( self.input_path )['time_stamps']
             self.fluor_data = self.data[:,self.fluor_channel]
             self.load_trigger_data()
             
         elif file_type == "hdf5":
-            try:
-                h5_file = h5py.File( self.input_path, 'r' )
-                self.data = np.asarray( h5_file[self.subject_id][self.exp_date][self.exp_type]['time_series_arr'] )
+            print "hdf5 file to load: ", self.subject_id, self.exp_date, self.exp_type
+            #try:
+            h5_file = h5py.File( self.input_path, 'r' )
+            self.data = np.asarray( h5_file[self.subject_id][self.exp_date][self.exp_type]['time_series_arr'] )
+            if self.exp_type != 'sucrose':
                 self.time_tuples = np.asarray( h5_file[self.subject_id][self.exp_date][self.exp_type]['event_tuples'] )
-                self.time_stamps = self.data[:,0]
-                self.trigger_data = self.data[:,1]
-                
-                load_flat = True
-                if (load_flat):
+            else:
+                self.time_typles = None
+
+            self.time_stamps = self.data[:,0]
+            self.trigger_data = self.data[:,1]
+            
+            load_flat = True
+            if (load_flat):
+                try:
                     self.fluor_data = np.asarray( h5_file[self.subject_id][self.exp_date][self.exp_type]['flat'] )[:, 0]
                     print "--> Loading flattened data"
-                else:
-                    self.fluor_data = self.data[:,2] #to use unflattened, original data
-            except Exception, e:
-                print "Unable to open HDF5 file", self.subject_id, self.exp_date, self.exp_type, "due to error:"
-                print e
-                return -1
+                except:
+                    print "--> Flattened data UNAVAILABLE"
+                    self.fluor_data = self.data[:,2] 
+            else:
+                self.fluor_data = self.data[:,2] #to use unflattened, original data
+            # except Exception, e:
+            #     print "Unable to open HDF5 file", self.subject_id, self.exp_date, self.exp_type, "due to error:"
+            #     print e
+            #     return -1
 
         self.normalize_fluorescence_data()
         self.crop_data() #crop data to range specified at commmand line
@@ -232,6 +244,26 @@ class FiberAnalyze( object ):
         """
         # clear figure
         pl.clf()
+
+        start = int(self.time_range.split(':')[0])
+        end = int(self.time_range.split(':')[1])
+        end = end if end != -1 else max(self.time_stamps)
+        start = start if start != -1 else min(self.time_stamps)
+        
+        # if end == -1:
+        #     end = max(FA.time_stamps)
+        # if start == -1:
+        #     start = min(FA.time_stamps)
+
+        #Set a larger resolution to ensure the plotted file size is not too large
+        if end - start < 100:
+            resolution = 1
+        elif end - start < 500 and end - start > 100:
+            resolution = 10
+        elif end - start > 500 and end - start < 1000:
+            resolution = 30
+        else:
+            resolution = 40
 
         # get appropriate time values for x-axis
         time_vals = self.time_stamps[range(len(self.fluor_data))]
@@ -1112,14 +1144,14 @@ class FiberAnalyze( object ):
         Remove trend from data due to photobleaching by fitting the time serie with an exponential curve
         and then subtracting the difference between the curve and the median value of the time series. 
         """
-        print "Debleaching the time series..."
+        print "--> Debleaching"
         
         fluor_data = self.fluor_data
         time_stamps = self.time_stamps[range(len(self.fluor_data))]
 
         trigger_data = self.trigger_data
 
-        print np.shape(fluor_data), np.shape(time_stamps), np.shape(trigger_data)
+        #print np.shape(fluor_data), np.shape(time_stamps), np.shape(trigger_data)
 
         xp, pxp, x0, y0, c, k, r2, yxp = self.fit_exponential(time_stamps, fluor_data)
         w, r2lin, yxplin = self.fit_linear(time_stamps, fluor_data)
@@ -1131,12 +1163,14 @@ class FiberAnalyze( object ):
 
         #flat_fluor_data = flat_fluor_data - min(flat_fluor_data) + 0.000001
 
-        pl.plot(time_stamps, fluor_data)
+        orig, = pl.plot(time_stamps, fluor_data)
         pl.plot(time_stamps, yxp, 'r')
-        pl.plot(time_stamps, flat_fluor_data)
+        debleached, = pl.plot(time_stamps, flat_fluor_data)
         pl.xlabel('Time [s]')
         pl.ylabel('Raw fluorescence (a.u.)')
         pl.title('Debleaching the fluorescence curve')
+        pl.legend([orig, debleached], [ "Original raw", "Debleached raw"])
+
 
         out_arr = np.zeros((len(flat_fluor_data),4))
         out_arr[:,0] = flat_fluor_data
@@ -1150,7 +1184,10 @@ class FiberAnalyze( object ):
         else:
             pl.savefig(out_path + "_debleached.png")
             np.savez(out_path + "_debleached.npz", data=out_arr, time_stamps=time_stamps)
+            print "--> Debleached output: " 
             print out_path + "_debleached.npz"
+            print ""
+
 
         if self.save_and_exit:
             sys.exit(0)
@@ -1535,7 +1572,7 @@ class FiberAnalyze( object ):
         sstot = np.sum(np.multiply(y - np.mean(y), y - np.mean(y)))
         sserr = np.sum(np.multiply(y - yxp, y - yxp))
         r2lin = 1 - sserr/sstot
-        print "r2lin", r2lin
+        #print "r2lin", r2lin
         
         return (w, r2lin, yxp)
 
@@ -1829,24 +1866,24 @@ def test_FiberAnalyze(options):
         if FA.time_range is None:
             FA.plot_basic_tseries(out_path = options.output_path + "_full_")
         else:
-            start = int(FA.time_range.split(':')[0])
-            end = int(FA.time_range.split(':')[1])
-            if end == -1:
-                end = max(FA.time_stamps)
-            if start == -1:
-                start = min(FA.time_stamps)
+            # start = int(FA.time_range.split(':')[0])
+            # end = int(FA.time_range.split(':')[1])
+            # if end == -1:
+            #     end = max(FA.time_stamps)
+            # if start == -1:
+            #     start = min(FA.time_stamps)
 
-            if end - start < 100:
-                res = 1
-            elif end - start < 500 and end - start > 100:
-                res = 10
-            elif end - start > 500 and end - start < 1000:
-                res = 30
-            else:
-                res = 40
+            # if end - start < 100:
+            #     res = 1
+            # elif end - start < 500 and end - start > 100:
+            #     res = 10
+            # elif end - start > 500 and end - start < 1000:
+            #     res = 30
+            # else:
+            #     res = 40
 
-            FA.plot_basic_tseries(out_path = options.output_path + "_" + str(int(FA.time_range.split(':')[0])) + "_" + str(int(FA.time_range.split(':')[1])) +"_",
-                                 resolution=res)
+            FA.plot_basic_tseries(out_path = options.output_path + "_" + str(int(FA.time_range.split(':')[0])) + 
+                                    "_" + str(int(FA.time_range.split(':')[1])) +"_" ) #,  resolution=res)
 
 
 

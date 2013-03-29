@@ -1,0 +1,13 @@
+animal#		date		start	end	exp_type	smoothness		
+421		20121008	1090	1160	sucrose		0 
+421		20121105	120	220	homecagesocial	0
+421		20121008	0	-1	sucrose		0 
+421		20121008	1000	1400	sucrose		0 
+8520		20121008	0	-1	sucrose		0
+8520		20121008	1300	1600	sucrose		0
+2229		20130108	120	240	homecagenovel	0
+2229		20130108	0	350	homecagenovel	0
+2229		20130108	140	175	homecagenovel	0
+2229		20130108	100	220	homecagesocial	0
+2229		20130108	0	350	homecagesocial	0
+2229		20130108	105	140	homecagesocial	0
