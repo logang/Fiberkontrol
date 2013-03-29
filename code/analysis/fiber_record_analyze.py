@@ -33,6 +33,8 @@ class FiberAnalyze( object ):
         self.filter_freqs = options.filter_freqs
         self.exp_type = options.exp_type
         self.event_spacing = int(options.event_spacing)
+        self.mouse_type = options.mouse_type
+
 
         if options.selectfiles:
             self.input_path = tkFileDialog.askopenfilename()
@@ -102,6 +104,8 @@ class FiberAnalyze( object ):
                     self.fluor_data = self.data[:,2] 
             else:
                 self.fluor_data = self.data[:,2] #to use unflattened, original data
+                print "--> Loading UNFLATTENED data"
+
             # except Exception, e:
             #     print "Unable to open HDF5 file", self.subject_id, self.exp_date, self.exp_type, "due to error:"
             #     print e
@@ -387,6 +391,8 @@ class FiberAnalyze( object ):
             else:
                 print "\t---> Loading group:", prefix.split("-")[3]
                 subject_num = h5_file[prefix.split("-")[3]]
+
+            subject_num.attrs['mouse_type'] = self.mouse_type
                 
             if prefix.split("-")[0] not in list(subject_num):
                 print "\t---> Creating subgroup:", prefix.split("-")[0]
@@ -1990,6 +1996,8 @@ if __name__ == "__main__":
                        help="Specify either 'homecagenovel', 'homecagesocial', or 'sucrose'.")
     parser.add_option("", "--event-spacing", dest="event_spacing", default=0,
                        help="Specify minimum time (in seconds) between the end of one event and the beginning of the next")
+    parser.add_option("", "--mouse-type", dest="mouse_type", default="GC5",
+                       help="Specify the type of virus injected in the mouse (GC5, GC3, EYFP)")
 
 
     (options, args) = parser.parse_args()

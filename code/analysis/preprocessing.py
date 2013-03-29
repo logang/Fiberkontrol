@@ -43,12 +43,12 @@ def generate_hdf5_file(analysis_filenames,out_path):
             
             if info[2] == 'homecagesocial':
                 cmd += ' --trigger-path '
-                cmd += os.path.join(path, 'GC5_'+info[3]+'_social ')
+                cmd += os.path.join(path, info[1] + '_'+info[3]+'_social ')
                 cmd += '--exp-type=homecagesocial '
 
             elif info[2] == 'homecagenovel':
                 cmd += ' --trigger-path '
-                cmd += os.path.join(path, 'GC5_'+info[3]+'_novel ')
+                cmd += os.path.join(path, info[1] + '_'+info[3]+'_novel ')
                 cmd += '--exp-type=homecagenovel '
 
             elif info[2] == 'sucrose':
@@ -60,6 +60,7 @@ def generate_hdf5_file(analysis_filenames,out_path):
             cmd += ' --save-to-h5 ' + out_path
             cmd += ' --fluor-normalization raw '
             cmd += ' --smoothness=0 '
+            cmd += ' --mouse-type=' + info[1]
             result = run_command_wrapper(cmd)
             print result
 
