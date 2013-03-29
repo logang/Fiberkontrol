@@ -256,19 +256,20 @@ class FiberAnalyze( object ):
         #     start = min(FA.time_stamps)
 
         #Set a larger resolution to ensure the plotted file size is not too large
-        if end - start < 100:
+        if end - start <= 100:
             resolution = 1
         elif end - start < 500 and end - start > 100:
-            resolution = 10
-        elif end - start > 500 and end - start < 1000:
+            resolution = 1
+        elif end - start >= 500 and end - start < 1000:
             resolution = 30
         else:
             resolution = 40
 
+        print "--> Resolution: ", resolution
+
         # get appropriate time values for x-axis
         time_vals = self.time_stamps[range(len(self.fluor_data))]
         fluor_data = self.fluor_data
-        print "np.max", np.max(fluor_data)
         trigger_data = self.trigger_data
 
         if window is not None:
@@ -280,19 +281,31 @@ class FiberAnalyze( object ):
 
 
         trigger_low = min(trigger_data) + 0.2
-        print "trigger_low", trigger_low
-        print "trigger_data", trigger_data
+        #print "trigger_low", trigger_low
+        #print "trigger_data", trigger_data
         trigger_high_locations = [time_vals[i] for i in range(len(trigger_data)) if trigger_data[i] > trigger_low]
         # Be careful whether event is recorded by trigger high or trigger low (i.e. > or < trigger_low)
 
 
-        print "median: ", np.median(self.fluor_data)
-
         # make filled blocks for trigger onset/offset
-        ymax = 1.1*np.max(fluor_data)
-        ymin = 1.1*np.min(fluor_data)
-        ymax = 3.0
-        ymin = -1
+        #ymax = 1.1*np.max(fluor_data)
+        #ymin = 1.1*np.min(fluor_data)
+
+        if self.exp_type == 'sucrose':
+            ymax = 3.0
+            ymin = -1
+        elif self.exp_type == 'homecagesocial':
+            ymax = 1.0
+            ymin = -1/3.0
+        elif self.exp_type == 'homecagenovel':
+            ymax = 1.0
+            ymin = -1/3.0
+
+        if self.fluor_normalization == 'raw':
+            ymax = 10.0
+            ymin = -1.0
+
+
 #        pl.fill( time_vals[::2], 10*trigger_data[::2] - 2, color='r', alpha=0.3 )
 #        pl.fill( time_vals[::2], trigger_data[::2], color='r', alpha=0.3 )
         pl.vlines(trigger_high_locations, -20, 20, edgecolor='r', linewidth=0.5, facecolor='r' )
