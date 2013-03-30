@@ -4,8 +4,10 @@ import pylab as pl
 import matplotlib as mpl
 #import statsmodels.api as sm
 from matplotlib import cm
+import matplotlib.pyplot as plt
 import os
 import sys
+import scipy.stats as stats
 
 from fiber_record_analyze import FiberAnalyze
 
@@ -235,6 +237,15 @@ def score_of_chunks(ts_arr, metric='area'):
     metric can be 'area' (area under curve) or 'peak' (peak fluorescence value)
     """
 
+    scores = []
+    for ts in ts_arr:
+        if metric == 'area':
+            scores.append(np.sum(ts))
+        elif metric == 'peak':
+            scores.append(np.max(ts))
+
+    return scores
+
 
 
 def compare_start_and_end_of_epoch(all_data, options, time_window=[0,0.25], metric='area', test='ttest'):
@@ -249,9 +260,9 @@ def compare_start_and_end_of_epoch(all_data, options, time_window=[0,0.25], metr
     metric can be 'area' (area under curve) or 'peak' (peak fluorescence value)
     """
 
-    pairs = get_novel_social_pairs(all_data, 'homecagesocial', 'homecagenovel') #can use any function here that returns pairs of data
-
-    sys.exit(1)
+    exp1 = 'homecagesocial'
+    exp2 = 'homecagenovel'
+    pairs = get_novel_social_pairs(all_data, exp1, exp2) #can use any function here that returns pairs of data
 
     pair_scores = dict() #key: animal_id, entry: a dict storing an array of scores for each trial type (i.e. homecagenovel and homecagesocial)
     pair_avg_scores = dict() #key: animal_id, entry: a dict storing the average score within a trial for each trial type (i.e. homecagenovel and homecagesocial)
@@ -262,9 +273,9 @@ def compare_start_and_end_of_epoch(all_data, options, time_window=[0,0.25], metr
         for exp_type in pairs[animal_id].keys():
 
             FA = FiberAnalyze( options )
-            FA.subject_id = animal_id
-            FA.exp_date = pairs[animal_id][exp_type]
-            FA.exp_type = exp_type
+            FA.subject_id = str(animal_id)
+            FA.exp_date = str(pairs[animal_id][exp_type])
+            FA.exp_type = str(exp_type)
             print FA.subject_id, " ", FA.exp_date, " ", FA.exp_type
             if(FA.load(file_type="hdf5") != -1):
 
@@ -273,21 +284,31 @@ def compare_start_and_end_of_epoch(all_data, options, time_window=[0,0.25], metr
                 print "len(end_event_times)", len(end_event_times)
                 print "len(start_event_times)", len(start_event_times)
 
-                #Get an array of time series chunks in a window around each event time
+                #--Get an array of time series chunks in a window around each event time
                 start_time_arr = np.asarray( FA.get_time_chunks_around_events(FA.fluor_data, start_event_times, time_window) )
                 end_time_arr = np.asarray( FA.get_time_chunks_around_events(FA.fluor_data, end_event_times, time_window) )
 
-                start_scores = score_of_chunks(start_time_arr, metric)
-                end_scores = score_of_chunks(end_time_arr, metric)
+                start_scores = np.array(score_of_chunks(start_time_arr, metric))
+                end_scores = np.array(score_of_chunks(end_time_arr, metric))
                 scores_diff = end_scores - start_scores
 
                 pair_scores[animal_id][exp_type] = scores_diff
                 pair_avg_scores[animal_id][exp_type] = np.mean(scores_diff)
 
-    # Next, plot all of the pair_scores (vs animal, for now)
+                # fig = plt.figure()
+                # ax = fig.add_subplot(2,1,1)
+                # title = FA.subject_id + ' ' + FA.exp_date + ' ' + FA.exp_type
+                # ax.set_title(title)
+                # FA.plot_perievent_hist(start_event_times, time_window, out_path=None, plotit=True, subplot=ax )
+                # ax = fig.add_subplot(2,1,2)
+                # FA.plot_perievent_hist(end_event_times, time_window, out_path=None, plotit=True, subplot=ax )
 
 
-    # Create two matched arrays (one for novel, one for social) with the avg score for each animal
+
+    #-- Next, plot all of the pair_scores (vs animal, for now)
+
+
+    #-- Create two matched arrays (one for novel, one for social) with the avg score for each animal
     exp_scores = dict() #key: exp_type, entry: array of avg score for each animal
     for animal_id in pair_avg_scores.keys():
         for exp_type in pair_avg_scores[animal_id].keys():
@@ -298,14 +319,21 @@ def compare_start_and_end_of_epoch(all_data, options, time_window=[0,0.25], metr
                 exp_scores[exp_type] = [pair_avg_scores[animal_id][exp_type]]
 
     print "Exp_scores", exp_scores
+    plt.figure()
+    p1, = plt.plot(exp_scores[exp1], 'o')
+    p2, = plt.plot(exp_scores[exp2], 'o')
+    plt.legend([p1, p2], [exp1, exp2])
+    plt.xlabel('Mouse')
+    plt.ylabel('Peak value within ' + str(time_window[1]) + 's of end - of start')
+    plt.show()
 
 
-    # if test == "ttest":
-    #         [tvalue, pvalue] = stats.ttest_rel(s_score_list, n_score_list)
-    #         print "normalized area tvalue: ", tvalue, " normalized area pvalue: ", pvalue
-    # if test == "wilcoxon":
-    #         [zstatistic, pvalue] = stats.wilcoxon(s_score_list, n_score_list)
-    #         print "normalized area zstatistic: ", zstatistic, " normalized area pvalue: ", pvalue
+    if test == "ttest":
+            [tvalue, pvalue] = stats.ttest_rel(exp_scores[exp1], exp_scores[exp2])
+            print "normalized area tvalue: ", tvalue, " normalized area pvalue: ", pvalue
+    if test == "wilcoxon":
+            [zstatistic, pvalue] = stats.wilcoxon(exp_scores[exp1], exp_scores[exp2])
+            print "normalized area zstatistic: ", zstatistic, " normalized area pvalue: ", pvalue
 
 
 
@@ -359,8 +387,13 @@ if __name__ == "__main__":
                       help="Specify a time window for peri-event plots in format before:after.")
     parser.add_option("", "--event-spacing", dest="event_spacing", default=0,
                        help="Specify minimum time (in seconds) between the end of one event and the beginning of the next")
+    parser.add_option("", "--mouse-type", dest="mouse_type", default="GC5",
+                       help="Specify the type of virus injected in the mouse (GC5, GC3, EYFP)")
+
+
     parser.add_option("", "--representative-time-series-specs-file", dest="representative_time_series_specs_file", default='representative_time_series_specs.txt',
                        help="Specify file of representative trials to plot. File in format: animal# date start_in_secs end_in_secs exp_type smoothness")
+
 
     
     (options, args) = parser.parse_args()
@@ -374,7 +407,7 @@ if __name__ == "__main__":
 #    group_regression_plot(all_data, options, exp_type=exp_type, time_window=time_window)
 ##    group_bout_heatmaps(all_data, options, exp_type=options.exp_type, time_window=time_window)
 ##    plot_representative_time_series(options, options.representative_time_series_specs_file)
-    compare_start_and_end_of_epoch(all_data, options, time_window=[0,0.25], metric='area', test='ttest')
+    compare_start_and_end_of_epoch(all_data, options, time_window=[0, 0.25], metric='peak', test='ttest')
 
 
 #----------------------------------------------------------------------------------------   
