@@ -253,6 +253,8 @@ class FiberAnalyze( object ):
         end = int(self.time_range.split(':')[1])
         end = end if end != -1 else max(self.time_stamps)
         start = start if start != -1 else min(self.time_stamps)
+
+        print "--> Length of time series: ", end-start
         
         # if end == -1:
         #     end = max(FA.time_stamps)
@@ -260,10 +262,10 @@ class FiberAnalyze( object ):
         #     start = min(FA.time_stamps)
 
         #Set a larger resolution to ensure the plotted file size is not too large
-        if end - start <= 100:
+        if end - start <= 100 and end - start > 0:
             resolution = 1
         elif end - start < 500 and end - start > 100:
-            resolution = 1
+            resolution = 10
         elif end - start >= 500 and end - start < 1000:
             resolution = 30
         else:
@@ -299,11 +301,11 @@ class FiberAnalyze( object ):
             ymax = 3.0
             ymin = -1
         elif self.exp_type == 'homecagesocial':
-            ymax = 1.0
-            ymin = -1/3.0
+            ymax = 0.5
+            ymin = -ymax/3.0
         elif self.exp_type == 'homecagenovel':
-            ymax = 1.0
-            ymin = -1/3.0
+            ymax = 0.5
+            ymin = -ymax/3.0
 
         if self.fluor_normalization == 'raw':
             ymax = 10.0
@@ -791,11 +793,12 @@ class FiberAnalyze( object ):
         event_times, with before and after event durations
         specified in window as [before, after] (in seconds).
         Subtracts the baseline value from each chunk (i.e. sets the minimum value in a chunk to 0)
+        Set baseline_window = -1 for no baseline normalization
         """
         window_indices = [self.convert_seconds_to_index( window[0]),
                           self.convert_seconds_to_index( window[1])]
 
-        if baseline_window is not None:
+        if baseline_window is not None and baseline_window != -1:
             baseline_indices = [self.convert_seconds_to_index( baseline_window[0]),
                                 self.convert_seconds_to_index( baseline_window[1])]
 
@@ -805,18 +808,21 @@ class FiberAnalyze( object ):
             e_idx = np.where(e<self.time_stamps)[0][0]
             if (e_idx + window_indices[1] < len(data)-1) and (e_idx - window_indices[0] > 0):
                 chunk = data[range(max(0, (e_idx-window_indices[0])),min(len(data)-1, (e_idx+window_indices[1])))]
-                if baseline_window is not None:
+                if baseline_window is not None and baseline_window != -1:
                     baseline_chunk = data[range(max(0, (e_idx-window_indices[0])), min(len(data)-1, (e_idx+window_indices[1])))]
                     baseline = np.min(baseline_chunk)
+                elif baseline_window == -1:
+                    baseline = 0
                 else:
                     baseline = np.min(chunk)
+
 
                 time_chunks.append(chunk - baseline)
             #except:
              #   print "Unable to extract window:", [(e-window_indices[0]),(e+window_indices[1])]
         return time_chunks
 
-    def plot_perievent_hist( self, event_times, window, out_path=None, plotit=True, subplot=None ):
+    def plot_perievent_hist( self, event_times, window, out_path=None, plotit=True, subplot=None, baseline_window=None ):
         """
         Peri-event time histogram for given event times.
         Plots the time series and their median over a time window around
@@ -836,7 +842,7 @@ class FiberAnalyze( object ):
         print "\t--> Window used for peri-event plot:", window
 
         # get blocks of time series for window around each event time
-        time_chunks = self.get_time_chunks_around_events(self.fluor_data, event_times, window)
+        time_chunks = self.get_time_chunks_around_events(self.fluor_data, event_times, window, baseline_window=baseline_window)
 
         # get time values from frame indices
         window_indices = [ self.convert_seconds_to_index(window[0]),
@@ -1972,7 +1978,7 @@ if __name__ == "__main__":
                       help="Specify path to files with trigger times, minus the '_s.npz' and '_e.npz' suffixes.")
     parser.add_option("-i", "--input-path", dest="input_path",
                       help="Specify the input path.")
-    parser.add_option("", "--time-range", dest="time_range",default=None,
+    parser.add_option("", "--time-range", dest="time_range",default='0:-1',
                       help="Specify a time window over which to analyze the time series in format start:end. -1 chooses the appropriate extremum")
     parser.add_option('-p', "--plot-type", default = '', dest="plot_type",
                       help="Type of plot to produce.")
