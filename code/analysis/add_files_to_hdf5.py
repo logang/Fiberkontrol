@@ -15,6 +15,8 @@ if __name__ == "__main__":
               help="Specify the name of the dataset (to be the name of the dataset in hdf5).")
 	parser.add_option("", "--hdfpath", dest="hdf_path", default=None,
               help="Specify the path to the hdf5 file.")
+	parser.add_option("", "--add-new", action="store_true", default=False, dest="add_new",
+              help="Flag to determine whether to create new group if they are not already in the hdf5 file.")
 
 	(options, args) = parser.parse_args()
 
@@ -57,22 +59,34 @@ if __name__ == "__main__":
 			# group by animal number, subgroup by date, subsubgroup by run type
 
 			if prefix.split("-")[3] not in list(h5_file):
-				print "\t---> Creating group:", prefix.split("-")[3]
-				subject_num= h5_file.create_group(prefix.split("-")[3])
+				if options.add_new:
+					print "\t---> Creating group:", prefix.split("-")[3]
+					subject_num= h5_file.create_group(prefix.split("-")[3])
+				else:
+					print "File " + prefix + " not already in hdf5"
+					continue
 			else:
 				print "\t---> Loading group:", prefix.split("-")[3]
 				subject_num = h5_file[prefix.split("-")[3]]
 	            
 			if prefix.split("-")[0] not in list(subject_num):
-				print "\t---> Creating subgroup:", prefix.split("-")[0]
-				date = subject_num.create_group(prefix.split("-")[0])
+				if options.add_new:
+					print "\t---> Creating subgroup:", prefix.split("-")[0]
+					date = subject_num.create_group(prefix.split("-")[0])
+				else:
+					print "File " + prefix + " not already in hdf5"
+					continue
 			else:
 				print "\t---> Loading subgroup:", prefix.split("-")[0]
 				date = subject_num[prefix.split("-")[0]]
 
 			if prefix.split("-")[2] not in list(date):
-				print "\t---> Creating subsubgroup:", prefix.split("-")[2]
-				run_type = date.create_group(prefix.split("-")[2])
+				if options.add_new:
+					print "\t---> Creating subsubgroup:", prefix.split("-")[2]
+					run_type = date.create_group(prefix.split("-")[2])
+				else:
+					print "File " + prefix + " not already in hdf5"
+					continue
 			else:
 				print "\t---> Loading subsubgroup:", prefix.split("-")[2]
 				run_type = date[prefix.split("-")[2]]

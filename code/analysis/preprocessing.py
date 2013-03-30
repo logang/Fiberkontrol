@@ -36,7 +36,7 @@ def generate_hdf5_file(analysis_filenames,out_path):
         info = fname.split('-')
         # only process GC5 files, generating a command line command to
         # run fiber_record_analyze.py on the data.
-        if info[1] == 'GC5' or info[1] == 'GC3' or info[1] == 'EYFP':
+        if info[1] == 'GC5' or info[1] == 'GC3' or info[1] == 'EYFP' or info[1] == 'GC5_NAcprojection':
             cmd = 'python fiber_record_analyze.py -i '
             cmd += f                
             
@@ -72,6 +72,7 @@ def add_flattened_files_to_hdf5(flat_directories, out_path):
         cmd += ' -n flat'
         cmd += ' --hdfpath='
         cmd += out_path
+        #Note that --add-new flag remains False
         print cmd
         
         #result = run_command_wrapper(cmd)
@@ -157,9 +158,9 @@ if __name__ == '__main__':
     analysis_filenames = read_filenames(options.analysis_filenames_file)
     experiment_dates = read_filenames(options.experiment_dates_file)
     print "This file contains a list of files to be used for batch processing."
-    #print "The list contains:"
-    #for f in analysis_filenames:
-     #   print '\t',f
+    print "The list contains:"
+    for f in analysis_filenames:
+        print '\t',f
 
 #    generate_hdf5_file(analysis_filenames, '/Users/logang/Documents/Results/FiberRecording/Cell/all_data_raw.h5')
     
