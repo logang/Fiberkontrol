@@ -107,14 +107,17 @@ def debleach_files(analysis_filenames):
     print "Be sure to add the Flat/ directories to the flat_directories global variable "
     print "in preprocessing.py"
 
-def read_filenames(filenames_file):
+def read_filenames(filenames_file, path_to_filenames=None):
     
     print "Filename: ", filenames_file
     filenames = []
     with open(filenames_file, 'rb') as f:
         reader = csv.reader(f, delimiter='\n', quoting=csv.QUOTE_NONE)
         for row in reader:
-            filenames.append(row[0])
+            if path_to_filenames is not None:
+                filenames.append(options.path_to_npz_data + row[0])
+            else:
+                filenames.append(row[0])
 
     return filenames
 
@@ -155,7 +158,7 @@ if __name__ == '__main__':
 
     (options, args) = parser.parse_args()
 
-    analysis_filenames = read_filenames(options.analysis_filenames_file)
+    analysis_filenames = read_filenames(options.analysis_filenames_file, options.path_to_npz_data)
     experiment_dates = read_filenames(options.experiment_dates_file)
     print "This file contains a list of files to be used for batch processing."
     print "The list contains:"
