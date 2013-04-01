@@ -14,7 +14,8 @@ from fiber_record_analyze import FiberAnalyze
 def group_regression_plot(all_data, options, exp_type='homecagesocial', time_window=[-1,1] ):
 
     """
-    Plot fits of regression lines on data from home cage or novel social fiber photometry data, with points corresponding to bout and bout number.
+    Plot fits of regression lines on data from home cage or novel social 
+    fiber photometry data, with points corresponding to bout and bout number.
 
     TODO: write better description of function. Clean up code. Have figure save to output_path. 
     """
@@ -84,7 +85,8 @@ def group_regression_plot(all_data, options, exp_type='homecagesocial', time_win
 #    pl.ylabel("log length of next interaction")
     pl.show()
 
-def group_bout_heatmaps(all_data, options, exp_type, time_window, df_max=0.35, event_edge="rising"):
+def group_bout_heatmaps(all_data, options, exp_type, time_window, 
+                        df_max=0.35, event_edge="rising"):
     """
     Save out 'heatmaps' showing time on the x axis, bouts on the y axis, and representing signal
     intensity with color.
@@ -108,22 +110,26 @@ def group_bout_heatmaps(all_data, options, exp_type, time_window, df_max=0.35, e
                 if(FA.load(file_type="hdf5") != -1):
                     event_times = FA.get_event_times(event_edge, int(options.event_spacing))
                     print "len(event_times)", len(event_times)
-                    time_arr = np.asarray( FA.get_time_chunks_around_events(FA.fluor_data, event_times, time_window) )
+                    time_arr = np.asarray( FA.get_time_chunks_around_events(FA.fluor_data, 
+                                                                            event_times, 
+                                                                            time_window) )
 
-                    # Generate a heatmap of activity by bout, with range set between the 5% quantile of
-                    # the data and the 'df_max' argument of the function
+                    # Generate a heatmap of activity by bout, with range set 
+                    # between the 5% quantile of the data and the 'df_max' argument 
+                    # of the function
                     from scipy.stats.mstats import mquantiles
                     baseline = mquantiles( time_arr.flatten(), prob=[0.05])
-                    ax.imshow(time_arr, interpolation="nearest",vmin=baseline,vmax=df_max,cmap=pl.cm.afmhot, 
-                                extent=[-time_window[0], time_window[1], 0, time_arr.shape[0]])
+                    ax.imshow(time_arr, interpolation="nearest",vmin=baseline,
+                              vmax=df_max,cmap=pl.cm.afmhot, 
+                              extent=[-time_window[0], time_window[1], 0, time_arr.shape[0]])
                     ax.set_aspect('auto')
                     pl.title("Animal #: "+animal_id+'   Date: '+dates)
                     pl.ylabel('Bout Number')
                     ax.axvline(0,color='white',linewidth=2,linestyle="--")
-                    #ax.axvline(np.abs(time_window[0])*time_arr.shape[1]/(time_window[1]-time_window[0]),color='white',linewidth=2,linestyle="--")
 
                     ax = fig.add_subplot(2,1,2)
-                    FA.plot_perievent_hist(event_times, time_window, out_path=None, plotit=True, subplot=ax )
+                    FA.plot_perievent_hist(event_times, time_window, 
+                                           out_path=None, plotit=True, subplot=ax )
                     pl.ylim([0,df_max])
 
                     if options.output_path is not None:
@@ -136,12 +142,63 @@ def group_bout_heatmaps(all_data, options, exp_type, time_window, df_max=0.35, e
                     else:
                         pl.show()
 
+def group_bout_ci(all_data, options, exp_type, time_window, 
+                       df_max=0.35, event_edge="rising"):
+    """
+    Save out plots of mean or median activity with confidence intervals. 
+
+    """
+    i=0 # color counter
+    exp_types = ['homecagesocial', 'homecagenovel']
+    for animal_id in all_data.keys():
+        # load data from hdf5 file by animal-date-exp_type
+        animal = all_data[animal_id]
+        for dates in animal.keys():
+            # Create figure
+            fig = pl.figure()
+            ax = fig.add_subplot(1,1,1)
+            for exp_type in exp_types:
+                date = animal[dates]
+                FA = FiberAnalyze( options )
+                FA.subject_id = animal_id
+                FA.exp_date = dates
+                FA.exp_type = exp_type
+                print animal_id, " ", dates, " ", exp_type
+                median_time_series = []
+                if exp_type in animal[dates].keys():
+                    if(FA.load(file_type="hdf5") != -1):
+                        event_times = FA.get_event_times(event_edge, int(options.event_spacing))
+                        print "len(event_times)", len(event_times)
+                        time_arr = np.asarray( FA.get_time_chunks_around_events(FA.fluor_data, 
+                                                                                event_times, 
+                                                                                time_window) )
+
+                        # Generate a heatmap of activity by bout, with range set 
+                        # between the 5% quantile of the data and the 'df_max' argument 
+                        # of the function
+                        median_time_series.append( np.median(time_arr, axis=0) )
+
+            ax.plot(median_time_series)
+            ax.set_aspect('auto')
+            pl.title("Animal #: "+animal_id+'   Date: '+dates)
+            pl.ylabel('Bout Number')
+            ax.axvline(0,color='white',linewidth=2,linestyle="--")
+
+            if options.output_path is not None:
+                import os
+                outdir = options.output_path
+                if not os.path.isdir(outdir):
+                    os.makedirs(outdir)
+                pl.savefig(outdir+'/'+animal_id+'_'+dates+'.png')
+                print outdir+'/'+animal_id+'_'+dates+'.png'
+            else:
+                pl.show()
+
 def group_plot_time_series(all_data, options):
     """
     Save out time series for each trial, overlaid with 
     red lines indicating event epochs
     """
-
     for animal_id in all_data.keys():
         # load data from hdf5 file by animal-date-exp_type
         animal = all_data[animal_id]
@@ -162,21 +219,22 @@ def group_plot_time_series(all_data, options):
                     print dir
                     if os.path.isdir(dir) is False:
                         os.makedirs(dir)
-                    FA.plot_basic_tseries(out_path = dir + '/' + FA.subject_id + "_" + FA.exp_date + "_" + FA.exp_type + "_" + 
-                                         str(int(FA.time_range.split(':')[0])) +  "_" + str(int(FA.time_range.split(':')[1])) +"_" ) 
+                    FA.plot_basic_tseries(out_path = dir + '/' + FA.subject_id + "_" + 
+                                          FA.exp_date + "_" + FA.exp_type + "_" + 
+                                          str(int(FA.time_range.split(':')[0])) +  "_" + 
+                                          str(int(FA.time_range.split(':')[1])) +"_" ) 
 
 
 def plot_representative_time_series(options, representative_time_series_specs_file):
     """
-    Save out plots of time series overlaid with bars indicating event times (i.e. sucrose lick or social interaction)
-    for all trials listed in representative_time_series_specs.txt
-    This function can be used to provide multiple levels of detail of the same time series (i.e. to 'zoom' in)
-    The format of representative_time_series_specs.txt is:
-
+    Save out plots of time series overlaid with bars indicating event times 
+    (i.e. sucrose lick or social interaction) for all trials listed in 
+    representative_time_series_specs.txt. This function can be used to provide 
+    multiple levels of detail of the same time series (i.e. to 'zoom' in) The 
+    format of representative_time_series_specs.txt is:
     animal#     date        start   end exp_type    smoothness      
 
     """
-
 #    all_data = h5py.File(options.input_path,'r') #just for testing
 
     print representative_time_series_specs_file
@@ -203,16 +261,16 @@ def plot_representative_time_series(options, representative_time_series_specs_fi
 
            # print "Test Keys: ", all_data[str(421)][str(20121008)][FA.exp_type].keys()
 
-
             print ""
             print "--> Plotting: ", FA.subject_id, FA.exp_date, FA.exp_type, FA.smoothness, FA.time_range
             if(FA.load(file_type="hdf5") != -1):
                 dir = options.output_path + '/' + FA.exp_type
                 if os.path.isdir(dir) is False:
                     os.makedirs(dir)
-                FA.plot_basic_tseries(out_path = dir + '/' + FA.subject_id + "_" + FA.exp_date + "_" + FA.exp_type + "_" + 
-                                         str(int(FA.time_range.split(':')[0])) +  "_" + str(int(FA.time_range.split(':')[1])) +"_" ) 
-
+                FA.plot_basic_tseries(out_path = dir + '/' + FA.subject_id + "_" +
+                                      FA.exp_date + "_" + FA.exp_type + "_" + 
+                                      str(int(FA.time_range.split(':')[0])) +  
+                                      "_" + str(int(FA.time_range.split(':')[1])) +"_" ) 
 
 
 def get_novel_social_pairs(all_data, exp1, exp2):
@@ -312,9 +370,17 @@ def compare_start_and_end_of_epoch(all_data, options, time_window=[0,0.25], metr
 
                 #--Get an array of time series chunks in a window around each event time
                 #reverse_window = [time_window[1], time_window[0]]
-                start_time_arr = np.asarray( FA.get_time_chunks_around_events(FA.fluor_data, start_event_times, time_window, baseline_window=-1 ) )
+                start_time_arr = np.asarray( FA.get_time_chunks_around_events(FA.fluor_data, 
+                                                                              start_event_times, 
+                                                                              time_window, 
+                                                                              baseline_window=-1))
+
                 #before_time_arr = np.asarray( FA.get_time_chunks_around_events(FA.fluor_data, end_event_times, reverse_window, baseline_window=-1 ))
-                end_time_arr = np.asarray( FA.get_time_chunks_around_events(FA.fluor_data, end_event_times, time_window, baseline_window=-1 ))
+
+                end_time_arr = np.asarray( FA.get_time_chunks_around_events(FA.fluor_data, 
+                                                                            end_event_times, 
+                                                                            time_window, 
+                                                                            baseline_window=-1 ))
 
                 start_scores = np.array(score_of_chunks(start_time_arr, metric))
                 #before_scores = np.array(score_of_chunks(before_time_arr, metric))
@@ -330,19 +396,25 @@ def compare_start_and_end_of_epoch(all_data, options, time_window=[0,0.25], metr
                     ax = fig.add_subplot(2,1,1)
                     title = FA.subject_id + ' ' + FA.exp_date + ' ' + FA.exp_type
                     ax.set_title(title)
-                    FA.plot_perievent_hist(start_event_times, time_window, out_path=options.output_path, plotit=True, subplot=ax, baseline_window=-1  )
+                    FA.plot_perievent_hist(start_event_times, time_window, 
+                                           out_path=options.output_path, plotit=True, 
+                                           subplot=ax, baseline_window=-1  )
+
                     #FA.plot_perievent_hist(end_event_times, reverse_window, out_path=options.output_path, plotit=True, subplot=ax, baseline_window=-1 )
+
                     ax = fig.add_subplot(2,1,2)
-                    FA.plot_perievent_hist(end_event_times, time_window, out_path=options.output_path, plotit=True, subplot=ax, baseline_window=-1 )
+                    FA.plot_perievent_hist(end_event_times, time_window, 
+                                           out_path=options.output_path, plotit=True, 
+                                           subplot=ax, baseline_window=-1 )
                     if options.output_path is None:
                         pl.show()
                     else:
                         print "Saving peri-event time series..."
-                        pl.savefig(options.output_path + FA.subject_id + '_' + FA.exp_date + '_' + FA.exp_type + "_perievent_tseries.png")
+                        pl.savefig(options.output_path + FA.subject_id + '_' + FA.exp_date + 
+                                   '_' + FA.exp_type + "_perievent_tseries.png")
 
 
     #-- Next, plot all of the pair_scores (vs animal, for now)
-
 
     #-- Create two matched arrays (one for novel, one for social) with the avg score for each animal
     exp_scores = dict() #key: exp_type, entry: array of avg score for each animal
@@ -399,43 +471,69 @@ if __name__ == "__main__":
     parser = OptionParser()
     parser.add_option("-o", "--output-path", dest="output_path", default=None,
                       help="Specify the ouput path.")
+
     parser.add_option("-t", "--trigger-path", dest="trigger_path", default=None,
-                      help="Specify path to files with trigger times, minus the '_s.npz' and '_e.npz' suffixes.")
+                      help=("Specify path to files with trigger times, minus the '_s.npz' "
+                            "and '_e.npz' suffixes."))
+
     parser.add_option("-i", "--input-path", dest="input_path",
                       help="Specify the input path.")
+
     parser.add_option("", "--time-range", dest="time_range",default=None,
-                      help="Specify a time window over which to analyze the time series in format start:end. -1 chooses the appropriate extremum")
+                      help=("Specify a time window over which to analyze the time series "
+                            "in format start:end. -1 chooses the appropriate extremum"))
+
     parser.add_option('-p', "--plot-type", default = 'tseries', dest="plot_type",
                       help="Type of plot to produce.")
+
     parser.add_option('', "--fluor_normalization", default = 'deltaF', dest="fluor_normalization",
-                      help="Normalization of fluorescence trace. Can be a.u. between [0,1]: 'stardardize' or deltaF/F: 'deltaF'.")
+                      help=("Normalization of fluorescence trace. Can be a.u. between [0,1]: "
+                            "'stardardize' or deltaF/F: 'deltaF'."))
+
     parser.add_option('-s', "--smoothness", default = 0, dest="smoothness",
                       help="Should the time series be smoothed, and how much.")
+
     parser.add_option('-x', "--selectfiles", default = False, dest = "selectfiles",
-                       help="Should you select filepaths in a pop window instead of in the command line.")
+                       help=("Should you select filepaths in a pop window instead of in the "
+                             "command line."))
+
     parser.add_option("", "--save-txt", action="store_true", default=False, dest="save_txt",
                       help="Save data matrix out to a text file.")
+
     parser.add_option("", "--save-to-h5", default=None, dest="save_to_h5",
                       help="Save data matrix to a dataset in an hdf5 file.")
-    parser.add_option("", "--save-and-exit", action="store_true", default=False, dest="save_and_exit",
-                      help="Exit immediately after saving data out.")
+
+    parser.add_option("", "--save-and-exit", action="store_true", default=False, 
+                      dest="save_and_exit", help="Exit immediately after saving data out.")
+
     parser.add_option("", "--filter-freqs", default=None, dest="filter_freqs",
-                      help="Use a notch filter to remove high frequency noise. Format lowfreq:highfreq.")
-    parser.add_option("", "--save-debleach", action="store_true", default=False, dest="save_debleach",
-                      help="Debleach fluorescence time series by fitting with an exponential curve.")
+                      help=("Use a notch filter to remove high frequency noise. Format "
+                            "lowfreq:highfreq."))
+
+    parser.add_option("", "--save-debleach", action="store_true", default=False, 
+                      dest="save_debleach", help=("Debleach fluorescence time series by "
+                                                  "fitting with an exponential curve."))
+
     parser.add_option('', "--exp-type", default = 'homecagesocial', dest="exp_type",
-                      help="Which type of experiment. Current options are 'homecagesocial' and 'homecagenovel'")
+                      help=("Which type of experiment. Current options are 'homecagesocial' "
+                            "and 'homecagenovel'"))
+
     parser.add_option("", "--time-window", dest="time_window",default='3:3',
                       help="Specify a time window for peri-event plots in format before:after.")
+
     parser.add_option("", "--event-spacing", dest="event_spacing", default=0,
-                       help="Specify minimum time (in seconds) between the end of one event and the beginning of the next")
+                       help=("Specify minimum time (in seconds) between the end of one event "
+                             "and the beginning of the next"))
+
     parser.add_option("", "--mouse-type", dest="mouse_type", default="GC5",
                        help="Specify the type of virus injected in the mouse (GC5, GC3, EYFP)")
 
 
-    parser.add_option("", "--representative-time-series-specs-file", dest="representative_time_series_specs_file", default='representative_time_series_specs.txt',
-                       help="Specify file of representative trials to plot. File in format: animal# date start_in_secs end_in_secs exp_type smoothness")
-
+    parser.add_option("", "--representative-time-series-specs-file", 
+                      dest="representative_time_series_specs_file", 
+                      default='representative_time_series_specs.txt',
+                      help=("Specify file of representative trials to plot. File in format: "
+                            "animal# date start_in_secs end_in_secs exp_type smoothness"))
 
     
     (options, args) = parser.parse_args()
@@ -447,7 +545,8 @@ if __name__ == "__main__":
 
     time_window = np.array(options.time_window.split(':'), dtype='float32') # [before,after] event in seconds 
 #    group_regression_plot(all_data, options, exp_type=exp_type, time_window=time_window)
-##    group_bout_heatmaps(all_data, options, exp_type=options.exp_type, time_window=time_window)
+#    group_bout_heatmaps(all_data, options, exp_type=options.exp_type, time_window=time_window)
+    group_bout_heatmaps(all_data, options, time_window=time_window)
 ##    group_plot_time_series(all_data, options)
 ##    plot_representative_time_series(options, options.representative_time_series_specs_file)
     compare_start_and_end_of_epoch(all_data, options, time_window=[0, .1], metric='peak', test='ttest')
