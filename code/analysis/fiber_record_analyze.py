@@ -817,6 +817,7 @@ class FiberAnalyze( object ):
                     baseline = np.min(chunk)
 
 
+
                 time_chunks.append(chunk - baseline)
             #except:
              #   print "Unable to extract window:", [(e-window_indices[0]),(e+window_indices[1])]
