@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 import os
 import sys
 import scipy.stats as stats
+from state_space import denoise
 
 from fiber_record_analyze import FiberAnalyze
 
@@ -30,10 +31,8 @@ def group_regression_plot(all_data, options, exp_type='homecagesocial', time_win
         animal = all_data[animal_id]
         for dates in animal.keys():
             date = animal[dates]
-            FA = FiberAnalyze( options )
-            FA.subject_id = animal_id
-            FA.exp_date = dates
-            FA.exp_type = exp_type
+
+            FA = loadFiberAnalyze(options, animal_id, dates, exp_type)
             FA.load(file_type="hdf5")
 
             # get intensity and next_val values for this animal
@@ -105,11 +104,9 @@ def group_bout_heatmaps(all_data, options, exp_type, time_window, df_max=0.35, e
                 ax = fig.add_subplot(2,1,1)
                 
                 date = animal[dates]
-                FA = FiberAnalyze( options )
-                FA.subject_id = animal_id
-                FA.exp_date = dates
-                FA.exp_type = exp_type
-                print animal_id, " ", dates, " ", exp_type
+
+                FA = loadFiberAnalyze(options, animal_id, dates, exp_type)
+
                 if exp_type in animal[dates].keys():
                     if(FA.load(file_type="hdf5") != -1):
                         event_times = FA.get_event_times(event_edge, float(options.event_spacing))
@@ -160,11 +157,9 @@ def group_bout_ci(all_data, options, exp_type, time_window,
             ax = fig.add_subplot(1,1,1)
             for exp_type in exp_types:
                 date = animal[dates]
-                FA = FiberAnalyze( options )
-                FA.subject_id = animal_id
-                FA.exp_date = dates
-                FA.exp_type = exp_type
-                print animal_id, " ", dates, " ", exp_type
+
+                FA = loadFiberAnalyze(options, animal_id, dates, exp_type)
+
                 median_time_series = []
                 if exp_type in animal[dates].keys():
                     if(FA.load(file_type="hdf5") != -1):
@@ -206,11 +201,8 @@ def group_plot_time_series(all_data, options):
         for date in animal.keys():
             if options.exp_date is None or options.exp_date == date:
                 for exp_type in animal[date].keys():
-                
-                    FA = FiberAnalyze( options )
-                    FA.subject_id = animal_id
-                    FA.exp_date = date
-                    FA.exp_type = exp_type
+
+                    FA = loadFiberAnalyze(options, animal_id, date, exp_type)
                     FA.fluor_normalization = 'deltaF'
                     FA.time_range = '0:-1'
 
@@ -252,10 +244,8 @@ def plot_representative_time_series(options, representative_time_series_specs_fi
             exp_type = specs[4]
             smoothness = specs[5]
 
-            FA = FiberAnalyze( options )
-            FA.subject_id = str(animal_id)
-            FA.exp_date = str(date)
-            FA.exp_type = str(exp_type)
+            FA = loadFiberAnalyze(options, animal_id, date, exp_type)
+
             FA.smoothness = int(smoothness)
             FA.time_range = str(start) + ':' + str(end)
             FA.fluor_normalization = 'deltaF'
@@ -346,6 +336,9 @@ def  loadFiberAnalyze(options, animal_id, exp_date, exp_type):
     FA.exp_date = str(exp_date)
     FA.exp_type = str(exp_type)
     print FA.subject_id, " ", FA.exp_date, " ", FA.exp_type
+
+    FA.fluor_data = denoise(FA.fluor_data)
+
     return FA
 
 def compileAnimalScoreDictIntoArray(pair_avg_scores):
@@ -781,7 +774,7 @@ if __name__ == "__main__":
 ##    group_plot_time_series(all_data, options)
 ##    plot_representative_time_series(options, options.representative_time_series_specs_file)
 ##    compare_start_and_end_of_epoch(all_data, options, exp1='homecagesocial', exp2='homecagenovel', time_window=[0, .5], metric='peak', test='ttest')
-    compare_epochs(all_data, options, exp1='homecagenovel', exp2='homecagesocial', time_window=[0, 0], metric='peak', test='wilcoxon', make_plot=True, max_bout_number=5, plot_perievent=True)
-##    compare_decay(all_data, options, exp1='homecagenovel', exp2='homecagesocial', time_window=[0, 0], metric='peak', test='ttest', make_plot=True, max_bout_number=10)
+##    compare_epochs(all_data, options, exp1='homecagenovel', exp2='homecagesocial', time_window=[0, 0], metric='peak', test='wilcoxon', make_plot=True, max_bout_number=5, plot_perievent=True)
+    compare_decay(all_data, options, exp1='homecagenovel', exp2='homecagesocial', time_window=[0, 0], metric='peak', test='ttest', make_plot=True, max_bout_number=10)
     
 #----------------------------------------------------------------------------------------   
