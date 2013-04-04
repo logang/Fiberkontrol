@@ -336,8 +336,6 @@ class FiberAnalyze( object ):
          #   pl.savefig(out_path + "basic_time_series.svg")
          #   pl.savefig(out_path + "basic_time_series.tiff")
 
-
-
     def save_time_series( self, save_path='.', output_type="txt", h5_filename=None ):
         """
         Save the raw calcium time series, with triggers corresponding to events
