@@ -32,7 +32,7 @@ class FiberAnalyze( object ):
         self.fluor_normalization = options.fluor_normalization
         self.filter_freqs = options.filter_freqs
         self.exp_type = options.exp_type
-        self.event_spacing = int(options.event_spacing)
+        self.event_spacing = float(options.event_spacing)
         self.mouse_type = options.mouse_type
 
 
@@ -787,7 +787,7 @@ class FiberAnalyze( object ):
             pl.savefig(out_path + "peak_finding.png")
 
 
-    def get_time_chunks_around_events(self, data, event_times, window, baseline_window=None):
+    def get_time_chunks_around_events(self, data, event_times, window, baseline_window=None, end_event_times=None):
         """
         Extracts chunks of fluorescence data around each event in 
         event_times, with before and after event durations
@@ -803,7 +803,15 @@ class FiberAnalyze( object ):
                                 self.convert_seconds_to_index( baseline_window[1])]
 
         time_chunks = []
-        for e in event_times:
+        for i in range(len(event_times)):
+#        for e in event_times:
+            e = event_times[i]
+            if end_event_times is not None:
+                full_window = [0, end_event_times[i] - event_times[i]]
+                window_indices = [self.convert_seconds_to_index( full_window[0]),
+                          self.convert_seconds_to_index( full_window[1])]
+                print "len(epoch) = ", full_window[1]
+
            # try:
             e_idx = np.where(e<self.time_stamps)[0][0]
             if (e_idx + window_indices[1] < len(data)-1) and (e_idx - window_indices[0] > 0):

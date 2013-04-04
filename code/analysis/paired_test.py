@@ -8,7 +8,7 @@ import sys
 """
 This class is for comparing the effect two different trial conditions (i.e. novel object interaction vs. social interaction)
 across a cohort of mice.
-The score used to measure the effect of each condition is determined by which  are passed in to the class.
+The score used to measure the effect of each condition is determined by which files are passed in to the class.
 An example of a score is the maximum fluorescence value within an interaction event, or the area under
 the curve within a window surrounding the event.
 
@@ -41,6 +41,9 @@ class PairAnalyze( object ):
 			self.s_windows = []
 			self.n_length_times = []
 			self.s_length_times = []
+			self.n_names = []
+			self.s_names = []
+
 
 			self.n_aux = [] #In case an auxiliary variable is provided
 			self.s_aux = []
@@ -54,6 +57,7 @@ class PairAnalyze( object ):
 					try:
 						self.p_files.append(np.load(self.p_path + '/' + infile))
 						print infile
+						self.n_names.append(infile.split("_")[0])
 					except:
 						print "FILE DOESN'T WORK: ", infile
 
@@ -93,6 +97,7 @@ class PairAnalyze( object ):
 					try:
 						self.n_files.append(np.load(self.n_path + '/' + infile))
 						print infile
+						self.n_names.append(infile.split("_")[0])
 					except:
 						print "FILE DOESN'T WORK: ", infile
 
@@ -102,6 +107,8 @@ class PairAnalyze( object ):
 					try:
 						self.s_files.append(np.load(self.s_path + '/' + infile))
 						print infile
+						self.s_names.append(infile.split("_")[0])
+
 					except:
 						print "FILE DOESN'T WORK: ", infile
 
@@ -269,9 +276,6 @@ class PairAnalyze( object ):
 				else:
 					time_from_first_event.append(0) 
 
-
-
-
 			event_lengths = np.array(event_ends) - np.array(event_starts)
 			event_lengths = event_lengths[event_lengths>=0]
 			event_lengths = event_lengths[event_lengths<10]
@@ -366,12 +370,7 @@ class PairAnalyze( object ):
 					self.eNegX_residuals, p_guess, args=(x, y), full_output=1)
 
 				x0,y0,c,k=p 
-				# print('''Reference data:\  
-				# 			x0 = {x0}
-				# 			y0 = {y0}
-				# 			c = {c}
-				# 			k = {k}
-				# 			'''.format(x0=x0,y0=y0,c=c,k=k))
+				# print('''Reference data:\ x0 = {x0} y0 = {y0} c = {c} k = {k}'''.format(x0=x0,y0=y0,c=c,k=k))
 
 				numPoints = np.floor((np.max(x) - np.min(x))*100)
 				xp = np.linspace(np.min(x), np.max(x), numPoints)
@@ -434,6 +433,11 @@ class PairAnalyze( object ):
 
 
 		def SummarizeBouts(self, scores_per_bout):
+			"""
+			Input: 
+
+			Output: the average score of each bout across all trials
+			"""
 
 			bout_avgs = np.zeros(len(scores_per_bout))
 			bout_stderr = np.zeros(len(scores_per_bout))
@@ -508,7 +512,6 @@ class PairAnalyze( object ):
 				plt.savefig(out_path + title + "_" + score_type + "_vs_time.pdf")
 			else:
 				plt.show()
-
 
 				#This does not currently work
 			def CompareAllPeaks(self):
@@ -730,6 +733,115 @@ class PairAnalyze( object ):
 					plt.show()
 
 
+		def GetIndividualDecayRates(self, scores):
+			"""
+			TO DO TO DO TO DO
+			Given an array [[scores from trial 1], [scores from trial 2], [scores from trial 3]...]
+			Returns an array [decay rate of trial 1, decay rate of trial 2, decay rate of trial 3...]
+			Where the decay rate is 'k' in an exponential fit to the data of the form (exp(-k*(x-x0))) + y0)
+			
+			Check for low R^2 values?
+			"""
+
+
+			k_array = [] #an array holding the decay rate for each trial
+			r2_array = [] #holds the r^2 value of each exponential fit
+			xp_array = [] #the x values for plotting the exponential fit
+			pxp_array = [] #the y values for plotting the exponential fit
+
+
+			for j in range(len(scores)):
+				f = scores[j]
+				print f
+
+				xp, pxp, x0, y0, c, k, r2 = self.fit_exponential(range(len(f)), f + 1)
+
+				text_x = np.max(f) + 3
+				text_y = np.max(f)
+				#plt.figure()
+				#fplot, = plt.plot(xp, pxp-1, 'b', linewidth=2)
+				#plt.plot(range(len(f)), f, 'o')
+				#plt.legend([fplot], ["decay rate = " + "{0:.2f}".format(k) + r", $r^2 = $" + "{0:.2f}".format(r2)])
+
+
+				k_array.append(k)
+				r2_array.append(r2)
+				xp_array.append(xp)
+				pxp_array.append(pxp)
+
+
+			return k_array, r2_array, xp_array, pxp_array
+
+		def CompareIndividualDecayRates(self, n_xp_array, n_pxp_array, n_scores_array, n_k_array, n_r2_array, n_names, 
+																	s_xp_array, s_pxp_array, s_scores_array, s_k_array, s_r2_array, s_names,
+																	test = "ttest", out_path=None):
+			"""
+			TO DO TO DO TO DO
+			Compares two outputs from GetIndividualDecayRates corresponding to different test conditions (i.e. novel and social)
+			Given an array of data points corresponding to separate trials, and
+			the exponential curve fits to those data points, plots their overlay.
+			Additionally determines the significance of the difference between the two conditions.
+			"""
+
+			for j in range(len(n_scores_array)):
+				n_xp = n_xp_array[j]
+				n_pxp  = n_pxp_array[j]
+				n_scores = n_scores_array[j]
+				n_bouts = range(len(n_scores))
+				n_k = n_k_array[j]
+				n_r2 = n_r2_array[j]
+
+				s_xp = s_xp_array[j]
+				s_pxp  = s_pxp_array[j]
+				s_scores = s_scores_array[j]
+				s_bouts = range(len(s_scores))
+				s_k = s_k_array[j]
+				s_r2 = s_r2_array[j]
+
+
+				
+				fig = plt.figure()	
+				ax = fig.add_subplot(111)
+				nplot, = ax.plot(n_xp, n_pxp - 1, 'b')
+				ax.plot(n_bouts, n_scores, 'ob')
+				splot, = ax.plot(s_xp, s_pxp -1, 'g')
+				ax.plot(s_bouts, s_scores, 'og')
+				plt.title(n_names[j])
+				plt.legend([nplot, splot], ["Novel object: decay rate = " + "{0:.2f}".format(n_k) + r", $r^2 = $" + "{0:.2f}".format(n_r2), 
+																	"Social interaction: decay rate = " + "{0:.2f}".format(s_k) + r", $r^2 = $" + "{0:.2f}".format(s_r2)])
+
+				if out_path is not None:
+					print out_path + "_individual_trial_decay.pdf"
+					plt.savefig(out_path + n_names[j] + "_individual_trial_decay.png")
+		
+			print "s", s_k_array
+			print "n", n_k_array
+
+			filt_s_k_array = []
+			filt_n_k_array = []
+			filt_names = []
+
+			r2_lim = 0.2
+			min_k_lim = 0.02
+			max_k_lim = 50.0
+			for i in range(len(n_k_array)):
+				if s_r2_array[i] > r2_lim and n_r2_array[i] > r2_lim:
+					if s_k_array[i] > min_k_lim and n_k_array[i] > min_k_lim:
+						if s_k_array[i] < max_k_lim and n_k_array[i] < max_k_lim:
+							filt_s_k_array.append(s_k_array[i])
+							filt_n_k_array.append(n_k_array[i])
+							filt_names.append(n_names[i])
+
+			print "filt_s", filt_s_k_array
+			print "filt_n", filt_n_k_array
+
+			if test == "ttest":
+				[tvalue, pvalue] = stats.ttest_rel(filt_s_k_array, filt_n_k_array)
+				print "normalized tvalue: ", tvalue, " normalized pvalue: ", pvalue
+			if test == "wilcoxon":
+				[zstatistic, pvalue] = stats.wilcoxon(s_k_array, n_k_array)
+				print "normalized area zstatistic: ", zstatistic, " normalized area pvalue: ", pvalue
+
 
 def test_PairAnalyze(options):
 	"""
@@ -753,11 +865,22 @@ def test_PairAnalyze(options):
 
 	###Use this for Before_After decay plots
 	###PA.CombinedAverage(PA.n_scores, None, PA.s_scores, None, titlen='Before', titles='After', score_type=PA.score_type, out_path=PA.output_path + PA.label)
-	
-	PA.CombinedAverage(PA.s_scores, None, None, None, titlen='Social', titles='', score_type=PA.score_type, out_path=PA.output_path + "_social_")
-	PA.CombinedAverage(PA.n_scores, None, None, None, titlen='Novel', titles='', score_type=PA.score_type, out_path=PA.output_path + "_novel_")	
-	PA.CombinedAverage(PA.n_scores, None, PA.s_scores, None, titlen='Novel', titles='Social', score_type=PA.score_type, out_path=PA.output_path + PA.label)
 
+	####USE THIS FOR SOCIAL VS NOVEL DECAY PLOTS	
+	####PA.CombinedAverage(PA.s_scores, None, None, None, titlen='Social', titles='', score_type=PA.score_type, out_path=PA.output_path + "_social_")
+	####PA.CombinedAverage(PA.n_scores, None, None, None, titlen='Novel', titles='', score_type=PA.score_type, out_path=PA.output_path + "_novel_")	
+	####PA.CombinedAverage(PA.n_scores, None, PA.s_scores, None, titlen='Novel', titles='Social', score_type=PA.score_type, out_path=PA.output_path + PA.label)
+
+
+
+
+	n_k_array, n_r2_array, n_xp_array, n_pxp_array = PA.GetIndividualDecayRates(PA.n_scores)
+	s_k_array, s_r2_array, s_xp_array, s_pxp_array = PA.GetIndividualDecayRates(PA.s_scores)
+	PA.CompareIndividualDecayRates(n_xp_array, n_pxp_array, PA.n_scores, n_k_array, n_r2_array, PA.n_names, s_xp_array, s_pxp_array, PA.s_scores, s_k_array, s_r2_array, PA.s_names, out_path=PA.output_path,)
+	print PA.n_names
+	print PA.s_names
+
+	plt.show()
 
 
 #	PA.AverageScores(PA.n_scores, PA.n_start_times, title='Novel', score_type='area', out_path=PA.output_path)

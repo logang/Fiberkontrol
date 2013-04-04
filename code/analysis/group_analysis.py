@@ -84,7 +84,7 @@ def group_regression_plot(all_data, options, exp_type='homecagesocial', time_win
 #    pl.ylabel("log length of next interaction")
     pl.show()
 
-def group_bout_heatmaps(all_data, options, exp_type, time_window, df_max=0.35, event_edge="rising"):
+def group_bout_heatmaps(all_data, options, exp_type, time_window, df_max=0.35, event_edge="rising", baseline_window=None):
     """
     Save out 'heatmaps' showing time on the x axis, bouts on the y axis, and representing signal
     intensity with color.
@@ -108,9 +108,10 @@ def group_bout_heatmaps(all_data, options, exp_type, time_window, df_max=0.35, e
                 print animal_id, " ", dates, " ", exp_type
                 if exp_type in animal[dates].keys():
                     if(FA.load(file_type="hdf5") != -1):
-                        event_times = FA.get_event_times(event_edge, int(options.event_spacing))
+                        event_times = FA.get_event_times(event_edge, float(options.event_spacing))
                         print "len(event_times)", len(event_times)
-                        time_arr = np.asarray( FA.get_time_chunks_around_events(FA.fluor_data, event_times, time_window) )
+                        print "baseline_window", baseline_window
+                        time_arr = np.asarray( FA.get_time_chunks_around_events(FA.fluor_data, event_times, time_window, baseline_window=baseline_window) )
 
                         # Generate a heatmap of activity by bout, with range set between the 5% quantile of
                         # the data and the 'df_max' argument of the function
@@ -217,7 +218,7 @@ def plot_representative_time_series(options, representative_time_series_specs_fi
 
 
 
-def get_novel_social_pairs(all_data, exp1, exp2):
+def get_novel_social_pairs(all_data, exp1, exp2, mouse_type = 'GC5'):
     """
     all_data = an hdf5 file containing all of the time series data
     exp1 and exp2 = the two experiment types to be compared (i.e. homecagesocial and homecagenovel)
@@ -232,7 +233,7 @@ def get_novel_social_pairs(all_data, exp1, exp2):
         # load data from hdf5 file by animal-date-exp_type
 
         animal = all_data[animal_id]
-        if animal.attrs['mouse_type'] == 'GC5': #don't use EYFP or GC3
+        if animal.attrs['mouse_type'] == mouse_type: #don't use EYFP or GC3
             pairs[animal_id] = dict()
             for date in animal.keys(): 
                 #make a list for each experiment type of all dates on which that exp was run
@@ -252,7 +253,7 @@ def get_novel_social_pairs(all_data, exp1, exp2):
             del pairs[animal_id]
         else:
             for exp_type in pairs[animal_id].keys():
-                pairs[animal_id][exp_type] = np.max(pairs[animal_id][exp_type])
+                pairs[animal_id][exp_type] = np.max(pairs[animal_id][exp_type]) #choose the most recent experiment date
 
     print "Pairs after max filter: ", pairs
 
@@ -270,7 +271,7 @@ def score_of_chunks(ts_arr, metric='area'):
     scores = []
     for ts in ts_arr:
         if metric == 'area':
-            scores.append(np.sum(ts))
+            scores.append(np.sum(ts)/len(ts))
         elif metric == 'peak':
             scores.append(np.max(ts))
 
@@ -331,7 +332,7 @@ def compare_start_and_end_of_epoch(all_data, options, exp1='homecagesocial', exp
 
     """
 
-    pairs = get_novel_social_pairs(all_data, exp1, exp2) #can use any function here that returns pairs of data
+    pairs = get_novel_social_pairs(all_data, exp1, exp2, mouse_type=options.mouse_type) #can use any function here that returns pairs of data
 
     pair_scores = dict() #key: animal_id, entry: a dict storing an array of scores for each trial type (i.e. homecagenovel and homecagesocial)
     pair_avg_scores = dict() #key: animal_id, entry: a dict storing the average score within a trial for each trial type (i.e. homecagenovel and homecagesocial)
@@ -343,8 +344,8 @@ def compare_start_and_end_of_epoch(all_data, options, exp1='homecagesocial', exp
             FA = loadFiberAnalyze(options, animal_id, pairs[animal_id][exp_type], exp_type)
             if(FA.load(file_type="hdf5") != -1):
 
-                start_event_times = FA.get_event_times("rising", int(options.event_spacing))
-                end_event_times = FA.get_event_times("falling", int(options.event_spacing))
+                start_event_times = FA.get_event_times("rising", float(options.event_spacing))
+                end_event_times = FA.get_event_times("falling", float(options.event_spacing))
 
                 #--Get an array of time series chunks in a window around each event time
                 reverse_window = [time_window[1], time_window[0]]
@@ -431,7 +432,7 @@ def statisticalTestOfComparison(exp_scores, exp1, exp2, test):
             return [zstatistic, pvalue]
 
 
-def plotEpochComparison(pair_scores, pair_avg_scores, exp_scores, exp1, exp2, time_window, metric):
+def plotEpochComparison(pair_scores, pair_avg_scores, exp_scores, exp1, exp2, time_window, metric, max_bout_number, pvalue, min_spacing):
 
     plt.close('all')
     plt.figure()
@@ -439,14 +440,17 @@ def plotEpochComparison(pair_scores, pair_avg_scores, exp_scores, exp1, exp2, ti
     p2, = plt.plot(exp_scores[exp2], 'o')
     plt.legend([p1, p2], [exp1, exp2])
     plt.xlabel('Mouse (one mouse per column)')
-    plt.ylabel( metric + ' w/in ' + str(time_window[1]) + 's window, avged across epochs)')
-    plt.title('Comparison of ' + metric + ' between ' + exp1 + ' and ' + exp2) 
+    if time_window == [0, 0]:
+        plt.ylabel( metric + ' w/in entire epoch, avged across epochs)')
+    else:
+        plt.ylabel( metric + ' w/in ' + str(time_window[1]) + 's window, avged across epochs)')
+    plt.title('Comparison of ' + metric + ' between ' + exp1 + ' and ' + exp2 + '. p < ' + str(pvalue)) 
 
-    plt.savefig(options.output_path + str(time_window[1]) + '_' + metric+ '.png')
+    plt.savefig(options.output_path + 'window_' + str(time_window[1]) + '_numbouts_' + str(max_bout_number) + '_minspace_' + min_spacing + '_' + metric+ '.png')
     plt.show()
 
 
-def compare_epochs(all_data, options, exp1='homecagesocial', exp2='homecagenovel', time_window=[0, 1], metric='peak', test='ttest', make_plot=True, just_first=False):
+def compare_epochs(all_data, options, exp1='homecagesocial', exp2='homecagenovel', time_window=[0, 1], metric='peak', test='ttest', make_plot=True, max_bout_number=0, plot_perievent=False):
     """
     Compares the fluorescence during epochs for each mouse undergoing two behavioral experiments (exp1 and exp2).
     Fluorescence can be quantified (or, scored) using metrics such as 'peak' (maximum fluorescence value during epoch) or 'area' 
@@ -456,12 +460,14 @@ def compare_epochs(all_data, options, exp1='homecagesocial', exp2='homecagenovel
     Using a statistical test, determines whether there is a significant difference in the average
     score between behavioral conditions across all mice.
 
+    Put time_window = [0, 0] to use the full length of each epoch as opposed to a fixed window.
+
     Returns: 1) a dict (keys: animal_id, entries: dict (keys: exp_type, entries: array with score for each epoch in trial))
             2) a dict (keys: animal_id, entries: dict (keys: exp_type, entries: average score across all epochs))
 
     """
 
-    pairs = get_novel_social_pairs(all_data, exp1, exp2) #can use any function here that returns pairs of data
+    pairs = get_novel_social_pairs(all_data, exp1, exp2, mouse_type=options.mouse_type) #can use any function here that returns pairs of data
 
     pair_scores = dict() #key: animal_id, entry: a dict storing an array of scores for each trial type (i.e. homecagenovel and homecagesocial)
     pair_avg_scores = dict() #key: animal_id, entry: a dict storing the average score within a trial for each trial type (i.e. homecagenovel and homecagesocial)
@@ -473,27 +479,46 @@ def compare_epochs(all_data, options, exp1='homecagesocial', exp2='homecagenovel
             FA = loadFiberAnalyze(options, animal_id, pairs[animal_id][exp_type], exp_type)
             if(FA.load(file_type="hdf5") != -1):
 
-                start_event_times = FA.get_event_times("rising", int(options.event_spacing))
-                end_event_times = FA.get_event_times("falling", int(options.event_spacing))
+                start_event_times = FA.get_event_times("rising", float(options.event_spacing))
+                end_event_times = FA.get_event_times("falling", float(options.event_spacing))
 
-                ###if metric == 'peak':
-                    ### should you look for the peak in the whole epoch or just in a time window??
-                    ### if so, use FA.get_peak, just loop through the array of start_event_times
                 #--Get an array of time series chunks in a window around each event time
-                start_time_arr = np.asarray( FA.get_time_chunks_around_events(FA.fluor_data, start_event_times, time_window, baseline_window=-1 ) )
+                if time_window == [0, 0]:
+                    start_time_arr = np.asarray( FA.get_time_chunks_around_events(FA.fluor_data, 
+                                                                                  event_times = start_event_times, window = time_window, 
+                                                                                  baseline_window=-1, end_event_times = end_event_times ) )
+                else:
+                    start_time_arr = np.asarray( FA.get_time_chunks_around_events(FA.fluor_data, 
+                                                                                  event_times = start_event_times, window = time_window, 
+                                                                                  baseline_window=-1) )
+
 
                 scores = np.array(score_of_chunks(start_time_arr, metric))
                 pair_scores[animal_id][exp_type] = scores
-                if just_first:
-                    pair_avg_scores[animal_id][exp_type] = scores[0] 
+                if max_bout_number>0:
+                    pair_avg_scores[animal_id][exp_type] = np.mean(scores[0:max_bout_number])
                 else:
                     pair_avg_scores[animal_id][exp_type] = np.mean(scores)
 
+                if(plot_perievent):
+                    fig = plt.figure()
+                    ax = fig.add_subplot(1,1,1)
+                    title = FA.subject_id + ' ' + FA.exp_date + ' ' + FA.exp_type
+                    ax.set_title(title)
+                    FA.plot_perievent_hist(start_event_times, [0, 10], out_path=options.output_path, plotit=True, subplot=ax, baseline_window=-1  )
+                    if options.output_path is None:
+                        pl.show()
+                    else:
+                        print "Saving peri-event time series..."
+                        pl.savefig(options.output_path + FA.subject_id + '_' + FA.exp_date + '_' + FA.exp_type + "_perievent_tseries.png")    
+
     exp_scores = compileAnimalScoreDictIntoArray(pair_avg_scores)
 
-    statisticalTestOfComparison(exp_scores, exp1, exp2, test)
+    print "Exp_scores ", exp_scores
+    [score, pvalue] = statisticalTestOfComparison(exp_scores, exp1, exp2, test)
 
-    plotEpochComparison(pair_scores, pair_avg_scores, exp_scores, exp1, exp2, time_window, metric)
+    print 'time_window ', time_window
+    plotEpochComparison(pair_scores, pair_avg_scores, exp_scores, exp1, exp2, time_window, metric, max_bout_number, pvalue, options.event_spacing)
 
     return [pair_scores, pair_avg_scores]
 
@@ -510,11 +535,10 @@ THIS IS NOT YET FINISHED
     bout_dict = dict()
     bout_avg_dict = dict()
     bout_count_dict = dict()
+    bout_std_err = dict()
 
     for animal_id in pair_scores.keys():
-
         for exp_type in pair_scores[animal_id].keys():
-
             if exp_type not in bout_dict.keys(): #initialize an exp_type key
                 bout_dict[exp_type] = dict()
 
@@ -526,45 +550,59 @@ THIS IS NOT YET FINISHED
                 else:
                     bout_dict[exp_type][i].append(score)
 
-    print "--Bout dict ", bout_dict
-
-
     for exp_type in bout_dict.keys():
         bout_avg_dict[exp_type] = []
         bout_count_dict[exp_type] = []
+        bout_std_err[exp_type] = []
 
         for i in bout_dict[exp_type].keys():
             bout_avg_dict[exp_type].append(np.mean(bout_dict[exp_type][i]))
             bout_count_dict[exp_type].append(len(bout_dict[exp_type][i]))
+            bout_std_err[exp_type].append(np.sqrt(np.var(np.array(bout_dict[exp_type][i]))/len(bout_dict[exp_type][i])))
 
-    print "--Bout avg dict ", bout_avg_dict
-
-    return [bout_dict, bout_avg_dict, bout_count_dict]
-
+    return [bout_dict, bout_avg_dict, bout_count_dict, bout_std_err]
 
 
+########################################################################
 
 
-def compare_decay(all_data, options, exp1='homecagesocial', exp2='homecagenovel', time_window=[0, 1], metric='peak', test='ttest', make_plot=True, just_first=False):
+def compare_decay(all_data, options, exp1='homecagesocial', 
+                  exp2='homecagenovel', time_window=[0, 1], 
+                  metric='peak', test='ttest', make_plot=True, 
+                  just_first=False, max_bout_number=0):
     """
     Using 'metric' to score the fluorescent response in each bout,
     plot the decay in the response vs. bout number
     Fit with an exponential.
     """
 
-    [pair_scores, pair_avg_scores] =  compare_epochs(all_data, options, exp1=exp1, exp2=exp2, time_window=time_window, metric=metric, test=test, make_plot=False, just_first=False)   
+    [pair_scores, pair_avg_scores] =  compare_epochs(all_data, options, exp1=exp1, exp2=exp2, 
+                                                    time_window=time_window, metric=metric, test=test, 
+                                                    make_plot=False, max_bout_number = max_bout_number)   
 
-    [bout_dict, bout_avg_dict, bout_count_dict] = get_bout_averages(pair_scores)
+    [bout_dict, bout_avg_dict, bout_count_dict, bout_std_err] = get_bout_averages(pair_scores)
 
+    if max_bout_number == 0:
+        max_bout_number = len(bout_avg_dict[bout_avg_dict.keys()[0]])
 
-    max_bout_number = 15
     colors = ['g', 'b']
 
-    plt.figure()
-    plot0, = plt.plot(bout_avg_dict[bout_avg_dict.keys()[0]][0:max_bout_number], 'o-', color=colors[0])
-    plot1, = plt.plot(bout_avg_dict[bout_avg_dict.keys()[1]][0:max_bout_number], 'o-', color=colors[1])
+    fig = plt.figure()  
+    ax = fig.add_subplot(111)
+    print "g: ", len(bout_avg_dict[bout_avg_dict.keys()[0]][0:max_bout_number])
+    print "r: ", len(range(max_bout_number))
+    print "stderr: ", len(bout_std_err[bout_avg_dict.keys()[0]][0:max_bout_number])
+
+    plot0 = ax.errorbar(np.array(range(max_bout_number)), bout_avg_dict[bout_avg_dict.keys()[0]][0:max_bout_number], 
+                            yerr=1.96*np.array(bout_std_err[bout_avg_dict.keys()[0]][0:max_bout_number]), fmt='o-')
+    plot1 = ax.errorbar(np.array(range(max_bout_number)), bout_avg_dict[bout_avg_dict.keys()[1]][0:max_bout_number], 
+                            yerr=1.96*np.array(bout_std_err[bout_avg_dict.keys()[1]][0:max_bout_number]), fmt='o-')
+    #plot0, = plt.plot(bout_avg_dict[bout_avg_dict.keys()[0]][0:max_bout_number], 'o-', color=colors[0])
+    #plot1, = plt.plot(bout_avg_dict[bout_avg_dict.keys()[1]][0:max_bout_number], 'o-', color=colors[1])
     plt.legend([plot0, plot1], bout_avg_dict.keys())
     plt.title('Average decay over time')
+    plt.savefig(options.output_path + 'decay_ ' + str(time_window[1]) + '_' + metric+ '.png')
+
 
     plt.figure()
     plot0, = plt.plot(bout_count_dict[bout_count_dict.keys()[0]][0:max_bout_number],  color=colors[0])
@@ -649,7 +687,7 @@ if __name__ == "__main__":
 ##    group_plot_time_series(all_data, options)
 ##    plot_representative_time_series(options, options.representative_time_series_specs_file)
 ##    compare_start_and_end_of_epoch(all_data, options, exp1='homecagesocial', exp2='homecagenovel', time_window=[0, .5], metric='peak', test='ttest')
-##    compare_epochs(all_data, options, exp1='homecagenovel', exp2='homecagesocial', time_window=[0, 1], metric='area', test='ttest', make_plot=True, just_first=False)
-    compare_decay(all_data, options, exp1='homecagenovel', exp2='homecagesocial', time_window=[0, 1], metric='peak', test='ttest', make_plot=True, just_first=False)
+    compare_epochs(all_data, options, exp1='homecagenovel', exp2='homecagesocial', time_window=[0, 0], metric='peak', test='wilcoxon', make_plot=True, max_bout_number=5, plot_perievent=True)
+##    compare_decay(all_data, options, exp1='homecagenovel', exp2='homecagesocial', time_window=[0, 0], metric='peak', test='ttest', make_plot=True, max_bout_number=10)
     
 #----------------------------------------------------------------------------------------   
