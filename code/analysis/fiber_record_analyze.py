@@ -306,6 +306,9 @@ class FiberAnalyze( object ):
         elif self.exp_type == 'homecagenovel':
             ymax = 0.5
             ymin = -ymax/3.0
+        elif self.exp_type == 'EPM':
+            ymax = 0.5
+            ymin = -ymax/3.0
 
         if self.fluor_normalization == 'raw':
             ymax = 10.0
@@ -629,7 +632,7 @@ class FiberAnalyze( object ):
             else:
                 event_times = self.event_start_times
                 end_times = self.event_end_times
-        elif type == "homecagenovel" or type == "homecagesocial":
+        elif type == "homecagenovel" or type == "homecagesocial" or type == 'EPM':
             event_times = self.get_event_times(edge)
         else:
             print "Experiment type not implemented. use --exp-type flag with 'sucrose', 'homecagenovel', or 'homecagesocial'."
@@ -911,7 +914,7 @@ class FiberAnalyze( object ):
             else:
                 event_times = self.event_start_times
                 end_times = self.event_end_times
-        elif type == "homecagesocial" or type == "homecagenovel":
+        elif type == "homecagesocial" or type == "homecagenovel" or type == 'EPM' :
             event_times = self.get_event_times(edge)
         else:
             print "Experiment type not implemented. use --exp-type flag with 'sucrose', 'homecagenovel', or 'homecagesocial'."
@@ -1003,7 +1006,7 @@ class FiberAnalyze( object ):
             else:
                 event_times = self.event_start_times
                 end_times = self.event_end_times
-        elif type == "homecagesocial" or type == "homecagenovel":
+        elif type == "homecagesocial" or type == "homecagenovel" or type == 'EPM':
             event_times = self.get_event_times("rising")
         else:
             print "Experiment type not implemented. use --exp-type flag with 'sucrose', 'homecagenovel', or 'homecagesocial'."
@@ -1470,7 +1473,7 @@ class FiberAnalyze( object ):
             else:
                 event_times = self.event_start_times
                 end_times = self.event_end_times
-        elif type == "homecagesocial" or type == "homecagenovel":
+        elif type == "homecagesocial" or type == "homecagenovel" or type == 'EPM':
             event_times = self.get_event_times()
         else:
             print "Experiment type not implemented. use --exp-type flag with 'sucrose', 'homecagenovel', or 'homecagesocial'."
@@ -1617,7 +1620,7 @@ class FiberAnalyze( object ):
         """
         type = self.exp_type
 
-        if type == "homecagesocial" or type == "homecagenovel":
+        if type == "homecagesocial" or type == "homecagenovel" or type == 'EPM':
             start_times = self.get_event_times("rising")
             end_times = self.get_event_times("falling")
         elif type == "sucrose":
@@ -1639,7 +1642,7 @@ class FiberAnalyze( object ):
             for i in range(len(start_times)):
                 if type == "sucrose":
                     peak = self.get_sucrose_peak(start_times[i], end_times[i])
-                elif type == "homecagesocial" or type == "homecagenovel":
+                elif type == "homecagesocial" or type == "homecagenovel" or type == 'EPM':
                     peak = self.get_peak(start_times[i], end_times[i])
                 else:
                     print "Experiment type not implemented. use --exp-type flag with 'sucrose', 'homecagenovel', or 'homecagesocial'."
@@ -1654,7 +1657,7 @@ class FiberAnalyze( object ):
             print np.max(peaks) + .3
             if type == "sucrose":
                 ax.set_ylim([0, np.max(peaks) + 0.4*np.max(peaks)])
-            elif type == "homecagesocial" or type == "homecagenovel":
+            elif type == "homecagesocial" or type == "homecagenovel" or type == 'EPM':
                 if np.max(peaks) > 0.8:
                     ax.set_ylim([0, 1.3])
                 else:
@@ -1708,7 +1711,7 @@ class FiberAnalyze( object ):
         type = self.exp_type
         if type == 'sucrose':
             start_times, end_times = self.get_sucrose_event_times()
-        elif type == 'homecagesocial' or type == 'homecagenovel':
+        elif type == 'homecagesocial' or type == 'homecagenovel' or type == 'EPM':
             start_times = self.get_event_times("rising")
             end_times = self.get_event_times("falling")
         else:
@@ -2006,7 +2009,7 @@ if __name__ == "__main__":
     parser.add_option("", "--filter-freqs", default=None, dest="filter_freqs",
                       help="Use a notch filter to remove high frequency noise. Format lowfreq:highfreq.")
     parser.add_option("", "--exp-type", dest="exp_type", default=None,
-                       help="Specify either 'homecagenovel', 'homecagesocial', or 'sucrose'.")
+                       help="Specify either 'homecagenovel', 'homecagesocial', or 'sucrose', or 'EPM'.")
     parser.add_option("", "--event-spacing", dest="event_spacing", default=0,
                        help="Specify minimum time (in seconds) between the end of one event and the beginning of the next")
     parser.add_option("", "--mouse-type", dest="mouse_type", default="GC5",
