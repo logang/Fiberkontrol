@@ -12,7 +12,11 @@ from state_space import denoise
 
 from fiber_record_analyze import FiberAnalyze
 
-def group_regression_plot(all_data, options, exp_type='homecagesocial', time_window=[-1,1] ):
+def group_regression_plot(all_data, 
+                          options, 
+                          exp_type='homecagesocial', 
+                          time_window=[-1,1],
+                          ):
 
     """
     Plot fits of regression lines on data from home cage or novel social 
@@ -36,7 +40,8 @@ def group_regression_plot(all_data, options, exp_type='homecagesocial', time_win
             #FA.load(file_type="hdf5")
 
             # get intensity and next_val values for this animal
-            peak_intensity, onset_next_vals = FA.plot_next_event_vs_intensity(intensity_measure="integrated", 
+            peak_intensity, onset_next_vals = FA.plot_next_event_vs_intensity(
+                                                                intensity_measure="integrated", 
                                                                 next_event_measure="onset", 
                                                                 window=time_window, out_path=None, 
                                                                 plotit=False)
@@ -89,12 +94,18 @@ def group_regression_plot(all_data, options, exp_type='homecagesocial', time_win
 
 #----------------------------------------------------------------------------------------
 
-def group_bout_heatmaps(all_data, options, exp_type, time_window, df_max=0.35, 
-                        event_edge="rising", baseline_window=None):
+def group_bout_heatmaps(all_data, 
+                        options, 
+                        exp_type, 
+                        time_window, 
+                        df_max=0.35, 
+                        event_edge="rising", 
+                        baseline_window=None):
     """
     Save out 'heatmaps' showing time on the x axis, bouts on the y axis, and representing signal
     intensity with color.
     """
+
     i=0 # color counter
     for animal_id in all_data.keys():
         # load data from hdf5 file by animal-date-exp_type
@@ -105,40 +116,58 @@ def group_bout_heatmaps(all_data, options, exp_type, time_window, df_max=0.35,
                 fig = pl.figure()
                 ax = fig.add_subplot(2,1,1)
                 
-                [FA, success] = loadFiberAnalyze(options, animal_id, dates, exp_type)
+                [FA, success] = loadFiberAnalyze(options, 
+                                                 animal_id, 
+                                                 dates, 
+                                                 exp_type)
+                [df_max, df_min] = FA.get_plot_ylim(exp_type, 
+                                                    FA.fluor_normalization)
 
                 if exp_type in animal[dates].keys():
+                    print "trigger_data", FA.trigger_data
+
                     if(success!=-1):
-                        event_times = FA.get_event_times(event_edge, float(options.event_spacing))
+                        event_times = FA.get_event_times(edge=event_edge, 
+                                                         nseconds=float(options.event_spacing), 
+                                                         exp_type=exp_type)
                         print "len(event_times)", len(event_times)
-                        print "baseline_window", baseline_window
-                        time_arr = np.asarray( FA.get_time_chunks_around_events(FA.fluor_data, event_times, time_window, baseline_window=baseline_window) )
+                        if len(event_times) > 0:
+                            print "baseline_window", baseline_window
+                            time_arr = np.asarray( FA.get_time_chunks_around_events(
+                                                        FA.fluor_data, 
+                                                        event_times, 
+                                                        time_window, 
+                                                        baseline_window=baseline_window) )
 
-                        # Generate a heatmap of activity by bout, with range set between the 5% quantile of
-                        # the data and the 'df_max' argument of the function
-                        from scipy.stats.mstats import mquantiles
-                        baseline = mquantiles( time_arr.flatten(), prob=[0.05])
-                        ax.imshow(time_arr, interpolation="nearest",vmin=baseline,vmax=df_max,cmap=pl.cm.afmhot, 
-                                    extent=[-time_window[0], time_window[1], 0, time_arr.shape[0]])
-                        ax.set_aspect('auto')
-                        pl.title("Animal #: "+animal_id+'   Date: '+dates)
-                        pl.ylabel('Bout Number')
-                        ax.axvline(0,color='white',linewidth=2,linestyle="--")
-                        #ax.axvline(np.abs(time_window[0])*time_arr.shape[1]/(time_window[1]-time_window[0]),color='white',linewidth=2,linestyle="--")
+                            # Generate a heatmap of activity by bout, with range set between the 5% quantile of
+                            # the data and the 'df_max' argument of the function
+                            from scipy.stats.mstats import mquantiles
+                            baseline = mquantiles( time_arr.flatten(), prob=[0.05])
+                            ax.imshow(time_arr, 
+                                      interpolation="nearest",
+                                      vmin=baseline,
+                                      vmax=df_max,
+                                      cmap=pl.cm.afmhot, 
+                                      extent=[-time_window[0], time_window[1], 0, time_arr.shape[0]])
+                            ax.set_aspect('auto')
+                            pl.title("Animal #: "+animal_id+'   Date: '+dates)
+                            pl.ylabel('Bout Number')
+                            ax.axvline(0,color='white',linewidth=2,linestyle="--")
+                            #ax.axvline(np.abs(time_window[0])*time_arr.shape[1]/(time_window[1]-time_window[0]),color='white',linewidth=2,linestyle="--")
 
-                        ax = fig.add_subplot(2,1,2)
-                        FA.plot_perievent_hist(event_times, time_window, out_path=None, plotit=True, subplot=ax )
-                        pl.ylim([0,df_max])
+                            ax = fig.add_subplot(2,1,2)
+                            FA.plot_perievent_hist(event_times, time_window, out_path=None, plotit=True, subplot=ax )
+                            pl.ylim([0,df_max])
 
-                        if options.output_path is not None:
-                            import os
-                            outdir = os.path.join(options.output_path, options.exp_type)
-                            if not os.path.isdir(outdir):
-                                os.makedirs(outdir)
-                            pl.savefig(outdir+'/'+animal_id+'_'+dates+'.png')
-                            print outdir+'/'+animal_id+'_'+dates+'.png'
-                        else:
-                            pl.show()
+                            if options.output_path is not None:
+                                import os
+                                outdir = os.path.join(options.output_path, options.exp_type)
+                                if not os.path.isdir(outdir):
+                                    os.makedirs(outdir)
+                                pl.savefig(outdir+'/'+animal_id+'_'+dates+'.png')
+                                print outdir+'/'+animal_id+'_'+dates+'.png'
+                            else:
+                                pl.show()
 
 #----------------------------------------------------------------------------------------
 
@@ -159,13 +188,18 @@ def group_bout_ci(all_data, options, exp_type, time_window,
             for exp_type in exp_types:
                 date = animal[dates]
 
-                [FA, success] = loadFiberAnalyze(options, animal_id, dates, exp_type)
+                [FA, success] = loadFiberAnalyze(options, 
+                                                 animal_id, 
+                                                 dates, 
+                                                 exp_type)
 
                 median_time_series = []
                 if exp_type in animal[dates].keys():
 #                    if(FA.load(file_type="hdf5") != -1):
                     if(success != -1):
-                        event_times = FA.get_event_times(event_edge, int(options.event_spacing))
+                        event_times = FA.get_event_times(edge=event_edge, 
+                                                         nseconds=int(options.event_spacing), 
+                                                         exp_type=exp_type)
                         print "len(event_times)", len(event_times)
                         time_arr = np.asarray( FA.get_time_chunks_around_events(FA.fluor_data, 
                                                                                 event_times, 
@@ -201,8 +235,8 @@ def group_plot_time_series(all_data, options):
     Save out time series for each trial, overlaid with 
     red lines indicating event epochs
     """
+    # load data from hdf5 file by animal-date-exp_type
     for animal_id in all_data.keys():
-        # load data from hdf5 file by animal-date-exp_type
         animal = all_data[animal_id]
         for date in animal.keys():
             if options.exp_date is None or options.exp_date == date:
@@ -425,8 +459,12 @@ def compare_start_and_end_of_epoch(all_data, options,
             [FA, success] = loadFiberAnalyze(options, animal_id, pairs[animal_id][exp_type], exp_type)
             if(success != -1):
 
-                start_event_times = FA.get_event_times("rising", float(options.event_spacing))
-                end_event_times = FA.get_event_times("falling", float(options.event_spacing))
+                start_event_times = FA.get_event_times(edge="rising", 
+                                                       nseconds=float(options.event_spacing), 
+                                                       exp_type=exp_type)
+                end_event_times = FA.get_event_times(edge="falling", 
+                                                     nseconds=float(options.event_spacing), 
+                                                     exp_type=exp_type)
 
                 #--Get an array of time series chunks in a window around each event time
                 reverse_window = [time_window[1], time_window[0]]
@@ -508,7 +546,17 @@ def statisticalTestOfComparison(exp_scores, exp1, exp2, test):
             return [zstatistic, pvalue]
 
 
-def plotEpochComparison(pair_scores, pair_avg_scores, exp_scores, exp1, exp2, time_window, metric, max_bout_number, pvalue, min_spacing):
+def plotEpochComparison(pair_scores, 
+                        pair_avg_scores, 
+                        exp_scores, 
+                        exp1, 
+                        exp2, 
+                        time_window, 
+                        metric, 
+                        max_bout_number, 
+                        pvalue, 
+                        min_spacing,
+                        ):
 
     plt.close('all')
     plt.figure()
@@ -519,10 +567,16 @@ def plotEpochComparison(pair_scores, pair_avg_scores, exp_scores, exp1, exp2, ti
     if time_window == [0, 0]:
         plt.ylabel( metric + ' w/in entire epoch, avged across epochs)')
     else:
-        plt.ylabel( metric + ' w/in ' + str(time_window[1]) + 's window, avged across epochs)')
-    plt.title('Comparison of ' + metric + ' between ' + exp1 + ' and ' + exp2 + '. p < ' + str(pvalue)) 
+        plt.ylabel( metric + ' w/in ' + 
+                    str(time_window[1]) + 's window, avged across epochs)')
+    plt.title('Comparison of ' + metric + 
+              ' between ' + exp1 + ' and ' + 
+              exp2 + '. p < ' + str(pvalue)) 
 
-    plt.savefig(options.output_path + 'window_' + str(time_window[1]) + '_numbouts_' + str(max_bout_number) + '_minspace_' + str(min_spacing) + '_' + metric+ '.png')
+    plt.savefig(options.output_path + 'window_' + 
+                str(time_window[1]) + '_numbouts_' + 
+                str(max_bout_number) + '_minspace_' + 
+                str(min_spacing) + '_' + metric+ '.png')
     plt.show()
 
 
@@ -536,16 +590,19 @@ def compare_epochs(all_data,
                    make_plot=True, 
                    max_bout_number=0, 
                    plot_perievent=False,
-                   show_plot=True):
+                   show_plot=True,
+                   ):
     """
     Compares the fluorescence during epochs for each mouse undergoing 
     two behavioral experiments (exp1 and exp2). Fluorescence can be 
     quantified (or, scored) using metrics such as 'peak' (maximum 
-    fluorescence value during epoch) or 'area'  (sum of fluorescence during epoch)
+    fluorescence value during epoch) or 'area'  
+    (sum of fluorescence during epoch)
 
-    Plots the average score for each mouse under each behavioral condition.
-    Using a statistical test, determines whether there is a significant 
-    difference in the average score between behavioral conditions across all mice.
+    Plots the average score for each mouse under each 
+    behavioral condition. Using a statistical test, determines 
+    whether there is a significant difference in the average 
+    score between behavioral conditions across all mice.
 
     In order to use the full length of each epoch as opposed to a fixed window,
     set time_window = [0, 0] 
@@ -558,32 +615,50 @@ def compare_epochs(all_data,
                                       entries: average score across all epochs))
     """
 
-    pairs = get_novel_social_pairs(all_data, exp1, exp2, mouse_type=options.mouse_type) #can use any function here that returns pairs of data
+    pairs = get_novel_social_pairs(all_data, 
+                                   exp1, 
+                                   exp2, 
+                                   mouse_type=options.mouse_type) #can use any function here that returns pairs of data
 
-    pair_scores = dict() #key: animal_id, entry: a dict storing an array of scores for each trial type (i.e. homecagenovel and homecagesocial)
-    pair_avg_scores = dict() #key: animal_id, entry: a dict storing the average score within a trial for each trial type (i.e. homecagenovel and homecagesocial)
+    pair_scores = dict() #key: animal_id, 
+                            #entry: a dict storing an array of scores for 
+                            #       each trial type (i.e. homecagenovel and homecagesocial)
+    pair_avg_scores = dict() #key: animal_id, 
+                                #entry: a dict storing the average score within a trial 
+                                #       for each trial type (i.e. homecagenovel and homecagesocial)
 
     for animal_id in pairs.keys():
         pair_scores[animal_id] = dict()
         pair_avg_scores[animal_id] = dict()
         for exp_type in pairs[animal_id].keys():
-            [FA, success] = loadFiberAnalyze(options, animal_id, pairs[animal_id][exp_type], exp_type)
-            #if(FA.load(file_type="hdf5") != -1):
+            [FA, success] = loadFiberAnalyze(options, 
+                                             animal_id, 
+                                             pairs[animal_id][exp_type], 
+                                             exp_type)
             if (success != -1):
-
-                start_event_times = FA.get_event_times("rising", float(options.event_spacing))
-                end_event_times = FA.get_event_times("falling", float(options.event_spacing))
+                start_event_times = FA.get_event_times(edge="rising", 
+                                                       nseconds=float(options.event_spacing),
+                                                       exp_type=exp_type)
+                end_event_times = FA.get_event_times(edge="falling", 
+                                                     nseconds=float(options.event_spacing),
+                                                     exp_type=exp_type)
 
                 #--Get an array of time series chunks in a window around each event time
                 if time_window == [0, 0]:
-                    start_time_arr = np.asarray( FA.get_time_chunks_around_events(FA.fluor_data, 
-                                                                                  event_times = start_event_times, window = time_window, 
-                                                                                  baseline_window=-1, end_event_times = end_event_times ) )
+                    start_time_arr = np.asarray( 
+                                        FA.get_time_chunks_around_events(
+                                            FA.fluor_data, 
+                                            event_times = start_event_times, 
+                                            window = time_window, 
+                                            baseline_window=-1, 
+                                            end_event_times = end_event_times))
                 else:
-                    start_time_arr = np.asarray( FA.get_time_chunks_around_events(FA.fluor_data, 
-                                                                                  event_times = start_event_times, window = time_window, 
-                                                                                  baseline_window=-1) )
-
+                    start_time_arr = np.asarray( 
+                                        FA.get_time_chunks_around_events(
+                                            FA.fluor_data,                              
+                                            event_times = start_event_times, 
+                                            window = time_window, 
+                                            baseline_window=-1))
 
                 scores = np.array(score_of_chunks(start_time_arr, metric))
                 pair_scores[animal_id][exp_type] = scores
@@ -597,17 +672,29 @@ def compare_epochs(all_data,
                     ax = fig.add_subplot(1,1,1)
                     title = FA.subject_id + ' ' + FA.exp_date + ' ' + FA.exp_type
                     ax.set_title(title)
-                    FA.plot_perievent_hist(start_event_times, [0, 10], out_path=options.output_path, plotit=True, subplot=ax, baseline_window=-1  )
+                    FA.plot_perievent_hist(start_event_times, 
+                                          [0, 10], 
+                                          out_path=options.output_path, 
+                                          plotit=True, 
+                                          subplot=ax, 
+                                          baseline_window=-1)
                     if options.output_path is None:
                         pl.show()
                     else:
                         print "Saving peri-event time series..."
-                        pl.savefig(options.output_path + FA.subject_id + '_' + FA.exp_date + '_' + FA.exp_type + "_perievent_tseries.png")    
+                        pl.savefig(options.output_path + 
+                                   FA.subject_id + '_' + 
+                                   FA.exp_date + '_' + 
+                                   FA.exp_type + 
+                                   "_perievent_tseries.png")    
 
     exp_scores = compileAnimalScoreDictIntoArray(pair_avg_scores)
 
     print "Exp_scores ", exp_scores
-    [score, pvalue] = statisticalTestOfComparison(exp_scores, exp1, exp2, test)
+    [score, pvalue] = statisticalTestOfComparison(exp_scores, 
+                                                  exp1, 
+                                                  exp2, 
+                                                  test)
 
     print 'time_window ', time_window
     plotEpochComparison(pair_scores, 
@@ -622,6 +709,8 @@ def compare_epochs(all_data,
                         options.event_spacing)
 
     return [pair_scores, pair_avg_scores]
+
+########################################################################
 
 def get_bout_averages(pair_scores):
     """
@@ -840,7 +929,7 @@ if __name__ == "__main__":
     # [before,after] event in seconds 
     time_window = np.array(options.time_window.split(':'), dtype='float32') 
 
-    to_plot = 'group_bout_heatmaps'
+    to_plot = 'group_plot_time_series'
 
     if to_plot == 'group_regression_plot':
         group_regression_plot(all_data, options, 

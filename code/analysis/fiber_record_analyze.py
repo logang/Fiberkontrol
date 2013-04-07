@@ -1116,16 +1116,22 @@ class FiberAnalyze( object ):
         the time at which this density returns to zero minus nseconds
         """
 
-        if self.event_spacing is not None:
+        print "event_spacing", self.event_spacing
+        print "nseconds", nseconds
+
+        if self.event_spacing is not None and self.event_spacing > 0.01:
             nseconds = self.event_spacing
 
         nindex = self.convert_seconds_to_index(nseconds)
+        print "nindex", nindex
         mask = np.ones(nindex)
 
         self.trigger_data = np.floor(2*self.trigger_data) #make sure that no licks is represented by 0
         time_vals = self.time_stamps[range(len(self.trigger_data))]
         print time_vals
         if density is None:
+            print "trigger_data", np.max(self.trigger_data)
+            print "mask", mask
             density = np.convolve(self.trigger_data, mask)
             density = density[nindex-1:] 
 
