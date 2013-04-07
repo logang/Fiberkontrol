@@ -37,9 +37,9 @@ def group_regression_plot(all_data, options, exp_type='homecagesocial', time_win
 
             # get intensity and next_val values for this animal
             peak_intensity, onset_next_vals = FA.plot_next_event_vs_intensity(intensity_measure="integrated", 
-                                                                               next_event_measure="onset", 
-                                                                               window=time_window, out_path=None, 
-                                                                               plotit=False)
+                                                                next_event_measure="onset", 
+                                                                window=time_window, out_path=None, 
+                                                                plotit=False)
 
             # fit a robust regression
             if len(onset_next_vals) > 0:
@@ -87,7 +87,10 @@ def group_regression_plot(all_data, options, exp_type='homecagesocial', time_win
 #    pl.ylabel("log length of next interaction")
     pl.show()
 
-def group_bout_heatmaps(all_data, options, exp_type, time_window, df_max=0.35, event_edge="rising", baseline_window=None):
+#----------------------------------------------------------------------------------------
+
+def group_bout_heatmaps(all_data, options, exp_type, time_window, df_max=0.35, 
+                        event_edge="rising", baseline_window=None):
     """
     Save out 'heatmaps' showing time on the x axis, bouts on the y axis, and representing signal
     intensity with color.
@@ -141,11 +144,12 @@ def group_bout_heatmaps(all_data, options, exp_type, time_window, df_max=0.35, e
                         else:
                             pl.show()
 
+#----------------------------------------------------------------------------------------
+
 def group_bout_ci(all_data, options, exp_type, time_window, 
-                       df_max=0.35, event_edge="rising"):
+                  df_max=0.35, event_edge="rising"):
     """
     Save out plots of mean or median activity with confidence intervals. 
-
     """
     i=0 # color counter
     exp_types = ['homecagesocial', 'homecagenovel']
@@ -175,6 +179,8 @@ def group_bout_ci(all_data, options, exp_type, time_window,
                         # between the 5% quantile of the data and the 'df_max' argument 
                         # of the function
                         median_time_series.append( np.median(time_arr, axis=0) )
+            1/0
+
 
             ax.plot(median_time_series)
             ax.set_aspect('auto')
@@ -191,6 +197,8 @@ def group_bout_ci(all_data, options, exp_type, time_window,
                 print outdir+'/'+animal_id+'_'+dates+'.png'
             else:
                 pl.show()
+
+#----------------------------------------------------------------------------------------
 
 def group_plot_time_series(all_data, options):
     """
@@ -219,6 +227,8 @@ def group_plot_time_series(all_data, options):
                                                   str(int(FA.time_range.split(':')[0])) +  "_" + 
                                                   str(int(FA.time_range.split(':')[1])) +"_" ) 
 
+
+#----------------------------------------------------------------------------------------
 
 def plot_representative_time_series(options, representative_time_series_specs_file):
     """
@@ -266,6 +276,7 @@ def plot_representative_time_series(options, representative_time_series_specs_fi
                                       str(int(FA.time_range.split(':')[0])) +  
                                       "_" + str(int(FA.time_range.split(':')[1])) +"_" ) 
 
+#----------------------------------------------------------------------------------------
 
 def get_novel_social_pairs(all_data, exp1, exp2, mouse_type = 'GC5'):
     """
@@ -307,7 +318,6 @@ def get_novel_social_pairs(all_data, exp1, exp2, mouse_type = 'GC5'):
 
     return pairs
 
-
 def score_of_chunks(ts_arr, metric='area'):
     """
     Given an array of time series chunks, return an array
@@ -315,7 +325,6 @@ def score_of_chunks(ts_arr, metric='area'):
 
     metric can be 'area' (area under curve) or 'peak' (peak fluorescence value)
     """
-
     scores = []
     for ts in ts_arr:
         if metric == 'area':
@@ -325,7 +334,7 @@ def score_of_chunks(ts_arr, metric='area'):
 
     return scores
 
-def  loadFiberAnalyze(options, animal_id, exp_date, exp_type):
+def loadFiberAnalyze(options, animal_id, exp_date, exp_type):
     """
     Load an instance of the fiberAnalyze class, initialized
     to an experimental trial identified by the id# of the animal,
@@ -353,10 +362,14 @@ def  loadFiberAnalyze(options, animal_id, exp_date, exp_type):
 
 def compileAnimalScoreDictIntoArray(pair_avg_scores):
     """
-    Create two matched arrays (i.e. one for novel, one for social) with the avg score for each animal
+    Create two matched arrays (i.e. one for novel, one for social) with the 
+    avg score for each animal
 
-    input: a dict (keys: animal_id, entries: dict (keys: exp_type, entries: average score across all epochs))
-    output: a dict (key: exp_type, entry: array of avg score for each animal, [avg_score_for_animal_1, avg_score_for_animal_2,...])
+    input: a dict (keys: animal_id, entries: dict (keys: exp_type, entries: 
+    average score across all epochs))
+
+    output: a dict (key: exp_type, entry: array of avg score for each animal, 
+    [avg_score_for_animal_1, avg_score_for_animal_2,...])
     """
     
     exp_scores = dict() #key: exp_type, entry: array of avg score for each animal
@@ -370,8 +383,13 @@ def compileAnimalScoreDictIntoArray(pair_avg_scores):
 
     return exp_scores
 
-def compare_start_and_end_of_epoch(all_data, options, exp1='homecagesocial', exp2='homecagenovel', time_window=[0,0.25], 
-                                    metric='area', test='ttest', plot_perievent=False, compare_before_after_end=False):
+def compare_start_and_end_of_epoch(all_data, options, 
+                                   exp1='homecagesocial', 
+                                   exp2='homecagenovel', time_window=[0,0.25], 
+                                   metric='area', 
+                                   test='ttest', 
+                                   plot_perievent=False, 
+                                   compare_before_after_end=False):
 
     """
     Calculates the difference between the fluorescence in a window at the beginning
@@ -682,9 +700,6 @@ def compare_decay(all_data, options, exp1='homecagesocial',
 
     plt.show()
 
-
-
-
 #-------------------------------------------------------------------------------------------
 
 if __name__ == "__main__":
@@ -700,7 +715,7 @@ if __name__ == "__main__":
                       help=("Specify path to files with trigger times, minus the '_s.npz' "
                             "and '_e.npz' suffixes."))
 
-    parser.add_option("-i", "--input-path", dest="input_path",
+    parser.add_option("-i", "--input-path", dest="input_path", default=None,
                       help="Specify the input path.")
 
     parser.add_option("", "--time-range", dest="time_range",default=None,
@@ -755,27 +770,29 @@ if __name__ == "__main__":
     parser.add_option("", "--exp-date", dest="exp_date", default=None,
                        help="Limit group analysis to trials of a specific date ")
 
-
     parser.add_option("", "--representative-time-series-specs-file", 
                       dest="representative_time_series_specs_file", 
                       default='representative_time_series_specs.txt',
                       help=("Specify file of representative trials to plot. File in format: "
                             "animal# date start_in_secs end_in_secs exp_type smoothness"))
-
     
     (options, args) = parser.parse_args()
 
     # --- Plot data --- #
 
-#    all_data = h5py.File("/Users/logang/Documents/Results/FiberRecording/Cell/all_data_raw.h5",'r')
     all_data = h5py.File(options.input_path,'r')
 
-    time_window = np.array(options.time_window.split(':'), dtype='float32') # [before,after] event in seconds 
+    # [before,after] event in seconds 
+    time_window = np.array(options.time_window.split(':'), dtype='float32') 
+
 #    group_regression_plot(all_data, options, exp_type=exp_type, time_window=time_window)
 #    group_bout_heatmaps(all_data, options, exp_type=options.exp_type, time_window=time_window)
+##    group_bout_heatmaps(all_data, options, time_window=time_window)
+    group_bout_ci(all_data, options, time_window=time_window)
 ##    group_plot_time_series(all_data, options)
 ##    plot_representative_time_series(options, options.representative_time_series_specs_file)
 ##    compare_start_and_end_of_epoch(all_data, options, exp1='homecagesocial', exp2='homecagenovel', time_window=[0, .5], metric='peak', test='ttest')
-##    compare_epochs(all_data, options, exp1='homecagenovel', exp2='homecagesocial', time_window=[0, 0], metric='area', test='wilcoxon', make_plot=True, max_bout_number=5, plot_perievent=True)
-    compare_decay(all_data, options, exp1='homecagenovel', exp2='homecagesocial', time_window=[0, 0], metric='peak', test='wilcoxon', make_plot=True, max_bout_number=10)
-#----------------------------------------------------------------------------------------   
+#    compare_epochs(all_data, options, exp1='homecagenovel', exp2='homecagesocial', time_window=[0, 0], metric='peak', test='wilcoxon', make_plot=True, max_bout_number=5, plot_perievent=True)
+##    compare_decay(all_data, options, exp1='homecagenovel', exp2='homecagesocial', time_window=[0, 0], metric='peak', test='ttest', make_plot=True, max_bout_number=10)
+
+# EOF
