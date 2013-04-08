@@ -12,6 +12,47 @@ from state_space import denoise
 
 from fiber_record_analyze import FiberAnalyze
 
+
+def group_iter_list(all_data, options):
+    """
+    Returns a list where each
+    entry is an array containing
+    [animal_id, date, exp_type].
+    Only includes experiments that 
+    match options.exp_date,
+    options.exp_type, and
+    options.mouse_type
+
+    One can then iterate over this list
+    to analyze a group of mice
+    """
+
+    iter_list = []
+    animal_id_list = []
+    date_list = []
+    exp_type_list = []
+
+    for animal_id in all_data.keys():
+        animal = all_data[animal_id]
+        if animal.attrs['mouse_type'] == mouse_type:
+            for date in animal.keys():
+                if options.exp_date is None or options.exp_date == date:
+                    for exp_type in animal[date].keys():
+                        if options.exp_type is None or exp_type == options.exp_type:
+
+                            iter_list.append([animal_id, date, exp_type])
+                            if animal_id not in animal_id_list:
+                                animal_id_list.append(animal_id)
+                            if date not in date_list:
+                                date_list.append(date)
+                            if exp_type not in exp_type_list:
+                                exp_type_list.append(exp_type)
+
+
+    return [iter_list, animal_id_list, date_list, exp_type_list]
+
+
+
 def group_regression_plot(all_data, 
                           options, 
                           exp_type='homecagesocial', 
@@ -766,9 +807,16 @@ def get_bout_averages(pair_scores):
 ########################################################################
 
 
-def plot_decay(bout_dict, bout_avg_dict, bout_count_dict, bout_std_err,
-                time_window=[0,1], metric='peak', 
-               output_path=None, max_bout_number=0, show_plot=False):
+def plot_decay(bout_dict, 
+               bout_avg_dict, 
+               bout_count_dict, 
+               bout_std_err,
+               time_window=[0,1], 
+               metric='peak', 
+               output_path=None, 
+               max_bout_number=0, 
+               show_plot=False,
+               ):
 
     """
     Plot the change in fluorescence vs. bout number 
@@ -799,11 +847,14 @@ def plot_decay(bout_dict, bout_avg_dict, bout_count_dict, bout_std_err,
                             fmt='o-')
     plt.legend([plot0, plot1], bout_avg_dict.keys())
     plt.title('Average decay over time')
-    plt.savefig(options.output_path + 'decay_ ' + str(time_window[1]) + '_' + metric+ '.png')
+    plt.savefig(options.output_path + 'decay_ ' + 
+                str(time_window[1]) + '_' + metric+ '.png')
 
     plt.figure()
-    plot0, = plt.plot(bout_count_dict[bout_count_dict.keys()[0]][0:max_bout_number],  color=colors[0])
-    plot1, = plt.plot(bout_count_dict[bout_count_dict.keys()[1]][0:max_bout_number],  color=colors[1])
+    plot0, = plt.plot(bout_count_dict[bout_count_dict.keys()[0]][0:max_bout_number],  
+                        color=colors[0])
+    plot1, = plt.plot(bout_count_dict[bout_count_dict.keys()[1]][0:max_bout_number],  
+                        color=colors[1])
     plt.legend([plot0, plot1], bout_count_dict.keys())
     plt.title('Counts of bout number')
 
