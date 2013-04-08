@@ -1,4 +1,37 @@
 animal#		date		start	end	exp_type	smoothness		
+408		20130327	0	-1	homecagesocial	0
+408		20130327	100	400	homecagesocial	0
+408		20130327	100	170	homecagesocial	0
+408		20130327	0	-1	homecagenovel	0
+408		20130327	100	400	homecagenovel	0
+408		20130327	100	170	homecagenovel	0
+
+
+410		20130327	0	-1	homecagesocial	0
+410		20130327	100	400	homecagesocial	0
+410		20130327	100	170	homecagesocial	0
+410		20130327	0	-1	homecagenovel	0
+410		20130327	150	450	homecagenovel	0
+410		20130327	150	220	homecagenovel	0
+
+
+
+718		20121105	0	-1	homecagenovel	0
+718		20121105	0	-1	homecagesocial	0
+718		20121105	100	400	homecagesocial	0
+718		20121105	150	450	homecagenovel	0
+718		20121105	270	340	homecagenovel	0
+718		20121105	105	175	homecagesocial	0
+
+
+660		20121105	0	-1	homecagenovel	0
+660		20121105	0	-1	homecagesocial	0
+
+660		20121105	70	370	homecagesocial	0
+660		20121105	100	400	homecagenovel	0
+660		20121105	100	170	homecagesocial	0
+660		20121105	110	180	homecagenovel	0
+
 421		20121008	1090	1160	sucrose		0 
 421		20121008	0	-1	sucrose		0 
 421		20121008	1000	1400	sucrose		0 
@@ -31,9 +64,6 @@ animal#		date		start	end	exp_type	smoothness
 
 8381		20121008	600	900	sucrose		0
 8381		20121008	0	-1	sucrose		0
-
-660		20121105	0	-1	homecagenovel	0
-660		20121105	0	-1	homecagesocial	0
 
 2227		20130108	0	-1	homecagenovel	0	
 2227		20130108	0	-1	homecagesocial	0	

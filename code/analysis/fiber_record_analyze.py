@@ -259,13 +259,13 @@ class FiberAnalyze( object ):
             ymax = 3.0
             ymin = -1
         elif exp_type == 'homecagesocial':
-            ymax = 0.5
+            ymax = 1.0
             ymin = -ymax/3.0
         elif exp_type == 'homecagenovel':
-            ymax = 0.5
+            ymax = 1.0
             ymin = -ymax/3.0
         elif exp_type == 'EPM':
-            ymax = 0.5
+            ymax = 1.0
             ymin = -ymax/3.0
 
         if fluor_normalization == 'raw':
@@ -764,7 +764,7 @@ class FiberAnalyze( object ):
         window_indices = [self.convert_seconds_to_index( window[0]),
                           self.convert_seconds_to_index( window[1])]
 
-        if baseline_window is not None and baseline_window != -1:
+        if baseline_window is not None and isinstance(baseline_window, int) and baseline_window != -1:
             baseline_indices = [self.convert_seconds_to_index( baseline_window[0]),
                                 self.convert_seconds_to_index( baseline_window[1])]
 
@@ -782,13 +782,16 @@ class FiberAnalyze( object ):
             e_idx = np.where(e<self.time_stamps)[0][0]
             if (e_idx + window_indices[1] < len(data)-1) and (e_idx - window_indices[0] > 0):
                 chunk = data[range(max(0, (e_idx-window_indices[0])),min(len(data)-1, (e_idx+window_indices[1])))]
-                if baseline_window is not None and baseline_window != -1:
+                if baseline_window is not None and isinstance(baseline_window, int) and baseline_window != -1:
                     baseline_chunk = data[range(max(0, (e_idx-window_indices[0])), min(len(data)-1, (e_idx+window_indices[1])))]
                     baseline = np.min(baseline_chunk)
-                elif baseline_window == -1:
+                elif isinstance(baseline_window, int) and baseline_window == -1:
                     baseline = 0
                 else:
-                    baseline = np.min(chunk)
+                    n = 10
+                    smooth_chunk = np.convolve(chunk, np.ones(n)*1.0/n, mode='same')
+                    #baseline = np.min(chunk)
+                    baseline = np.min(smooth_chunk)
 
 
 
@@ -1892,11 +1895,6 @@ class FiberAnalyze( object ):
         pl.xlim(1000.0,0.01)
 
         pl.show()
-
-
-
-
-
 
 
 

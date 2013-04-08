@@ -25,6 +25,8 @@ def group_iter_list(all_data, options):
 
     One can then iterate over this list
     to analyze a group of mice
+
+    TODO: This has not yet been incorporated into the rest of the code
     """
 
     iter_list = []
@@ -77,7 +79,8 @@ def group_regression_plot(all_data,
         for dates in animal.keys():
             date = animal[dates]
 
-            FA = loadFiberAnalyze(options, animal_id, dates, exp_type)
+            FA = FiberAnalyze(options)
+            [FA, success] = loadFiberAnalyze(FA, options, animal_id, dates, exp_type)
             #FA.load(file_type="hdf5")
 
             # get intensity and next_val values for this animal
@@ -157,7 +160,9 @@ def group_bout_heatmaps(all_data,
                 fig = pl.figure()
                 ax = fig.add_subplot(2,1,1)
                 
-                [FA, success] = loadFiberAnalyze(options, 
+                FA = FiberAnalyze(options)
+                [FA, success] = loadFiberAnalyze(FA,
+                                                 options, 
                                                  animal_id, 
                                                  dates, 
                                                  exp_type)
@@ -205,8 +210,8 @@ def group_bout_heatmaps(all_data,
                                 outdir = os.path.join(options.output_path, options.exp_type)
                                 if not os.path.isdir(outdir):
                                     os.makedirs(outdir)
-                                pl.savefig(outdir+'/'+animal_id+'_'+dates+'.png')
-                                print outdir+'/'+animal_id+'_'+dates+'.png'
+                                pl.savefig(outdir+'/'+animal_id+'_'+dates+options.plot_format)
+                                print outdir+'/'+animal_id+'_'+dates+options.plot_format
                             else:
                                 pl.show()
 
@@ -229,7 +234,9 @@ def group_bout_ci(all_data, options, exp_type, time_window,
             for exp_type in exp_types:
                 date = animal[dates]
 
-                [FA, success] = loadFiberAnalyze(options, 
+                FA = FiberAnalyze(options)
+                [FA, success] = loadFiberAnalyze(FA,
+                                                 options, 
                                                  animal_id, 
                                                  dates, 
                                                  exp_type)
@@ -264,8 +271,8 @@ def group_bout_ci(all_data, options, exp_type, time_window,
                 outdir = options.output_path
                 if not os.path.isdir(outdir):
                     os.makedirs(outdir)
-                pl.savefig(outdir+'/'+animal_id+'_'+dates+'.png')
-                print outdir+'/'+animal_id+'_'+dates+'.png'
+                pl.savefig(outdir+'/'+animal_id+'_'+dates+options.plot_format)
+                print outdir+'/'+animal_id+'_'+dates+options.plot_format
             else:
                 pl.show()
 
@@ -283,10 +290,11 @@ def group_plot_time_series(all_data, options):
             if options.exp_date is None or options.exp_date == date:
                 for exp_type in animal[date].keys():
                     if options.exp_type is None or exp_type == options.exp_type:
-
-                        [FA, success] = loadFiberAnalyze(options, animal_id, date, exp_type)
+                        FA = FiberAnalyze(options)
                         FA.fluor_normalization = 'deltaF'
                         FA.time_range = '0:-1'
+                        [FA, success] = loadFiberAnalyze(FA, options, animal_id, date, exp_type)
+
                         if (success != -1):
                             dir = options.output_path + '/' + FA.exp_type
                             print dir
@@ -326,11 +334,13 @@ def plot_representative_time_series(options, representative_time_series_specs_fi
             exp_type = specs[4]
             smoothness = specs[5]
 
-            [FA, success] = loadFiberAnalyze(options, animal_id, date, exp_type)
-
+            FA = FiberAnalyze(options)
             FA.smoothness = int(smoothness)
             FA.time_range = str(start) + ':' + str(end)
             FA.fluor_normalization = 'deltaF'
+            [FA, success] = loadFiberAnalyze(FA, options, animal_id, date, exp_type)
+
+
 
            # print "Test Keys: ", all_data[str(421)][str(20121008)][FA.exp_type].keys()
 
@@ -402,7 +412,7 @@ def score_of_chunks(ts_arr, metric='area'):
 
     return scores
 
-def loadFiberAnalyze(options, animal_id, exp_date, exp_type):
+def loadFiberAnalyze(FA, options, animal_id, exp_date, exp_type):
     """
     Load an instance of the fiberAnalyze class, initialized
     to an experimental trial identified by the id# of the animal,
@@ -410,7 +420,6 @@ def loadFiberAnalyze(options, animal_id, exp_date, exp_type):
         homecagesocial or homecagenovel)
     """
 
-    FA = FiberAnalyze( options )
     FA.subject_id = str(animal_id)
     FA.exp_date = str(exp_date)
     FA.exp_type = str(exp_type)
@@ -438,7 +447,9 @@ def compileAnimalScoreDictIntoArray(pair_avg_scores):
     """
     
     exp_scores = dict() #key: exp_type, entry: array of avg score for each animal
+    animal_list = []
     for animal_id in pair_avg_scores.keys():
+        animal_list.append(animal_id)
         for exp_type in pair_avg_scores[animal_id].keys():
             print animal_id, exp_type
             if exp_type in exp_scores.keys():
@@ -446,9 +457,17 @@ def compileAnimalScoreDictIntoArray(pair_avg_scores):
             else:
                 exp_scores[exp_type] = [pair_avg_scores[animal_id][exp_type]]
 
-    return exp_scores
+    return [exp_scores, animal_list]
 
-def plot_compare_start_and_end(exp_scores, exp1, exp2, compare_before_after_end, time_window, metric, output_path):
+def plot_compare_start_and_end(options,
+                               exp_scores, 
+                               exp1, 
+                               exp2, 
+                               compare_before_after_end, 
+                               time_window, 
+                               metric, 
+                               output_path,
+                               ):
     
     plt.figure()
     p1, = plt.plot(exp_scores[exp1], 'o')
@@ -456,15 +475,19 @@ def plot_compare_start_and_end(exp_scores, exp1, exp2, compare_before_after_end,
     plt.legend([p1, p2], [exp1, exp2])
     plt.xlabel('Mouse (one mouse per column)')
     if compare_before_after_end:
-        plt.ylabel( 'After End - Before End (' + metric +' w/in ' + str(time_window[1]) + 's window, avged across epochs)')
+        plt.ylabel( 'After End - Before End (' + metric +' w/in ' + 
+                     str(time_window[1]) + 's window, avged across epochs)')
     else:
-        plt.ylabel( 'End - Start (' + metric +' w/in ' + str(time_window[1]) + 's window, avged across epochs)')
+        plt.ylabel( 'End - Start (' + metric +' w/in ' + str(time_window[1]) + 
+                    's window, avged across epochs)')
 
     plt.title('More fluorescence after end than after start of interaction with novel object ')
     if compare_before_after_end:
-        pl.savefig(output_path + str(time_window[1]) + '_' + metric+ '_after_minus_before_end.png')
+        pl.savefig(output_path + str(time_window[1]) + '_' + metric+ 
+                    '_after_minus_before_end'+options.plot_format)
     else:
-        pl.savefig(output_path + str(time_window[1]) + '_' + metric+ '_end_minus_start.png')
+        pl.savefig(output_path + str(time_window[1]) + '_' + metric+ 
+                    '_end_minus_start'+options.plot_format)
 
 
 def compare_start_and_end_of_epoch(all_data, options, 
@@ -497,7 +520,8 @@ def compare_start_and_end_of_epoch(all_data, options,
         pair_scores[animal_id] = dict()
         pair_avg_scores[animal_id] = dict()
         for exp_type in pairs[animal_id].keys():
-            [FA, success] = loadFiberAnalyze(options, animal_id, pairs[animal_id][exp_type], exp_type)
+            FA = FiberAnalyze(options)
+            [FA, success] = loadFiberAnalyze(FA, options, animal_id, pairs[animal_id][exp_type], exp_type)
             if(success != -1):
 
                 start_event_times = FA.get_event_times(edge="rising", 
@@ -551,21 +575,25 @@ def compare_start_and_end_of_epoch(all_data, options,
                     else:
                         print "Saving peri-event time series..."
                         pl.savefig(options.output_path + FA.subject_id + '_' + FA.exp_date + 
-                                   '_' + FA.exp_type + "_perievent_tseries.png")
+                                   '_' + FA.exp_type + "_perievent_tseries"+options.plot_format)
+                        pl.savefig(options.output_path + FA.subject_id + '_' + FA.exp_date + 
+                                   '_' + FA.exp_type + "_perievent_tseries"+options.plot_format)
 
 
-    exp_scores = compileAnimalScoreDictIntoArray(pair_avg_scores)
+    [exp_scores, animal_list] = compileAnimalScoreDictIntoArray(pair_avg_scores)
     statisticalTestOfComparison(exp_scores, exp1, exp2, test)
     print "Exp_scores", exp_scores
 
     plt.close('all')
-    plot_compare_start_and_end(exp_scores, 
+    plot_compare_start_and_end(options=options,
+                               exp_scores=exp_scores, 
                                exp1=exp1, 
                                exp2=exp2, 
                                compare_before_after_end=compare_before_after_end, 
                                time_window=time_window, 
                                metric=metric, 
-                               output_path=options.output_path)
+                               output_path=options.output_path,
+                                )
     if show_plot:
         plt.show()
 
@@ -597,6 +625,7 @@ def plotEpochComparison(pair_scores,
                         max_bout_number, 
                         pvalue, 
                         min_spacing,
+                        animal_list,
                         ):
 
     plt.close('all')
@@ -614,10 +643,23 @@ def plotEpochComparison(pair_scores,
               ' between ' + exp1 + ' and ' + 
               exp2 + '. p < ' + str(pvalue)) 
 
-    plt.savefig(options.output_path + 'window_' + 
-                str(time_window[1]) + '_numbouts_' + 
-                str(max_bout_number) + '_minspace_' + 
-                str(min_spacing) + '_' + metric+ '.png')
+    print "window_" + str(time_window[1]) + "_numbouts_" + str(max_bout_number) + "_minspace_" + str(min_spacing) + "_" + metric
+    print exp1, ": ", exp_scores[exp1]
+    print exp2, ": ", exp_scores[exp2]
+
+    filename = options.output_path + 'window_' + \
+                str(time_window[1]) + '_numbouts_' + \
+                str(max_bout_number) + '_minspace_' + \
+                str(min_spacing).replace(".", "-") + '_' + metric
+    f = open(filename+'.txt', 'w')
+    f.write(str(exp1) + '\n')
+    f.write(str(exp_scores[exp1]) + '\n')
+    f.write(str(exp2) + '\n')
+    f.write(str(exp_scores[exp2]) + '\n')
+    f.write("animal ordering: " + str(animal_list))
+    f.close()
+
+    plt.savefig(filename+ options.plot_format)
     plt.show()
 
 
@@ -672,7 +714,9 @@ def compare_epochs(all_data,
         pair_scores[animal_id] = dict()
         pair_avg_scores[animal_id] = dict()
         for exp_type in pairs[animal_id].keys():
-            [FA, success] = loadFiberAnalyze(options, 
+            FA = FiberAnalyze(options)
+            [FA, success] = loadFiberAnalyze(FA,
+                                             options, 
                                              animal_id, 
                                              pairs[animal_id][exp_type], 
                                              exp_type)
@@ -727,9 +771,9 @@ def compare_epochs(all_data,
                                    FA.subject_id + '_' + 
                                    FA.exp_date + '_' + 
                                    FA.exp_type + 
-                                   "_perievent_tseries.png")    
+                                   "_perievent_tseries"+options.plot_format)    
 
-    exp_scores = compileAnimalScoreDictIntoArray(pair_avg_scores)
+    [exp_scores, animal_list] = compileAnimalScoreDictIntoArray(pair_avg_scores)
 
     print "Exp_scores ", exp_scores
     [score, pvalue] = statisticalTestOfComparison(exp_scores, 
@@ -747,7 +791,8 @@ def compare_epochs(all_data,
                         metric, 
                         max_bout_number, 
                         pvalue, 
-                        options.event_spacing)
+                        options.event_spacing,
+                        animal_list)
 
     return [pair_scores, pair_avg_scores]
 
@@ -807,7 +852,8 @@ def get_bout_averages(pair_scores):
 ########################################################################
 
 
-def plot_decay(bout_dict, 
+def plot_decay(options,
+               bout_dict, 
                bout_avg_dict, 
                bout_count_dict, 
                bout_std_err,
@@ -815,6 +861,7 @@ def plot_decay(bout_dict,
                metric='peak', 
                output_path=None, 
                max_bout_number=0, 
+               min_spacing=0,
                show_plot=False,
                ):
 
@@ -847,8 +894,10 @@ def plot_decay(bout_dict,
                             fmt='o-')
     plt.legend([plot0, plot1], bout_avg_dict.keys())
     plt.title('Average decay over time')
-    plt.savefig(options.output_path + 'decay_ ' + 
-                str(time_window[1]) + '_' + metric+ '.png')
+    plt.xlabel('Bout number')
+    plt.ylabel('Average ' + metric + ' per bout [dF/F]')
+    plt.savefig(options.output_path + 'decay_window_' + 
+                str(time_window[1]) + '_minspace_' + str(min_spacing) + '_' + metric+ options.plot_format)
 
     plt.figure()
     plot0, = plt.plot(bout_count_dict[bout_count_dict.keys()[0]][0:max_bout_number],  
@@ -891,12 +940,18 @@ def compare_decay(all_data, options, exp1='homecagesocial',
 
     [bout_dict, bout_avg_dict, bout_count_dict, bout_std_err] = get_bout_averages(pair_scores)
 
-    plot_decay(bout_dict, bout_avg_dict, bout_count_dict, bout_std_err,
+    plot_decay(options=options,
+               bout_dict=bout_dict, 
+               bout_avg_dict=bout_avg_dict, 
+               bout_count_dict=bout_count_dict, 
+               bout_std_err=bout_std_err,
                time_window=time_window, 
                metric=metric, 
                output_path=options.output_path, 
                max_bout_number=max_bout_number,
-               show_plot=True)
+               min_spacing=options.event_spacing,
+               show_plot=True,
+               )
 
 
 #-------------------------------------------------------------------------------------------
@@ -970,6 +1025,9 @@ if __name__ == "__main__":
                       default='representative_time_series_specs.txt',
                       help=("Specify file of representative trials to plot. File in format: "
                             "animal# date start_in_secs end_in_secs exp_type smoothness"))
+
+    parser.add_option("", "--plot-format", dest="plot_format", default='.png',
+                      help="Image format for saving plots: '.png', '.pdf', '.svg', '.tiff'")
     
     (options, args) = parser.parse_args()
 
@@ -980,11 +1038,11 @@ if __name__ == "__main__":
     # [before,after] event in seconds 
     time_window = np.array(options.time_window.split(':'), dtype='float32') 
 
-    to_plot = 'group_plot_time_series'
+    to_plot = 'plot_representative_time_series'
 
     if to_plot == 'group_regression_plot':
         group_regression_plot(all_data, options, 
-                              exp_type=exp_type, time_window=time_window)
+                              exp_type=options.exp_type, time_window=time_window)
     elif to_plot == 'group_bout_heatmaps':
         group_bout_heatmaps(all_data, options, 
                             exp_type=options.exp_type, time_window=time_window)
@@ -1003,11 +1061,11 @@ if __name__ == "__main__":
         compare_epochs(all_data, options, 
                        exp1='homecagenovel', exp2='homecagesocial', 
                        time_window=[0, 0], metric='peak', test='wilcoxon', 
-                       make_plot=True, max_bout_number=5, plot_perievent=True)
+                       make_plot=True, max_bout_number=10, plot_perievent=False)
     elif to_plot == 'compare_decay':
         compare_decay(all_data, options, 
                       exp1='homecagenovel', exp2='homecagesocial', 
-                      time_window=[0, 0], metric='peak', test='wilcoxon', 
-                      make_plot=True, max_bout_number=10)
+                      time_window=[0, 0], metric='area', test='wilcoxon', 
+                      make_plot=True, max_bout_number=15)
 
 # EOF
