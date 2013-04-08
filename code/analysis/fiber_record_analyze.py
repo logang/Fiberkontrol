@@ -202,7 +202,6 @@ class FiberAnalyze( object ):
 
         print "--> Trigger data loaded"
 
-
     def normalize_fluorescence_data(self):
         """
         Normalize data to either 'deltaF', the standard metric used
@@ -228,7 +227,6 @@ class FiberAnalyze( object ):
             pass
         else:
             raise ValueError( self.fluor_normalization, "is not a valid entry for --fluor-normalization.")
-
 
 
     def load_event_data( self, s_filename, e_filename ):
@@ -292,7 +290,6 @@ class FiberAnalyze( object ):
         trigger_high_locations = [time_vals[i] for i in range(len(trigger_data)) if trigger_data[i] > trigger_low]
         # Be careful whether event is recorded by trigger high or trigger low (i.e. > or < trigger_low)
 
-
         # make filled blocks for trigger onset/offset
         #ymax = 1.1*np.max(fluor_data)
         #ymin = 1.1*np.min(fluor_data)
@@ -313,7 +310,6 @@ class FiberAnalyze( object ):
         if self.fluor_normalization == 'raw':
             ymax = 10.0
             ymin = -1.0
-
 
 #        pl.fill( time_vals[::2], 10*trigger_data[::2] - 2, color='r', alpha=0.3 )
 #        pl.fill( time_vals[::2], trigger_data[::2], color='r', alpha=0.3 )

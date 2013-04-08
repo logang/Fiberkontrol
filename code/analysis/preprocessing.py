@@ -97,7 +97,6 @@ def debleach_files(analysis_filenames):
         # instead of after the command has finished running
         os.system(cmd) 
 
-
     print "Now make a folder Flat/ for each day of trials, and place in this folder "
     print "the 'flat' time series for a each trial. Determine which is the 'flat' "
     print "time series by using the plots comparing original and debleached "
@@ -125,7 +124,6 @@ def add_flattened_files_to_hdf5(flat_directories, out_path):
         #result = run_command_wrapper(cmd)
         #print result
         os.system(cmd)
-
 
 def read_filenames(filenames_file, path_to_filenames=None):
     """
@@ -202,7 +200,9 @@ if __name__ == '__main__':
         print 'You must supply at a path to the NPZ files to be analyzed.'
         sys.exit(1)
 
-    analysis_filenames = read_filenames(options.analysis_filenames_file, args[0])
+    path_to_npz_data = args[0]
+
+    analysis_filenames = read_filenames(options.analysis_filenames_file, path_to_npz_data)
     experiment_dates = read_filenames(options.experiment_dates_file)
     print "This file contains a list of files to be used for batch processing."
     print "The list contains:"
@@ -215,7 +215,7 @@ if __name__ == '__main__':
             os.makedirs(out_path)
             print "Created output directory:", out_path
     else:
-        out_path = options.output_path # path to HDF5 output file
+        out_path = options.out_path # path to HDF5 output file
 
     if options.generate_hdf5:
         try:
@@ -226,7 +226,7 @@ if __name__ == '__main__':
         generate_hdf5_file(analysis_filenames, out_path)
 
     if options.add_flattened_files:
-        flat_directories = get_flat_directories(experiment_dates, options.path_to_npz_data)
+        flat_directories = get_flat_directories(experiment_dates, path_to_npz_data)
         add_flattened_files_to_hdf5(flat_directories, out_path)
     
     if options.save_debleach:

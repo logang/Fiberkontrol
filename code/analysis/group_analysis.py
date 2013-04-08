@@ -27,13 +27,13 @@ def group_regression_plot(all_data, options, exp_type='homecagesocial', time_win
 
     i=0 # color counter
     for animal_id in all_data.keys():
+
         # load data from hdf5 file by animal-date-exp_type
         animal = all_data[animal_id]
         for dates in animal.keys():
             date = animal[dates]
 
             FA = loadFiberAnalyze(options, animal_id, dates, exp_type)
-            #FA.load(file_type="hdf5")
 
             # get intensity and next_val values for this animal
             peak_intensity, onset_next_vals = FA.plot_next_event_vs_intensity(intensity_measure="integrated", 
@@ -87,13 +87,13 @@ def group_regression_plot(all_data, options, exp_type='homecagesocial', time_win
 #    pl.ylabel("log length of next interaction")
     pl.show()
 
-#----------------------------------------------------------------------------------------
+#------------------------------------------------------------------------------
 
 def group_bout_heatmaps(all_data, options, exp_type, time_window, df_max=0.35, 
                         event_edge="rising", baseline_window=None):
     """
-    Save out 'heatmaps' showing time on the x axis, bouts on the y axis, and representing signal
-    intensity with color.
+    Save out 'heatmaps' showing time on the x axis, bouts on the y axis, and 
+    representing signal intensity with color.
     """
     i=0 # color counter
     for animal_id in all_data.keys():
@@ -116,14 +116,19 @@ def group_bout_heatmaps(all_data, options, exp_type, time_window, df_max=0.35,
                         event_times = FA.get_event_times(event_edge, float(options.event_spacing))
                         print "len(event_times)", len(event_times)
                         print "baseline_window", baseline_window
-                        time_arr = np.asarray( FA.get_time_chunks_around_events(FA.fluor_data, event_times, time_window, baseline_window=baseline_window) )
+                        time_arr = np.asarray(FA.get_time_chunks_around_events(FA.fluor_data, 
+                                                                               event_times, 
+                                                                               time_window, 
+                                                                               baseline_window=baseline_window))
 
-                        # Generate a heatmap of activity by bout, with range set between the 5% quantile of
-                        # the data and the 'df_max' argument of the function
+                        # Generate a heatmap of activity by bout, with range set 
+                        # between the 5% quantile of the data and the 'df_max' 
+                        # argument of the function
                         from scipy.stats.mstats import mquantiles
                         baseline = mquantiles( time_arr.flatten(), prob=[0.05])
-                        ax.imshow(time_arr, interpolation="nearest",vmin=baseline,vmax=df_max,cmap=pl.cm.afmhot, 
-                                    extent=[-time_window[0], time_window[1], 0, time_arr.shape[0]])
+                        ax.imshow(time_arr, interpolation="nearest",vmin=baseline,
+                                  vmax=df_max,cmap=pl.cm.afmhot, 
+                                  extent=[-time_window[0], time_window[1], 0, time_arr.shape[0]])
                         ax.set_aspect('auto')
                         pl.title("Animal #: "+animal_id+'   Date: '+dates)
                         pl.ylabel('Bout Number')
@@ -265,7 +270,8 @@ def plot_representative_time_series(options, representative_time_series_specs_fi
            # print "Test Keys: ", all_data[str(421)][str(20121008)][FA.exp_type].keys()
 
             print ""
-            print "--> Plotting: ", FA.subject_id, FA.exp_date, FA.exp_type, FA.smoothness, FA.time_range
+            print "\t--> Plotting: ", FA.subject_id, FA.exp_date, FA.exp_type, 
+            print "\t              ", FA.smoothness, FA.time_range
            # if(FA.load(file_type="hdf5") != -1):
             if (success != -1):
                 dir = options.output_path + '/' + FA.exp_type
@@ -357,7 +363,6 @@ def loadFiberAnalyze(options, animal_id, exp_date, exp_type):
         FA.fluor_data = np.asarray(denoise(FA.fluor_data))
     print "np.shape(FA.fluor_data) after denoise: ", FA.fluor_data
 
-
     return [FA, success]
 
 def compileAnimalScoreDictIntoArray(pair_avg_scores):
@@ -371,7 +376,6 @@ def compileAnimalScoreDictIntoArray(pair_avg_scores):
     output: a dict (key: exp_type, entry: array of avg score for each animal, 
     [avg_score_for_animal_1, avg_score_for_animal_2,...])
     """
-    
     exp_scores = dict() #key: exp_type, entry: array of avg score for each animal
     for animal_id in pair_avg_scores.keys():
         for exp_type in pair_avg_scores[animal_id].keys():
