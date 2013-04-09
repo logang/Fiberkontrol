@@ -25,6 +25,8 @@ class FiberAnalyze( object ):
         self.exp_date = None
         self.exp_type = None
 
+        self.load_flat = True
+
         # values from option parser
         self.smoothness = int(options.smoothness)
         self.plot_type = options.plot_type
@@ -88,8 +90,7 @@ class FiberAnalyze( object ):
             self.time_stamps = self.data[:,0]
             self.trigger_data = self.data[:,1]
             
-            load_flat = True
-            if (load_flat):
+            if (self.load_flat):
                 try:
                     self.fluor_data = np.asarray( h5_file[self.subject_id][self.exp_date][self.exp_type]['flat'] )[:, 0]
                     print "--> Loading flattened data"
