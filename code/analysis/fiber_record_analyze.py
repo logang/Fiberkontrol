@@ -199,7 +199,6 @@ class FiberAnalyze( object ):
 
         print "--> Trigger data loaded"
 
-
     def normalize_fluorescence_data(self):
         """
         Normalize data to either: 
@@ -340,6 +339,7 @@ class FiberAnalyze( object ):
             pl.vlines(trigger_high_locations, -20, 20, 
                       edgecolor='r', linewidth=0.5, facecolor='r' )
         pl.plot( time_vals[::resolution], fluor_data[::resolution], 'k-') 
+
         pl.ylim([ymin,ymax])
         if window is not None:
             pl.xlim([window[0], window[1]])

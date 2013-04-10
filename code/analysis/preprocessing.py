@@ -99,7 +99,6 @@ def debleach_files(analysis_filenames):
         # instead of after the command has finished running
         os.system(cmd) 
 
-
     print "Now make a folder Flat/ for each day of trials, and place in this folder "
     print "the 'flat' time series for a each trial. Determine which is the 'flat' "
     print "time series by using the plots comparing original and debleached "
@@ -127,7 +126,6 @@ def add_flattened_files_to_hdf5(flat_directories, out_path):
         #result = run_command_wrapper(cmd)
         #print result
         os.system(cmd)
-
 
 def read_filenames(filenames_file, path_to_filenames=None):
     """

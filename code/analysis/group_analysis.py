@@ -74,6 +74,7 @@ def group_regression_plot(all_data,
 
     i=0 # color counter
     for animal_id in all_data.keys():
+
         # load data from hdf5 file by animal-date-exp_type
         animal = all_data[animal_id]
         for dates in animal.keys():
@@ -137,7 +138,7 @@ def group_regression_plot(all_data,
 #    pl.ylabel("log length of next interaction")
     pl.show()
 
-#----------------------------------------------------------------------------------------
+#------------------------------------------------------------------------------
 
 def group_bout_heatmaps(all_data, 
                         options, 
@@ -150,6 +151,7 @@ def group_bout_heatmaps(all_data,
     Save out 'heatmaps' showing time on the x axis, 
     bouts on the y axis, and representing signal
     intensity with color.
+
     """
 
     i=0 # color counter
@@ -216,6 +218,7 @@ def group_bout_heatmaps(all_data,
                                 print outdir+'/'+animal_id+'_'+dates+options.plot_format
                             else:
                                 pl.show()
+
 
 #----------------------------------------------------------------------------------------
 
@@ -347,7 +350,8 @@ def plot_representative_time_series(options, representative_time_series_specs_fi
            # print "Test Keys: ", all_data[str(421)][str(20121008)][FA.exp_type].keys()
 
             print ""
-            print "--> Plotting: ", FA.subject_id, FA.exp_date, FA.exp_type, FA.smoothness, FA.time_range
+            print "\t--> Plotting: ", FA.subject_id, FA.exp_date, FA.exp_type, 
+            print "\t              ", FA.smoothness, FA.time_range
            # if(FA.load(file_type="hdf5") != -1):
             if (success != -1):
                 dir = options.output_path + '/' + FA.exp_type
@@ -471,7 +475,6 @@ def compileAnimalScoreDictIntoArray(pair_avg_scores):
     output: a dict (key: exp_type, entry: array of avg score for each animal, 
     [avg_score_for_animal_1, avg_score_for_animal_2,...])
     """
-    
     exp_scores = dict() #key: exp_type, entry: array of avg score for each animal
     animal_list = []
     for animal_id in pair_avg_scores.keys():
