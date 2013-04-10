@@ -13,7 +13,7 @@ from state_space import denoise
 from fiber_record_analyze import FiberAnalyze
 
 
-def group_iter_list(all_data, options):
+def group_iter_list(all_data, options, exp_type=None, animal_id=None, exp_date=None, mouse_type=None):
     """
     Returns a list where each
     entry is an array containing
@@ -34,23 +34,32 @@ def group_iter_list(all_data, options):
     date_list = []
     exp_type_list = []
 
-    for animal_id in all_data.keys():
-        animal = all_data[animal_id]
-        if animal.attrs['mouse_type'] == mouse_type:
-            for date in animal.keys():
-                if options.exp_date is None or options.exp_date == date:
-                    for exp_type in animal[date].keys():
-                        if options.exp_type is None or exp_type == options.exp_type:
+    if exp_date is None:
+        exp_date = options.exp_date
+    if exp_type is None:
+        exp_type = options.exp_type
+    if mouse_type is None:
+        mouse_type = options.mouse_type
 
-                            iter_list.append([animal_id, date, exp_type])
-                            if animal_id not in animal_id_list:
-                                animal_id_list.append(animal_id)
-                            if date not in date_list:
-                                date_list.append(date)
-                            if exp_type not in exp_type_list:
-                                exp_type_list.append(exp_type)
+    for animal_id_key in all_data.keys():
+        if animal_id is None or animal_id_key == animal_id:
+            animal = all_data[animal_id_key]
+            if animal.attrs['mouse_type'] == mouse_type:
+                for date_key in animal.keys():
+                    if exp_date is None or exp_date == date_key:
+                        for exp_type_key in animal[date_key].keys():
+                            if exp_type is None or exp_type_key == exp_type:
+                                iter_list.append({'animal_id':animal_id_key, 
+                                                  'date':date_key, 
+                                                  'exp_type':exp_type_key})
+                                if animal_id_key not in animal_id_list:
+                                    animal_id_list.append(animal_id_key)
+                                if date_key not in date_list:
+                                    date_list.append(date_key)
+                                if exp_type_key not in exp_type_list:
+                                    exp_type_list.append(exp_type_key)
 
-
+    print [iter_list, animal_id_list, date_list, exp_type_list]
     return [iter_list, animal_id_list, date_list, exp_type_list]
 
 
@@ -146,7 +155,8 @@ def group_bout_heatmaps(all_data,
                         time_window, 
                         df_max=0.35, 
                         event_edge="rising", 
-                        baseline_window=None):
+                        baseline_window=None,
+                        max_num_epochs=0):
     """
     Save out 'heatmaps' showing time on the x axis, 
     bouts on the y axis, and representing signal
@@ -182,6 +192,9 @@ def group_bout_heatmaps(all_data,
                                                          exp_type=exp_type)
                         print "len(event_times)", len(event_times)
                         if len(event_times) > 0:
+                            if max_num_epochs > 0:
+                                event_times = event_times[0:max_num_epochs]
+
                             print "baseline_window", baseline_window
                             time_arr = np.asarray( FA.get_time_chunks_around_events(
                                                         FA.fluor_data, 
@@ -289,26 +302,51 @@ def group_plot_time_series(all_data, options):
     red lines indicating event epochs
     """
     # load data from hdf5 file by animal-date-exp_type
-    for animal_id in all_data.keys():
-        animal = all_data[animal_id]
-        for date in animal.keys():
-            if options.exp_date is None or options.exp_date == date:
-                for exp_type in animal[date].keys():
-                    if options.exp_type is None or exp_type == options.exp_type:
-                        FA = FiberAnalyze(options)
-                        FA.fluor_normalization = 'deltaF'
-                        FA.time_range = '0:-1'
-                        [FA, success] = loadFiberAnalyze(FA, options, animal_id, date, exp_type)
 
-                        if (success != -1):
-                            dir = options.output_path + '/' + FA.exp_type
-                            print dir
-                            if os.path.isdir(dir) is False:
-                                os.makedirs(dir)
-                            FA.plot_basic_tseries(out_path = dir + '/' + FA.subject_id + "_" + 
-                                                  FA.exp_date + "_" + FA.exp_type + "_" + 
-                                                  str(int(FA.time_range.split(':')[0])) +  "_" + 
-                                                  str(int(FA.time_range.split(':')[1])) +"_" ) 
+    [iter_list, animal_id_list, date_list, exp_type_list] = group_iter_list(all_data, options)
+
+    for exp in iter_list:
+        animal_id = exp['animal_id']
+        date = exp['date']
+        exp_type = exp['exp_type']
+
+        FA = FiberAnalyze(options)
+        FA.fluor_normalization = 'deltaF'
+        FA.time_range = '0:-1'
+        [FA, success] = loadFiberAnalyze(FA, options, animal_id, date, exp_type)
+
+        if (success != -1):
+            dir = options.output_path + '/' + FA.exp_type
+            print dir
+            if os.path.isdir(dir) is False:
+                os.makedirs(dir)
+            FA.plot_basic_tseries(out_path = dir + '/' + FA.subject_id + "_" + 
+                                  FA.exp_date + "_" + FA.exp_type + "_" + 
+                                  str(int(FA.time_range.split(':')[0])) +  "_" + 
+                                  str(int(FA.time_range.split(':')[1])) +"_" ) 
+
+
+
+    # for animal_id in all_data.keys():
+    #     animal = all_data[animal_id]
+    #     for date in animal.keys():
+    #         if options.exp_date is None or options.exp_date == date:
+    #             for exp_type in animal[date].keys():
+    #                 if options.exp_type is None or exp_type == options.exp_type:
+    #                     FA = FiberAnalyze(options)
+    #                     FA.fluor_normalization = 'deltaF'
+    #                     FA.time_range = '0:-1'
+    #                     [FA, success] = loadFiberAnalyze(FA, options, animal_id, date, exp_type)
+
+    #                     if (success != -1):
+    #                         dir = options.output_path + '/' + FA.exp_type
+    #                         print dir
+    #                         if os.path.isdir(dir) is False:
+    #                             os.makedirs(dir)
+    #                         FA.plot_basic_tseries(out_path = dir + '/' + FA.subject_id + "_" + 
+    #                                               FA.exp_date + "_" + FA.exp_type + "_" + 
+    #                                               str(int(FA.time_range.split(':')[0])) +  "_" + 
+    #                                               str(int(FA.time_range.split(':')[1])) +"_" ) 
 
 
 #----------------------------------------------------------------------------------------
@@ -742,15 +780,28 @@ def compare_epochs(all_data,
                                 #entry: a dict storing the average score within a trial 
                                 #       for each trial type (i.e. homecagenovel and homecagesocial)
 
+
+    [iter_list, animal_id_list, date_list, exp_type_list] = group_iter_list(all_data, options)
+
     for animal_id in pairs.keys():
         pair_scores[animal_id] = dict()
         pair_avg_scores[animal_id] = dict()
         for exp_type in pairs[animal_id].keys():
+            date = pairs[animal_id][exp_type]
+        # for animal_id in animal_id_list:
+        #     pair_scores[animal_id] = dict()
+        #     pair_avg_scores[animal_id] = dict()
+
+        # for animal in iter_list:
+        #     animal_id = animal[animal_id]
+        #     exp_type = animal[exp_type]
+        #     date = animal[date]
+
             FA = FiberAnalyze(options)
             [FA, success] = loadFiberAnalyze(FA,
                                              options, 
                                              animal_id, 
-                                             pairs[animal_id][exp_type], 
+                                             date, 
                                              exp_type)
             if (success != -1):
                 start_event_times = FA.get_event_times(edge="rising", 
@@ -847,6 +898,10 @@ def get_bout_averages(pair_scores):
                                           entries: an array with the number of trials 
                                                    that had at least as many bouts
                                                    as the index of the array)
+
+            4) bout_std_err = a dict (keys: exp_type, 
+                                          entries: an array with the standard
+                                                   error for each bout number)
     """
 
     bout_dict = dict()
@@ -873,7 +928,7 @@ def get_bout_averages(pair_scores):
         bout_std_err[exp_type] = []
 
         for i in bout_dict[exp_type].keys():
-            bout_avg_dict[exp_type].append(np.mean(bout_dict[exp_type][i]))
+            bout_avg_dict[exp_type].append(np.mean(bout_dict[exp_type][i])) #mean of scores of bout number i
             bout_count_dict[exp_type].append(len(bout_dict[exp_type][i]))
             std_err = stats.sem(bout_dict[exp_type][i])
             bout_std_err[exp_type].append(std_err)
@@ -925,9 +980,13 @@ def plot_decay(options,
                             yerr=1.96*np.array(bout_std_err[bout_avg_dict.keys()[1]][0:max_bout_number]), 
                             fmt='o-', color=colors[1])
     plt.legend([plot0, plot1], bout_avg_dict.keys())
-    plt.title('Average decay over time')
     plt.xlabel('Bout number')
+    plt.title('Average decay over time')
     plt.ylabel('Average ' + metric + ' per bout [dF/F]')
+    if metric == 'spacing':
+        plt.title('Average time interval between bouts')
+        plt.ylabel('Average time from end of bout to beginning of next bout [s]')
+
     plt.savefig(options.output_path + 'decay_window_' + 
                 str(time_window[1]) + '_minspace_' + str(min_spacing) + '_mousetype_' + 
                 options.mouse_type + '_' + metric+ options.plot_format)
@@ -1085,14 +1144,15 @@ if __name__ == "__main__":
     # [before,after] event in seconds 
     time_window = np.array(options.time_window.split(':'), dtype='float32') 
 
-    to_plot = 'plot_representative_time_series'
+    to_plot = 'group_plot_time_series'
 
     if to_plot == 'group_regression_plot':
         group_regression_plot(all_data, options, 
                               exp_type=options.exp_type, time_window=time_window)
     elif to_plot == 'group_bout_heatmaps':
         group_bout_heatmaps(all_data, options, 
-                            exp_type=options.exp_type, time_window=time_window)
+                            exp_type=options.exp_type, time_window=time_window,
+                            max_num_epochs=9)
     elif to_plot == 'group_bout_ci':
         group_bout_ci(all_data, options, 
                       time_window=time_window)
