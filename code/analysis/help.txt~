@@ -1,0 +1,77 @@
+--------Preprocessing files---------
+* Note, that we can make this simpler if we store flattened
+* data in place of the original data. Just use the flattened
+* filenames in analysis_filenames.txt in place of step 4, skip step 6
+* and change the load_flat variable in fiber_record_analyze.py 
+* to be false 
+
+1) Make sure that data files have the format:
+20121105-GC5-homecagesocial-8497-600patch-2012_11_5_19-6_run_number_0.npz
+
+and complete filenames like:
+'/Users/isaackauvar/Dropbox/Fiberkontrol/Fiberkontrol_Data/Lisa_Data/20121105/20121105-GC5-homecagesocial-8497-600patch-2012_11_5_19-6_run_number_0.npz'
+
+
+2) Add all filenames to the file
+      analysis_filenames.txt
+   in the Fiberkontrol/code/analysis directory
+
+3) Run
+
+python preprocessing.py --save-debleach -f analysis_filenames.txt
+
+4) Populate folders titled Flat/ 
+   for each day of the trial
+   based on the plots in Debleach/
+
+5) Run
+
+python preprocessing.py --generate-hdf5 -f analysis_filenames.txt
+
+6) Make sure that experiment_dates.txt contains
+   all the dates of all experiments you desire to include
+
+7) Run
+
+python preprocessing.py --add-flattened-files -f analysis_filenames.txt -d experiment_dates.txt
+
+~if data is located at end of a different path, add --path-to-npz-data='/Users/isaackauvar/Dropbox/Fiberkontrol/Fiberkontrol_Data/Lisa_Data/' (with the correct path)
+
+8) Now you should have a single hdf5 file that contains both the original
+   raw data stored in 'time_series_arr', which has the fluorescence data,
+   the trigger data, and the time stamps. Additionally in 'flat' data
+   is the flattened data (still in raw normalization format) 
+
+------------Analyzing files------------
+1) Plot representative time series (including zoomed in version of the same time series)
+specified in the file representative_time_series_specs.txt
+
+~in group_analysis.py, uncomment 
+   plot_representative_time_series(options, options.representative_time_series_specs_file)
+
+~then run:
+
+python group_analysis.py --input-path='/Users/isaackauvar/Documents/2012-2013/ZDlab/FiberKontrol/Results/Cell/all_data_raw.h5' --output-path=/Users/isaackauvar/Documents/2012-2013/ZDlab/FiberKontrol/Results/Cell/Plots/Representative_Time_Series
+
+
+
+2) Plot group heatmaps (with perievent plots). 
+
+~in group_analysis.py, uncomment
+    group_bout_heatmaps()
+
+~then run:
+python group_analysis.py --input-path='/Users/isaackauvar/Documents/2012-2013/ZDlab/FiberKontrol/Results/Cell/all_data_raw.h5' --output-path=/Users/isaackauvar/Documents/2012-2013/ZDlab/FiberKontrol/Results/Cell/Plots/Heatmaps
+
+~This currently plots all timeseries in hdf5 file. Can adjust this by adding a conditional statement in the function to look for specific mouse_types etc.
+
+~You may have to play around with the time_window size, and you may have to play around with the ymax value in plot_perievent_hist in fiber_record_analyze.py
+
+3) Plot all timeseries (for an initial overview of all of the data)
+
+~in group_analysis.py, uncomment
+    group_plot_time_series()
+
+4) Compare end and start of epoch:
+
+python group_analysis.py --input-path='/Users/isaackauvar/Documents/2012-2013/ZDlab/FiberKontrol/Results/Cell/all_data_raw.h5' --output-path=/Users/isaackauvar/Documents/2012-2013/ZDlab/FiberKontrol/Results/Cell/Plots/End_vs_start/
