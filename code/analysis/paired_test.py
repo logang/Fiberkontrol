@@ -463,7 +463,6 @@ class PairAnalyze( object ):
 			fig = plt.figure()	
 			ax = fig.add_subplot(111)
 			#ax.plot(bout_numbers, bout_avgs, 'o')
-			ax.errorbar(bout_numbers, bout_avgs, yerr=1.96*bout_stderr, fmt='o')
 		#	ax.plot(all_bout_indices, all_bouts, 'o', alpha=0.3)
 			plt.xlabel('Bout number')
 			plt.ylabel('Average ' + score_type + ' across all trials [dF/F]')

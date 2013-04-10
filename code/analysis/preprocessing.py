@@ -57,7 +57,7 @@ def generate_hdf5_file(analysis_filenames,out_path):
                 cmd += '--exp-type=EPM'
 
             elif info[2] == 'sucrose':
-                cmd += '--exp-type=sucrose '
+                cmd += ' --exp-type=sucrose '
 
             else:
                 print info[3], "is not a recognized experiment type. Check filenames."

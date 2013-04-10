@@ -81,53 +81,54 @@ def group_regression_plot(all_data,
 
             FA = FiberAnalyze(options)
             [FA, success] = loadFiberAnalyze(FA, options, animal_id, dates, exp_type)
-            #FA.load(file_type="hdf5")
 
             # get intensity and next_val values for this animal
-            peak_intensity, onset_next_vals = FA.plot_next_event_vs_intensity(
-                                                                intensity_measure="integrated", 
-                                                                next_event_measure="onset", 
-                                                                window=time_window, out_path=None, 
-                                                                plotit=False)
+            if success != -1:
+                peak_intensity, onset_next_vals = FA.plot_next_event_vs_intensity(
+                                                                    intensity_measure="integrated", 
+                                                                    next_event_measure="onset", 
+                                                                    window=time_window, 
+                                                                    out_path=None, 
+                                                                    plotit=False)
 
-            # fit a robust regression
-            if len(onset_next_vals) > 0:
-                X = np.vstack( (np.log(peak_intensity), np.ones((len(onset_next_vals),))) )
-#                rlm_model = sm.RLM(np.log(onset_next_vals), X.T, M=sm.robust.norms.TukeyBiweight())
-#                lm_results = rlm_model.fit()
-                lm_model = sm.OLS(np.log(onset_next_vals), X.T)
-                lm_results = lm_model.fit()
-                print "-------------------------------------"
-                print animal_id, dates
-                try:
-                    print "\t--> Slope:",lm_results.params[0]
-#                    print "\t--> Intercept:",lm_results.params[1]
-#                    print "\t--> Confidence Interval for Slope:", lm_results.conf_int()[0,:]
-                    print "\t--> P-value for Slope:", lm_results.pvalues[0]
-#                    print "\t--> Confidence Interval for Intercept:", lm_results.conf_int()[1,:]
-#                    print "\t--> P-value Interval for Intercept:", lm_results.pvalues[1]
-                    print "\t--> R-squared", lm_results.rsquared
-                except:
-                    pass
-                try:
-                    print "\t--> R-squared Adjusted:", lm_results.rsquared_adj
-                except:
-                    print "\t--> Could not calculate adjusted R-squared."
-                yhat = lm_results.fittedvalues
+                # fit a robust regression
+                if len(onset_next_vals) > 0:
+                    X = np.vstack( (np.log(peak_intensity), np.ones((len(onset_next_vals),))) )
+    #                rlm_model = sm.RLM(np.log(onset_next_vals), X.T, M=sm.robust.norms.TukeyBiweight())
+    #                lm_results = rlm_model.fit()
+                    lm_model = sm.OLS(np.log(onset_next_vals), X.T)
+                    lm_results = lm_model.fit()
+                    print "-------------------------------------"
+                    print animal_id, dates
+                    try:
+                        print "\t--> Slope:",lm_results.params[0]
+    #                    print "\t--> Intercept:",lm_results.params[1]
+    #                    print "\t--> Confidence Interval for Slope:", lm_results.conf_int()[0,:]
+                        print "\t--> P-value for Slope:", lm_results.pvalues[0]
+    #                    print "\t--> Confidence Interval for Intercept:", lm_results.conf_int()[1,:]
+    #                    print "\t--> P-value Interval for Intercept:", lm_results.pvalues[1]
+                        print "\t--> R-squared", lm_results.rsquared
+                    except:
+                        pass
+                    try:
+                        print "\t--> R-squared Adjusted:", lm_results.rsquared_adj
+                    except:
+                        print "\t--> Could not calculate adjusted R-squared."
+                    yhat = lm_results.fittedvalues
 
-#                fig = pl.figure()
-#                ax = fig.add_subplot(1,1,1)
-#                ax.loglog(peak_intensity,onset_next_vals,'o')
+    #                fig = pl.figure()
+    #                ax = fig.add_subplot(1,1,1)
+    #                ax.loglog(peak_intensity,onset_next_vals,'o')
 
-#                ax.plot(np.log(peak_intensity), np.log(onset_next_vals),'o',color=cm.jet(float(i)/10.))
-                ax.plot(peak_intensity, onset_next_vals,'o',color=cm.jet(float(i)/10.))
-#                ax.plot(np.log(peak_intensity), yhat, '-', color=cm.jet(float(i)/10.) )
+    #                ax.plot(np.log(peak_intensity), np.log(onset_next_vals),'o',color=cm.jet(float(i)/10.))
+                    ax.plot(peak_intensity, onset_next_vals,'o',color=cm.jet(float(i)/10.))
+    #                ax.plot(np.log(peak_intensity), yhat, '-', color=cm.jet(float(i)/10.) )
 
-#                pl.show()
-                i+=1 # increment color counter
-            else:
-                #ax.plot(np.log(peak_intensity), np.log(onset_next_vals),'o')
-                print "No values to plot for", animal_id, dates, exp_type
+    #                pl.show()
+                    i+=1 # increment color counter
+                else:
+                    #ax.plot(np.log(peak_intensity), np.log(onset_next_vals),'o')
+                    print "No values to plot for", animal_id, dates, exp_type
 
 #    pl.xlabel("log peak intensity in first second after interaction onset")
     pl.xlabel("log integrated intensity in first second after interaction onset")
@@ -146,7 +147,8 @@ def group_bout_heatmaps(all_data,
                         event_edge="rising", 
                         baseline_window=None):
     """
-    Save out 'heatmaps' showing time on the x axis, bouts on the y axis, and representing signal
+    Save out 'heatmaps' showing time on the x axis, 
+    bouts on the y axis, and representing signal
     intensity with color.
     """
 
@@ -361,7 +363,8 @@ def plot_representative_time_series(options, representative_time_series_specs_fi
 def get_novel_social_pairs(all_data, exp1, exp2, mouse_type = 'GC5'):
     """
     all_data = an hdf5 file containing all of the time series data
-    exp1 and exp2 = the two experiment types to be compared (i.e. homecagesocial and homecagenovel)
+    exp1 and exp2 = the two experiment types to be compared 
+    (i.e. homecagesocial and homecagenovel)
 
     Returns: a dict where the keys are animal_ids
     and each entry is a dict containing for each exp_type (the keys), 
@@ -375,7 +378,8 @@ def get_novel_social_pairs(all_data, exp1, exp2, mouse_type = 'GC5'):
         if animal.attrs['mouse_type'] == mouse_type: #don't use EYFP or GC3
             pairs[animal_id] = dict()
             for date in animal.keys(): 
-                #make a list for each experiment type of all dates on which that exp was run
+                ##make a list for each experiment type of 
+                ##all dates on which that exp was run
                 for exp_type in animal[date].keys(): 
                     if exp_type == str(exp1) or exp_type == str(exp2):
                         if exp_type in pairs[animal_id].keys():
@@ -383,8 +387,8 @@ def get_novel_social_pairs(all_data, exp1, exp2, mouse_type = 'GC5'):
                         else:
                             pairs[animal_id][exp_type] = [int(date)]
                     
-    #As a heuristic to choose between multiple trials of the same exp_type,
-    # use the one with the latest (largest) date                
+    ##As a heuristic to choose between multiple trials of the same exp_type,
+    ##use the one with the latest (largest) date                
     for animal_id in pairs.keys():
         if pairs[animal_id].keys() == []:
             del pairs[animal_id]
@@ -396,20 +400,42 @@ def get_novel_social_pairs(all_data, exp1, exp2, mouse_type = 'GC5'):
 
     return pairs
 
-def score_of_chunks(ts_arr, metric='area'):
+def score_of_chunks(ts_arr, metric='area', start_event_times=None, end_event_times=None):
     """
     Given an array of time series chunks, return an array
     holding a score for each of these chunks
 
-    metric can be 'area' (area under curve) or 'peak' (peak fluorescence value)
+    metric can be
+    'area' (area under curve),
+    'peak' (peak fluorescence value), 
+    'spacing', (time from end of current epoch to beginning of the next)
+    'epoch_length' (time from beginning of epoch to end of epoch)
     """
     scores = []
+    i=0
     for ts in ts_arr:
         if metric == 'area':
             scores.append(np.sum(ts)/len(ts))
         elif metric == 'peak':
             scores.append(np.max(ts))
+        elif metric == 'spacing':
+            if start_event_times is None or end_event_times is None:
+                raise ValueError( "start_event_times and end_event_times were not passed to score_of_chunks() in group_analysis.")
+            else:
+                if i == len(start_event_times) - 1:
+                    scores.append(0)
+                else:
+                    scores.append(start_event_times[i+1] - end_event_times[i])
+        elif metric == 'epoch_length':
+            if start_event_times is None or end_event_times is None:
+                raise ValueError( "start_event_times and end_event_times were not passed to score_of_chunks() in group_analysis.")
+            else:
+                if i == len(start_event_times) - 1:
+                    scores.append(0)
+                else:
+                    scores.append(end_event_times[i] - start_event_times[i])
 
+        i = i + 1
     return scores
 
 def loadFiberAnalyze(FA, options, animal_id, exp_date, exp_type):
@@ -678,9 +704,12 @@ def compare_epochs(all_data,
     """
     Compares the fluorescence during epochs for each mouse undergoing 
     two behavioral experiments (exp1 and exp2). Fluorescence can be 
-    quantified (or, scored) using metrics such as 'peak' (maximum 
-    fluorescence value during epoch) or 'area'  
-    (sum of fluorescence during epoch)
+    quantified (or, scored) using metrics such as 
+    'peak' (maximum fluorescence value during epoch),
+    'area'  (sum of fluorescence during epoch),
+    'spacing', (time from end of current epoch to beginning of the next)
+
+
 
     Plots the average score for each mouse under each 
     behavioral condition. Using a statistical test, determines 
@@ -745,7 +774,8 @@ def compare_epochs(all_data,
                                             window = time_window, 
                                             baseline_window=-1))
 
-                scores = np.array(score_of_chunks(start_time_arr, metric))
+                scores = np.array(score_of_chunks(start_time_arr, metric, 
+                                                    start_event_times, end_event_times))
                 pair_scores[animal_id][exp_type] = scores
                 if max_bout_number>0:
                     pair_avg_scores[animal_id][exp_type] = np.mean(scores[0:max_bout_number])
@@ -796,7 +826,6 @@ def compare_epochs(all_data,
 
     return [pair_scores, pair_avg_scores]
 
-########################################################################
 
 def get_bout_averages(pair_scores):
     """
@@ -888,16 +917,17 @@ def plot_decay(options,
     x = np.array(range(max_bout_number))
     plot0 = ax.errorbar(x, bout_avg_dict[bout_avg_dict.keys()[0]][0:max_bout_number], 
                             yerr=1.96*np.array(bout_std_err[bout_avg_dict.keys()[0]][0:max_bout_number]), 
-                            fmt='o-')
+                            fmt='o-', color=colors[0])
     plot1 = ax.errorbar(x, bout_avg_dict[bout_avg_dict.keys()[1]][0:max_bout_number], 
                             yerr=1.96*np.array(bout_std_err[bout_avg_dict.keys()[1]][0:max_bout_number]), 
-                            fmt='o-')
+                            fmt='o-', color=colors[1])
     plt.legend([plot0, plot1], bout_avg_dict.keys())
     plt.title('Average decay over time')
     plt.xlabel('Bout number')
     plt.ylabel('Average ' + metric + ' per bout [dF/F]')
     plt.savefig(options.output_path + 'decay_window_' + 
-                str(time_window[1]) + '_minspace_' + str(min_spacing) + '_' + metric+ options.plot_format)
+                str(time_window[1]) + '_minspace_' + str(min_spacing) + '_mousetype_' + 
+                options.mouse_type + '_' + metric+ options.plot_format)
 
     plt.figure()
     plot0, = plt.plot(bout_count_dict[bout_count_dict.keys()[0]][0:max_bout_number],  
@@ -909,24 +939,38 @@ def plot_decay(options,
 
     plt.figure()
     exps = bout_dict.keys()
+    plots = [0, 0]
     for i in range(len(exps)):
         exp = bout_dict[exps[i]]
         for j in exp:
-            plt.plot(j*np.ones(len(exp[j])), exp[j], 'o', color=colors[i])
+            plots[i], = plt.plot(j*np.ones(len(exp[j])), exp[j], 'o', color=colors[i])
     plt.title('Individual decays over time')
+    plt.legend(plots, bout_count_dict.keys())
 
     if show_plot:
         plt.show()
 
 
-def compare_decay(all_data, options, exp1='homecagesocial', 
-                  exp2='homecagenovel', time_window=[0, 1], 
-                  metric='peak', test='ttest', make_plot=True, 
-                  just_first=False, max_bout_number=0):
+def compare_decay(all_data, 
+                  options, 
+                  exp1='homecagesocial', 
+                  exp2='homecagenovel', 
+                  time_window=[0, 1], 
+                  metric='peak', 
+                  test='ttest', 
+                  make_plot=True, 
+                  just_first=False, 
+                  max_bout_number=0):
     """
     Using 'metric' to score the fluorescent response in each bout,
     plot the decay in the response vs. bout number
-    TODO: Fit with an exponential 
+
+    Metric can be:
+    'peak' (maximum fluorescence value during epoch),
+    'area'  (sum of fluorescence during epoch),
+    'spacing', (time from end of current epoch to beginning of the next)
+
+    TODO: Fit with an exponential?
     """
 
     [pair_scores, pair_avg_scores] =  compare_epochs(all_data, options, 
@@ -1060,12 +1104,12 @@ if __name__ == "__main__":
     elif to_plot == 'compare_epochs':
         compare_epochs(all_data, options, 
                        exp1='homecagenovel', exp2='homecagesocial', 
-                       time_window=[0, 0], metric='peak', test='wilcoxon', 
-                       make_plot=True, max_bout_number=10, plot_perievent=False)
+                       time_window=[0, 0], metric='area', test='wilcoxon', 
+                       make_plot=True, max_bout_number=5, plot_perievent=False)
     elif to_plot == 'compare_decay':
         compare_decay(all_data, options, 
                       exp1='homecagenovel', exp2='homecagesocial', 
-                      time_window=[0, 0], metric='area', test='wilcoxon', 
+                      time_window=[0, 0], metric='spacing', test='wilcoxon', 
                       make_plot=True, max_bout_number=15)
 
 # EOF
