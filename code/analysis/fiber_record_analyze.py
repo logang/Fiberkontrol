@@ -4,6 +4,7 @@ import numpy as np
 import scipy as sp
 import pylab as pl
 import scipy.signal as signal
+
 import scipy.stats as ss
 #from debleach import exponential_basis_debleach
 from scipy.stats import ranksums
@@ -68,6 +69,7 @@ class FiberAnalyze( object ):
         """
         Load time series and events from NPZ or HDF5 file. 
         """
+
         self.time_tuples = None
         if file_type == "npz":
             print ""
@@ -237,6 +239,7 @@ class FiberAnalyze( object ):
         """
         self.s_vals = np.load(s_filename)['arr_0']
         self.e_vals = np.load(e_filename)['arr_0']
+        print 's_vals', self.s_vals
         return zip(self.s_vals,self.e_vals)
 
     def set_resolution(self, start, end):
@@ -1896,7 +1899,6 @@ class FiberAnalyze( object ):
 
 
 
-
 #-----------------------------------------------------------------------------------------
 #------------------------END: TO POSSIBLY DELETE-------------------------------------------
 #-----------------------------------------------------------------------------------------
@@ -1926,6 +1928,7 @@ def test_FiberAnalyze(options):
   #  FA.plot_lick_density_vs_time(1, out_path = options.output_path)
    # FA.get_sucrose_event_times(5, "falling")
 #    FA.event_vs_baseline_barplot(out_path = options.output_path)
+
 
     
 
@@ -1962,8 +1965,6 @@ def test_FiberAnalyze(options):
 
  ##   FA.compare_before_and_after_event(window=[3, 3], metric="area", out_path=options.output_path)
  ##   FA.compare_before_and_after_event(window=[3, 3], metric="peak", out_path=options.output_path)
-
-
 
 
 #-----------------------------------------------------------------------------------------
