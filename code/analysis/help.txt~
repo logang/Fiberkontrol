@@ -27,14 +27,14 @@ python preprocessing.py --save-debleach -f analysis_filenames.txt
 
 5) Run
 
-python preprocessing.py --generate-hdf5 -f analysis_filenames.txt
+python preprocessing.py 'path_to_npz' --generate-hdf5 -f analysis_filenames.txt
 
 6) Make sure that experiment_dates.txt contains
    all the dates of all experiments you desire to include
 
 7) Run
 
-python preprocessing.py --add-flattened-files -f analysis_filenames.txt -d experiment_dates.txt
+python preprocessing.py 'path_to_npz' --add-flattened-files -f analysis_filenames.txt -d experiment_dates.txt
 
 ~if data is located at end of a different path, add --path-to-npz-data='/Users/isaackauvar/Dropbox/Fiberkontrol/Fiberkontrol_Data/Lisa_Data/' (with the correct path)
 

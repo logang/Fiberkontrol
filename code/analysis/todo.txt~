@@ -1,0 +1,32 @@
+-create prediction plot where bout number is on the xaxis instead of dF/F
+
+-create test data in order to test prediction plot
+
+-use group_iter_list in:
+     group_regression_plot
+     group_bout_ci
+     get_novel_social_pairs
+
+
+-functions to test:
+	   -loading data
+	   -list of mice to include
+	   -calculating dF/F
+	   -timing (this should be correct, everything
+	   	   should be based off self.time_stamps)
+           -group_bout_heatmaps
+	   -group_regression_plot
+	   -group_bout_ci (? I don't think we are using this)
+	   -group_plot_time_series
+	   -plot_representative_time_series
+		-clean up representative_time_series_specs.txt
+	   -get_novel_social_pairs
+	   -score_of_chunks
+	   -compare_start_and_end_of_epoch
+	   -statisticalTestOfComparison (also make sure we are using wilcoxon everywhere?)
+	   -compare_epochs
+	   -plot_decay
+	   -compare_decay (and plot_decay, and fit_exponential)
+	   -event_length_histogram
+
+	   

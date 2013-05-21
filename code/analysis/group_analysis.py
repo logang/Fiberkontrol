@@ -488,7 +488,6 @@ def plot_representative_time_series(options, representative_time_series_specs_fi
             [FA, success] = loadFiberAnalyze(FA, options, animal_id, date, exp_type)
 
 
-
            # print "Test Keys: ", all_data[str(421)][str(20121008)][FA.exp_type].keys()
 
             print ""
@@ -1388,7 +1387,7 @@ if __name__ == "__main__":
     time_window = np.array(options.time_window.split(':'), dtype='float32') 
 
 
-    to_plot = 'compare_start_and_end_of_epoch'
+    to_plot = 'compare_epochs'
 
 
     if to_plot == 'group_regression_plot':
