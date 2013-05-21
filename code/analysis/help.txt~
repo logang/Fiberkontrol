@@ -15,6 +15,7 @@ and complete filenames like:
 2) Add all filenames to the file
       analysis_filenames.txt
    in the Fiberkontrol/code/analysis directory
+   You can always adjust the directory the files with a search and replace all    command in analysis_filesnames.txt
 
 3) Run
 

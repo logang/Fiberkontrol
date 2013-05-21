@@ -10,9 +10,7 @@ from fiber_record_analyze import FiberAnalyze
 # R imports
 from rpy2.robjects.packages import importr
 DSE = importr("dse")
-print "DSE", DSE
 RWT = importr("rwt")
-print "RWT", RWT
 import rpy2.robjects as ro
 
 # Define and import R functions

@@ -252,27 +252,46 @@ class FiberAnalyze( object ):
             resolution = 1
         elif end - start < 500 and end - start > 100:
             resolution = 10
+            #resolution = 30
         elif end - start >= 500 and end - start < 1000:
             resolution = 30
+           #resolution=100
         else:
             resolution = 40
+           #resolution=100
+
 
         print "--> Resolution: ", resolution
         return resolution
 
-    def get_plot_ylim(self, exp_type, fluor_normalization):
+    def get_plot_ylim(self, exp_type, fluor_normalization, ymax_setting='small', max_val=0.0):
+        """
+        Can set ymax_setting to 'small' or 'large'
+        """
 
         if exp_type == 'sucrose':
-            ymax = 3.0
+            if ymax_setting == 'small':
+                ymax = 1.0
+            if ymax_setting == 'large' or max_val > ymax:
+                ymax = 3.0
             ymin = -1
         elif exp_type == 'homecagesocial':
-            ymax = 1.2
+            if ymax_setting == 'small':
+                ymax = 0.35
+            if ymax_setting == 'large' or max_val > ymax:
+                ymax = 1.2
             ymin = -ymax/3.0
         elif exp_type == 'homecagenovel':
-            ymax = 1.2
+            if ymax_setting == 'small':
+                ymax = 0.35
+            if ymax_setting == 'large' or max_val > ymax:
+                ymax = 1.2
             ymin = -ymax/3.0
         elif exp_type == 'EPM':
-            ymax = 1.2
+            if ymax_setting == 'small':
+                ymax = 0.35
+            if ymax_setting == 'large' or max_val > ymax:
+                ymax = 1.2
             ymin = -ymax/3.0
 
         if fluor_normalization == 'raw':
@@ -284,7 +303,7 @@ class FiberAnalyze( object ):
     def plot_basic_tseries( self, 
                             out_path=None, 
                             window=None, 
-                            resolution=30, 
+                            resolution=None, 
                             plot_all_trigger_data=False ):
         """
         Generate a plot showing the raw calcium time series, 
@@ -307,7 +326,8 @@ class FiberAnalyze( object ):
         end = end if end != -1 else max(self.time_stamps)
         start = start if start != -1 else min(self.time_stamps)
 
-        resolution = self.set_resolution(start, end)
+        if resolution is None:
+            resolution = self.set_resolution(start, end)
 
         time_vals = self.time_stamps[range(len(self.fluor_data))]
         fluor_data = self.fluor_data
@@ -321,7 +341,7 @@ class FiberAnalyze( object ):
             fluor_data = fluor_data[window_indices[0]:window_indices[1]]
             trigger_data = trigger_data[window_indices[0]:window_indices[1]]
 
-        [ymax, ymin] = self.get_plot_ylim(self.exp_type, self.fluor_normalization)
+        [ymax, ymin] = self.get_plot_ylim(self.exp_type, self.fluor_normalization, np.max(fluor_data))
 
 
         trigger_low = min(trigger_data) + 0.2
@@ -332,12 +352,14 @@ class FiberAnalyze( object ):
         ## Be careful whether event is recorded 
         ## by trigger high or trigger low (i.e. > or < trigger_low)
 
-        if plot_all_trigger_data:
-            pl.fill( time_vals[::2], 10*trigger_data[::2] - 2, 
-                     color='r', alpha=0.3 )
-        else:
-            pl.vlines(trigger_high_locations, -20, 20, 
-                      edgecolor='r', linewidth=0.5, facecolor='r' )
+        # if plot_all_trigger_data:
+        #     pl.fill( time_vals[::2], 10*trigger_data[::2] - 2, 
+        #              color='r', alpha=0.3 )
+        # else:
+      #  pl.vlines(trigger_high_locations, -.05, 0, 
+       #           edgecolor='r', linewidth=0.5, facecolor='r' )
+        pl.plot(trigger_high_locations, -0.1*np.ones(len(trigger_high_locations)), 'r.', markersize=0.1)
+        print "--> Resolution: ", resolution
         pl.plot( time_vals[::resolution], fluor_data[::resolution], 'k-') 
 
         pl.ylim([ymin,ymax])
@@ -905,7 +927,7 @@ class FiberAnalyze( object ):
                 pl.ylabel(r'$\delta F/F$')
             else:
                 pl.ylabel('Fluorescence Intensity (a.u.)')
-            pl.xlabel('Time from onset of social bout (seconds)')
+            pl.xlabel('Time from onset of bout (seconds)')
 
             # show plot now or save of an output path was specified
             if out_path is None and subplot is None:
@@ -979,6 +1001,7 @@ class FiberAnalyze( object ):
             nseconds = self.event_spacing
 
         if self.time_tuples is not None:
+            print "self.time_tuples: ", self.time_tuples
             event_times = []
             for i in range(len(self.time_tuples)):
                 pair = self.time_tuples[i]

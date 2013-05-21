@@ -2,11 +2,12 @@ import h5py
 import numpy as np
 import pylab as pl
 import matplotlib as mpl
-#import statsmodels.api as sm
+import statsmodels.api as sm
 from matplotlib import cm
 import matplotlib.pyplot as plt
 import os
 import sys
+import scipy as sp
 import scipy.stats as stats
 from state_space import denoise
 
@@ -68,6 +69,7 @@ def group_regression_plot(all_data,
                           options, 
                           exp_type='homecagesocial', 
                           time_window=[-1,1],
+                          metric="integrated",
                           ):
 
     """
@@ -95,7 +97,7 @@ def group_regression_plot(all_data,
             # get intensity and next_val values for this animal
             if success != -1:
                 peak_intensity, onset_next_vals = FA.plot_next_event_vs_intensity(
-                                                                    intensity_measure="integrated", 
+                                                                    intensity_measure=metric, 
                                                                     next_event_measure="onset", 
                                                                     window=time_window, 
                                                                     out_path=None, 
@@ -156,81 +158,158 @@ def group_bout_heatmaps(all_data,
                         df_max=0.35, 
                         event_edge="rising", 
                         baseline_window=None,
-                        max_num_epochs=0):
+                        max_num_epochs=0,
+                        ymax_setting='large'):
     """
     Save out 'heatmaps' showing time on the x axis, 
     bouts on the y axis, and representing signal
     intensity with color.
 
+    ymax_setting = 'large' or 'small' allows you to zoom in on
+        weaker responding mice
+
     """
 
     i=0 # color counter
-    for animal_id in all_data.keys():
-        # load data from hdf5 file by animal-date-exp_type
-        animal = all_data[animal_id]
-        for dates in animal.keys():
-            if options.exp_date is None or options.exp_date == dates:
 
+    [iter_list, animal_id_list, date_list, exp_type_list] = group_iter_list(all_data, options)
+
+    for exp in iter_list:
+        animal_id = exp['animal_id']
+        date = exp['date']
+        exp_type = exp['exp_type']
+
+
+        FA = FiberAnalyze(options)
+        [FA, success] = loadFiberAnalyze(FA,
+                                         options, 
+                                         animal_id, 
+                                         date, 
+                                         exp_type)
+        [df_max, df_min] = FA.get_plot_ylim(exp_type, 
+                                            FA.fluor_normalization,
+                                            ymax_setting,
+                                            np.max(FA.fluor_data))
+
+
+        if(success!=-1):
+            event_times = FA.get_event_times(edge=event_edge, 
+                                             nseconds=float(options.event_spacing), 
+                                             exp_type=exp_type)
+            print "len(event_times)", len(event_times)
+            if len(event_times) > 0:
+                if max_num_epochs > 0:
+                    event_times = event_times[0:max_num_epochs]
+
+                print "baseline_window", baseline_window
+                time_arr = np.asarray( FA.get_time_chunks_around_events(
+                                            FA.fluor_data, 
+                                            event_times, 
+                                            time_window, 
+                                            baseline_window=baseline_window) )
+
+                # Generate a heatmap of activity by bout, with range set between the 5% quantile of
+                # the data and the 'df_max' argument of the function
                 fig = pl.figure()
                 ax = fig.add_subplot(2,1,1)
+
+                from scipy.stats.mstats import mquantiles
+                baseline = mquantiles( time_arr.flatten(), prob=[0.05])
+                ax.imshow(time_arr, 
+                          interpolation="nearest",
+                          vmin=baseline,
+                          vmax=df_max,
+                          cmap=pl.cm.afmhot, 
+                          extent=[-time_window[0], time_window[1], 0, time_arr.shape[0]])
+                ax.set_aspect('auto')
+                pl.title("Animal #: "+animal_id+'   Date: '+date)
+                pl.ylabel('Bout Number')
+                ax.axvline(0,color='white',linewidth=2,linestyle="--")
+                #ax.axvline(np.abs(time_window[0])*time_arr.shape[1]/(time_window[1]-time_window[0]),color='white',linewidth=2,linestyle="--")
+
+                ax = fig.add_subplot(2,1,2)
+                FA.plot_perievent_hist(event_times, time_window, out_path=None, plotit=True, subplot=ax )
+                pl.ylim([0,df_max])
+
+                if options.output_path is not None:
+                    import os
+                    outdir = os.path.join(options.output_path, options.exp_type)
+                    if not os.path.isdir(outdir):
+                        os.makedirs(outdir)
+                    pl.savefig(outdir+'/'+animal_id+'_'+date+options.plot_format)
+                    print outdir+'/'+animal_id+'_'+date+options.plot_format
+                else:
+                    pl.show()
+
+
+
+    # for animal_id in all_data.keys():
+    #     # load data from hdf5 file by animal-date-exp_type
+    #     animal = all_data[animal_id]
+    #     for date in animal.keys():
+    #         if options.exp_date is None or options.exp_date == date:
+
+    #             fig = pl.figure()
+    #             ax = fig.add_subplot(2,1,1)
                 
-                FA = FiberAnalyze(options)
-                [FA, success] = loadFiberAnalyze(FA,
-                                                 options, 
-                                                 animal_id, 
-                                                 dates, 
-                                                 exp_type)
-                [df_max, df_min] = FA.get_plot_ylim(exp_type, 
-                                                    FA.fluor_normalization)
+    #             FA = FiberAnalyze(options)
+    #             [FA, success] = loadFiberAnalyze(FA,
+    #                                              options, 
+    #                                              animal_id, 
+    #                                              date, 
+    #                                              exp_type)
+    #             [df_max, df_min] = FA.get_plot_ylim(exp_type, 
+    #                                                 FA.fluor_normalization,
+    #                                                 ymax_setting)
 
-                if exp_type in animal[dates].keys():
-                    print "trigger_data", FA.trigger_data
+    #             if exp_type in animal[date].keys():
+    #                 print "trigger_data", FA.trigger_data
 
-                    if(success!=-1):
-                        event_times = FA.get_event_times(edge=event_edge, 
-                                                         nseconds=float(options.event_spacing), 
-                                                         exp_type=exp_type)
-                        print "len(event_times)", len(event_times)
-                        if len(event_times) > 0:
-                            if max_num_epochs > 0:
-                                event_times = event_times[0:max_num_epochs]
+    #                 if(success!=-1):
+    #                     event_times = FA.get_event_times(edge=event_edge, 
+    #                                                      nseconds=float(options.event_spacing), 
+    #                                                      exp_type=exp_type)
+    #                     print "len(event_times)", len(event_times)
+    #                     if len(event_times) > 0:
+    #                         if max_num_epochs > 0:
+    #                             event_times = event_times[0:max_num_epochs]
 
-                            print "baseline_window", baseline_window
-                            time_arr = np.asarray( FA.get_time_chunks_around_events(
-                                                        FA.fluor_data, 
-                                                        event_times, 
-                                                        time_window, 
-                                                        baseline_window=baseline_window) )
+    #                         print "baseline_window", baseline_window
+    #                         time_arr = np.asarray( FA.get_time_chunks_around_events(
+    #                                                     FA.fluor_data, 
+    #                                                     event_times, 
+    #                                                     time_window, 
+    #                                                     baseline_window=baseline_window) )
 
-                            # Generate a heatmap of activity by bout, with range set between the 5% quantile of
-                            # the data and the 'df_max' argument of the function
-                            from scipy.stats.mstats import mquantiles
-                            baseline = mquantiles( time_arr.flatten(), prob=[0.05])
-                            ax.imshow(time_arr, 
-                                      interpolation="nearest",
-                                      vmin=baseline,
-                                      vmax=df_max,
-                                      cmap=pl.cm.afmhot, 
-                                      extent=[-time_window[0], time_window[1], 0, time_arr.shape[0]])
-                            ax.set_aspect('auto')
-                            pl.title("Animal #: "+animal_id+'   Date: '+dates)
-                            pl.ylabel('Bout Number')
-                            ax.axvline(0,color='white',linewidth=2,linestyle="--")
-                            #ax.axvline(np.abs(time_window[0])*time_arr.shape[1]/(time_window[1]-time_window[0]),color='white',linewidth=2,linestyle="--")
+    #                         # Generate a heatmap of activity by bout, with range set between the 5% quantile of
+    #                         # the data and the 'df_max' argument of the function
+    #                         from scipy.stats.mstats import mquantiles
+    #                         baseline = mquantiles( time_arr.flatten(), prob=[0.05])
+    #                         ax.imshow(time_arr, 
+    #                                   interpolation="nearest",
+    #                                   vmin=baseline,
+    #                                   vmax=df_max,
+    #                                   cmap=pl.cm.afmhot, 
+    #                                   extent=[-time_window[0], time_window[1], 0, time_arr.shape[0]])
+    #                         ax.set_aspect('auto')
+    #                         pl.title("Animal #: "+animal_id+'   Date: '+date)
+    #                         pl.ylabel('Bout Number')
+    #                         ax.axvline(0,color='white',linewidth=2,linestyle="--")
+    #                         #ax.axvline(np.abs(time_window[0])*time_arr.shape[1]/(time_window[1]-time_window[0]),color='white',linewidth=2,linestyle="--")
 
-                            ax = fig.add_subplot(2,1,2)
-                            FA.plot_perievent_hist(event_times, time_window, out_path=None, plotit=True, subplot=ax )
-                            pl.ylim([0,df_max])
+    #                         ax = fig.add_subplot(2,1,2)
+    #                         FA.plot_perievent_hist(event_times, time_window, out_path=None, plotit=True, subplot=ax )
+    #                         pl.ylim([0,df_max])
 
-                            if options.output_path is not None:
-                                import os
-                                outdir = os.path.join(options.output_path, options.exp_type)
-                                if not os.path.isdir(outdir):
-                                    os.makedirs(outdir)
-                                pl.savefig(outdir+'/'+animal_id+'_'+dates+options.plot_format)
-                                print outdir+'/'+animal_id+'_'+dates+options.plot_format
-                            else:
-                                pl.show()
+    #                         if options.output_path is not None:
+    #                             import os
+    #                             outdir = os.path.join(options.output_path, options.exp_type)
+    #                             if not os.path.isdir(outdir):
+    #                                 os.makedirs(outdir)
+    #                             pl.savefig(outdir+'/'+animal_id+'_'+date+options.plot_format)
+    #                             print outdir+'/'+animal_id+'_'+date+options.plot_format
+    #                         else:
+    #                             pl.show()
 
 
 #----------------------------------------------------------------------------------------
@@ -275,7 +354,6 @@ def group_bout_ci(all_data, options, exp_type, time_window,
                         # between the 5% quantile of the data and the 'df_max' argument 
                         # of the function
                         median_time_series.append( np.median(time_arr, axis=0) )
-            1/0
 
 
             ax.plot(median_time_series)
@@ -398,7 +476,9 @@ def plot_representative_time_series(options, representative_time_series_specs_fi
                 FA.plot_basic_tseries(out_path = dir + '/' + FA.subject_id + "_" +
                                       FA.exp_date + "_" + FA.exp_type + "_" + 
                                       str(int(FA.time_range.split(':')[0])) +  
-                                      "_" + str(int(FA.time_range.split(':')[1])) +"_" ) 
+                                      "_" + str(int(FA.time_range.split(':')[1])) +"_",
+                                      )
+                                      #resolution=1000 ) 
 
 #----------------------------------------------------------------------------------------
 
@@ -534,6 +614,7 @@ def plot_compare_start_and_end(options,
                                time_window, 
                                metric, 
                                output_path,
+                               pvalue = None,
                                ):
     
     plt.figure()
@@ -548,7 +629,10 @@ def plot_compare_start_and_end(options,
         plt.ylabel( 'End - Start (' + metric +' w/in ' + str(time_window[1]) + 
                     's window, avged across epochs)')
 
-    plt.title('More fluorescence after end than after start of interaction with novel object ')
+    if pvalue is not None:
+        plt.title('Comparison of peak fluorescence after start and end of interaction, p<' + "{0:.4f}".format(pvalue))
+    else:
+        plt.title('Comparison of peak fluorescence after start and end of interaction')
     if compare_before_after_end:
         pl.savefig(output_path + str(time_window[1]) + '_' + metric+ 
                     '_after_minus_before_end'+options.plot_format)
@@ -565,7 +649,10 @@ def compare_start_and_end_of_epoch(all_data, options,
                                    test='ttest', 
                                    plot_perievent=False, 
                                    compare_before_after_end=False,
-                                   show_plot=True):
+                                   show_plot=True,
+                                   perivent_window = [3, 3],
+                                   max_bout_number=0, 
+                                    ):
 
     """
     Calculates the difference between the fluorescence in a window at the beginning
@@ -622,19 +709,26 @@ def compare_start_and_end_of_epoch(all_data, options,
                     scores_diff = end_scores - before_scores
 
                 pair_scores[animal_id][exp_type] = scores_diff
-                pair_avg_scores[animal_id][exp_type] = np.mean(scores_diff)
+                #pair_avg_scores[animal_id][exp_type] = np.mean(scores_diff)
+
+                if max_bout_number>0:
+                    pair_avg_scores[animal_id][exp_type] = np.mean(scores_diff[0:max_bout_number])
+                else:
+                    pair_avg_scores[animal_id][exp_type] = np.mean(scores_diff)
 
                 if(plot_perievent):
                     fig = plt.figure()
                     ax = fig.add_subplot(2,1,1)
                     title = FA.subject_id + ' ' + FA.exp_date + ' ' + FA.exp_type
                     ax.set_title(title)
-                    FA.plot_perievent_hist(start_event_times, time_window, 
+                    FA.plot_perievent_hist(start_event_times, perivent_window, 
                                            out_path=options.output_path, plotit=True, 
                                            subplot=ax, baseline_window=-1  )
+                    plt.title('Top: aligned with start; Bottom: aligned with end')
+
 
                     ax = fig.add_subplot(2,1,2)
-                    FA.plot_perievent_hist(end_event_times, time_window, 
+                    FA.plot_perievent_hist(end_event_times, perivent_window, 
                                            out_path=options.output_path, plotit=True, 
                                            subplot=ax, baseline_window=-1 )
                     if options.output_path is None:
@@ -648,7 +742,7 @@ def compare_start_and_end_of_epoch(all_data, options,
 
 
     [exp_scores, animal_list] = compileAnimalScoreDictIntoArray(pair_avg_scores)
-    statisticalTestOfComparison(exp_scores, exp1, exp2, test)
+    [zstatistic, pvalue] = statisticalTestOfComparison(exp_scores, exp1, exp2, test)
     print "Exp_scores", exp_scores
 
     plt.close('all')
@@ -660,9 +754,24 @@ def compare_start_and_end_of_epoch(all_data, options,
                                time_window=time_window, 
                                metric=metric, 
                                output_path=options.output_path,
+                               pvalue = pvalue,
                                 )
+    filename = options.output_path + 'window_' + \
+            str(time_window[1]).replace(".","-") + '_numbouts_' + \
+            str(max_bout_number) + '_minspace_' + \
+            str(options.event_spacing).replace(".", "-") + '_' + metric
+    f = open(filename+'.txt', 'w')
+    f.write(str(exp1) + '\n')
+    f.write(str(exp_scores[exp1]) + '\n')
+    f.write(str(exp2) + '\n')
+    f.write(str(exp_scores[exp2]) + '\n')
+    f.write("animal ordering: " + str(animal_list))
+    f.close()
+
     if show_plot:
         plt.show()
+
+
 
 
 def statisticalTestOfComparison(exp_scores, exp1, exp2, test):
@@ -781,7 +890,7 @@ def compare_epochs(all_data,
                                 #       for each trial type (i.e. homecagenovel and homecagesocial)
 
 
-    [iter_list, animal_id_list, date_list, exp_type_list] = group_iter_list(all_data, options)
+    #[iter_list, animal_id_list, date_list, exp_type_list] = group_iter_list(all_data, options)
 
     for animal_id in pairs.keys():
         pair_scores[animal_id] = dict()
@@ -810,6 +919,9 @@ def compare_epochs(all_data,
                 end_event_times = FA.get_event_times(edge="falling", 
                                                      nseconds=float(options.event_spacing),
                                                      exp_type=exp_type)
+
+                print "start_event_times: ", start_event_times
+                print "end_event_times: ", end_event_times
 
                 #--Get an array of time series chunks in a window around each event time
                 if time_window == [0, 0]:
@@ -938,6 +1050,52 @@ def get_bout_averages(pair_scores):
 
 ########################################################################
 
+def eNegX(p, x):
+        x0, y0, c, k=p
+        #Set c=1 to normalize all of the trials, since we
+        # are only interested in the rate of decay
+        y = (1 * np.exp(-k*(x-x0))) + y0
+        return y
+
+def eNegX_residuals(p, x, y):
+    return y - eNegX(p, x)
+
+def fit_exponential(x, y, num_points=100):
+    # Because we are optimizing over a nonlinear function
+    # choose a number of possible starting values of (x0, y0, c, k)
+    # and use the results from whichever produces the smallest 
+    # residual
+    # num_points gives the number of points in the returned curve, pxp
+
+    kguess = [0, 0.1, 0.5, 1.0, 10, 100, 500, 1000]
+    yguess = [0, 1]
+    max_r2 = -1
+    maxvalues = ()
+    for kg in kguess:
+        for yg in yguess:
+            p_guess=(np.min(x), yg, 1, kg)
+            p, cov, infodict, mesg, ier = sp.optimize.leastsq(
+                eNegX_residuals, p_guess, args=(x, y), full_output=1)
+
+            x0,y0,c,k=p 
+
+            numPoints = np.floor((np.max(x) - np.min(x))*num_points)
+            xp = np.linspace(np.min(x), np.max(x), numPoints)
+            pxp = eNegX(p, xp)
+            yxp = eNegX(p, x)
+
+            sstot = np.sum(np.multiply(y - np.mean(y), y - np.mean(y)))
+            sserr = np.sum(np.multiply(y - yxp, y - yxp))
+            r2 = 1 - sserr/sstot
+            if max_r2 == -1:
+                maxvalues = (xp, pxp, x0, y0, c, k, r2, yxp)
+            if r2 > max_r2:
+                max_r2 = r2
+                maxvalues = (xp, pxp, x0, y0, c, k, r2, yxp)
+
+    print "maxvalues", maxvalues
+
+    return maxvalues
 
 def plot_decay(options,
                bout_dict, 
@@ -973,13 +1131,40 @@ def plot_decay(options,
     fig = plt.figure()  
     ax = fig.add_subplot(111)
     x = np.array(range(max_bout_number))
-    plot0 = ax.errorbar(x, bout_avg_dict[bout_avg_dict.keys()[0]][0:max_bout_number], 
-                            yerr=1.96*np.array(bout_std_err[bout_avg_dict.keys()[0]][0:max_bout_number]), 
-                            fmt='o-', color=colors[0])
-    plot1 = ax.errorbar(x, bout_avg_dict[bout_avg_dict.keys()[1]][0:max_bout_number], 
-                            yerr=1.96*np.array(bout_std_err[bout_avg_dict.keys()[1]][0:max_bout_number]), 
-                            fmt='o-', color=colors[1])
-    plt.legend([plot0, plot1], bout_avg_dict.keys())
+    y0 = bout_avg_dict[bout_avg_dict.keys()[0]][0:max_bout_number]
+    y1 = bout_avg_dict[bout_avg_dict.keys()[1]][0:max_bout_number]
+
+
+    yvalues = y0
+    try:
+        xp, pxp, xo, yo, c, k, r2, yxp = fit_exponential(x, np.array(yvalues)+1.0)
+        ax.plot(xp, pxp-1, color=colors[0])
+        legend0 = bout_avg_dict.keys()[0] + ": decay rate = " + "{0:.2f}".format(k) + ", r^2 = " + "{0:.2f}".format(r2)
+    except:
+        legend0 = bout_avg_dict.keys()[0]
+        print "Exponential Curve fit did not work"
+
+    plot0 = ax.errorbar(x, y0, 
+                        yerr=1.96*np.array(bout_std_err[bout_avg_dict.keys()[0]][0:max_bout_number]), 
+                        fmt='o', color=colors[0])
+
+    yvalues = y1
+    try:
+        xp, pxp, xo, yo, c, k, r2, yxp = fit_exponential(x, np.array(yvalues)+1.0)
+        ax.plot(xp, pxp-1, color=colors[1])
+        legend1 = bout_avg_dict.keys()[1] + ": decay rate = " + "{0:.2f}".format(k) + ", r^2 = " + "{0:.2f}".format(r2)
+    except:
+        legend1 = bout_avg_dict.keys()[1]
+        print "Exponential Curve fit did not work"
+
+    plot1 = ax.errorbar(x, y1, 
+                        yerr=1.96*np.array(bout_std_err[bout_avg_dict.keys()[1]][0:max_bout_number]), 
+                        fmt='o', color=colors[1])
+
+
+
+
+    plt.legend([plot0, plot1], [legend0, legend1])
     plt.xlabel('Bout number')
     plt.title('Average decay over time')
     plt.ylabel('Average ' + metric + ' per bout [dF/F]')
@@ -1058,6 +1243,60 @@ def compare_decay(all_data,
                min_spacing=options.event_spacing,
                show_plot=True,
                )
+
+
+def event_length_histogram(all_data, 
+                           options, 
+                           make_plot=True,
+                           max_bout_number=0):
+
+    """
+    Plots a histogram of the length (in seconds) of each event
+    """
+
+    [iter_list, animal_id_list, date_list, exp_type_list] = group_iter_list(all_data, options)
+
+    event_lengths = np.zeros(0)
+
+    for exp in iter_list:
+        animal_id = exp['animal_id']
+        date = exp['date']
+        exp_type = exp['exp_type']
+
+        FA = FiberAnalyze(options)
+        FA.fluor_normalization = 'deltaF'
+        FA.time_range = '0:-1'
+        [FA, success] = loadFiberAnalyze(FA, options, animal_id, date, exp_type)
+
+        if (success != -1):
+
+            start_event_times = np.array(FA.get_event_times(edge="rising", 
+                                                   nseconds=float(options.event_spacing), 
+                                                   exp_type=exp_type))
+            end_event_times = np.array(FA.get_event_times(edge="falling", 
+                                                 nseconds=float(options.event_spacing), 
+                                                 exp_type=exp_type))
+
+            lengths = end_event_times - start_event_times
+            event_lengths = np.append(event_lengths, lengths)
+
+    print event_lengths
+    x = np.arange(0.,15., 0.1)
+    pl.figure()
+    pl.hist(event_lengths, x)
+    pl.title("Distribution of bout lengths: " + str(options.exp_type))
+    pl.xlabel("Bout length [s]")
+    pl.ylabel("Number of bouts")
+    if options.output_path is not None:
+        import os
+        outdir = os.path.join(options.output_path, options.exp_type)
+        if not os.path.isdir(outdir):
+            os.makedirs(outdir)
+        pl.savefig(outdir+'/'+exp_type+'_event_length_hist' + options.plot_format)
+        print outdir+'/'+exp_type+'_event_length_hist' + options.plot_format
+    else:
+        pl.show()
+
 
 
 #-------------------------------------------------------------------------------------------
@@ -1144,17 +1383,18 @@ if __name__ == "__main__":
     # [before,after] event in seconds 
     time_window = np.array(options.time_window.split(':'), dtype='float32') 
 
-    to_plot = 'group_plot_time_series'
+    to_plot = 'compare_start_and_end_of_epoch'
 
     if to_plot == 'group_regression_plot':
         group_regression_plot(all_data, options, 
-                              exp_type=options.exp_type, time_window=time_window)
+                              exp_type=options.exp_type, time_window=time_window,
+                              metric="integrated")
     elif to_plot == 'group_bout_heatmaps':
         group_bout_heatmaps(all_data, options, 
                             exp_type=options.exp_type, time_window=time_window,
-                            max_num_epochs=9)
+                            max_num_epochs=15, ymax_setting = 'small')
     elif to_plot == 'group_bout_ci':
-        group_bout_ci(all_data, options, 
+        group_bout_ci(all_data, options, exp_type=options.exp_type,
                       time_window=time_window)
     elif to_plot == 'group_plot_time_series':
         group_plot_time_series(all_data, options)
@@ -1163,16 +1403,20 @@ if __name__ == "__main__":
     elif to_plot == 'compare_start_and_end_of_epoch':
         compare_start_and_end_of_epoch(all_data, options, 
                                        exp1='homecagesocial', exp2='homecagenovel', 
-                                       time_window=[0, .5], metric='peak', test='ttest')
+                                       time_window=[0, .5], metric='peak', test='wilcoxon',
+                                       plot_perievent=False)
     elif to_plot == 'compare_epochs':
         compare_epochs(all_data, options, 
                        exp1='homecagenovel', exp2='homecagesocial', 
-                       time_window=[0, 0], metric='area', test='wilcoxon', 
+                       time_window=[0, 0], metric='peak', test='wilcoxon', 
                        make_plot=True, max_bout_number=5, plot_perievent=False)
     elif to_plot == 'compare_decay':
         compare_decay(all_data, options, 
                       exp1='homecagenovel', exp2='homecagesocial', 
-                      time_window=[0, 0], metric='spacing', test='wilcoxon', 
-                      make_plot=True, max_bout_number=15)
+                      time_window=[0, 0], metric='peak', test='wilcoxon', 
+                      make_plot=True, max_bout_number=13)
+    elif to_plot == 'event_length_histogram':
+        event_length_histogram(all_data, options, 
+                               make_plot=True)
 
 # EOF
