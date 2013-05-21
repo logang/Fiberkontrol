@@ -14,7 +14,11 @@ from state_space import denoise
 from fiber_record_analyze import FiberAnalyze
 
 
-def group_iter_list(all_data, options, exp_type=None, animal_id=None, exp_date=None, mouse_type=None):
+def group_iter_list(all_data, options, 
+                    exp_type=None, 
+                    animal_id=None, 
+                    exp_date=None, 
+                    mouse_type=None):
     """
     Returns a list where each
     entry is an array containing
@@ -27,7 +31,7 @@ def group_iter_list(all_data, options, exp_type=None, animal_id=None, exp_date=N
     One can then iterate over this list
     to analyze a group of mice
 
-    TODO: This has not yet been incorporated into the rest of the code
+    TODO: This has not yet been incorporated into all of the rest of the code
     """
 
     iter_list = []
@@ -63,6 +67,28 @@ def group_iter_list(all_data, options, exp_type=None, animal_id=None, exp_date=N
     print [iter_list, animal_id_list, date_list, exp_type_list]
     return [iter_list, animal_id_list, date_list, exp_type_list]
 
+
+def loadFiberAnalyze(FA, options, animal_id, exp_date, exp_type):
+    """
+    Load an instance of the fiberAnalyze class, initialized
+    to an experimental trial identified by the id# of the animal,
+    the date of the experiment, and the type of the experiment (i.e. 
+        homecagesocial or homecagenovel)
+    """
+
+    FA.subject_id = str(animal_id)
+    FA.exp_date = str(exp_date)
+    FA.exp_type = str(exp_type)
+    print FA.subject_id, " ", FA.exp_date, " ", FA.exp_type
+    try:
+        success = FA.load(file_type="hdf5") 
+    except:
+        success = -1
+    if(success != -1):
+        print "denoise"
+        FA.fluor_data = np.asarray(denoise(FA.fluor_data))
+
+    return [FA, success]
 
 
 def group_regression_plot(all_data, 
@@ -559,28 +585,6 @@ def score_of_chunks(ts_arr, metric='area', start_event_times=None, end_event_tim
 
         i = i + 1
     return scores
-
-def loadFiberAnalyze(FA, options, animal_id, exp_date, exp_type):
-    """
-    Load an instance of the fiberAnalyze class, initialized
-    to an experimental trial identified by the id# of the animal,
-    the date of the experiment, and the type of the experiment (i.e. 
-        homecagesocial or homecagenovel)
-    """
-
-    FA.subject_id = str(animal_id)
-    FA.exp_date = str(exp_date)
-    FA.exp_type = str(exp_type)
-    print FA.subject_id, " ", FA.exp_date, " ", FA.exp_type
-    try:
-        success = FA.load(file_type="hdf5") 
-    except:
-        success = -1
-    if(success != -1):
-        print "denoise"
-        FA.fluor_data = np.asarray(denoise(FA.fluor_data))
-
-    return [FA, success]
 
 def compileAnimalScoreDictIntoArray(pair_avg_scores):
     """
@@ -1301,9 +1305,8 @@ def event_length_histogram(all_data,
 
 #-------------------------------------------------------------------------------------------
 
-if __name__ == "__main__":
-
-    # Parse command line options
+def set_and_read_options_parser():
+        # Parse command line options
     from optparse import OptionParser
 
     parser = OptionParser()
@@ -1375,15 +1378,18 @@ if __name__ == "__main__":
                       help="Image format for saving plots: '.png', '.pdf', '.svg', '.tiff'")
     
     (options, args) = parser.parse_args()
+    return (options, args)
 
-    # --- Plot data --- #
 
+if __name__ == "__main__":
+    (options, args) = set_and_read_options_parser()
     all_data = h5py.File(options.input_path,'r')
-
     # [before,after] event in seconds 
     time_window = np.array(options.time_window.split(':'), dtype='float32') 
 
+
     to_plot = 'compare_start_and_end_of_epoch'
+
 
     if to_plot == 'group_regression_plot':
         group_regression_plot(all_data, options, 

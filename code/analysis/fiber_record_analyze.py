@@ -561,30 +561,6 @@ class FiberAnalyze( object ):
         else:
            # pl.savefig(os.path.join(out_path,"event_vs_baseline_barplot"))
             pl.savefig(out_path + "event_vs_baseline_barplot.pdf")
-        
-    def low_pass_filter(self, cutoff):
-        """
-        Low pass filter the data with frequency cutoff: 'cutoff'.
-        """
-
-        if self.filt_fluor_data is None:
-            rawsignal = self.fluor_data
-        else:
-            rawsignal = self.filt_fluor_data
-
-        if self.fft is None:
-            self.get_fft()
-        bp = self.fft
-
-        for i in range(len(bp)):
-            if self.fft_freq[i]>= cutoff: bp[i] = 0
-        self.fft = bp #update fft of the class to the filtered version
-
-        ibp = sp.ifft(bp)
-        low_pass_y = np.real(ibp)
-        low_pass_y += np.median(self.fluor_data) - np.median(low_pass_y)
-        self.filt_fluor_data = low_pass_y
-        return low_pass_y
 
     def smooth(self, num_time_points, window_type='gaussian'):
         """
@@ -604,21 +580,6 @@ class FiberAnalyze( object ):
         print "done smoothing."
         return smoothed_fluor_data/np.sum(window)
 
-
-    def get_peaks( self, window_in_seconds=1 ):
-        """
-        Heuristic for finding local peaks in the calcium data. 
-        """
-        print "get_peaks"
-       # peak_widths = np.array([100,250,500,750,1000])
-        window_in_indices = self.convert_seconds_to_index(window_in_seconds)
-        print "window_in_indices", window_in_indices
-        peak_widths = np.array([window_in_indices])
-        self.peak_inds = signal.find_peaks_cwt(self.fluor_data, widths=peak_widths, wavelet=None, max_distances=None, gap_thresh=None, min_length=None, min_snr=5, noise_perc=50)
-        self.peak_vals = self.fluor_data[self.peak_inds]
-        self.peak_times = self.time_stamps[self.peak_inds]
-        return self.peak_inds, self.peak_vals, self.peak_times
-
     def notch_filter(self, low, high):
         """
         Notch filter that cuts out frequencies (Hz) between [low:high].
@@ -635,10 +596,6 @@ class FiberAnalyze( object ):
         print "fft calculated."
 
         bpfilt = np.where(self.fft_freq <=high and self.fft_freq >= low, bp, 0)
-#        for i in range(len(bp)):
-#            if self.fft_freq[i]<= high and self.fft_freq[i]>= low:
-#                bp[i] = 0
-#        self.fft = bp #update fft of the class to the filtered version
         self.fft=bpfilt
 
         ibp = sp.ifft(bp)
@@ -647,170 +604,21 @@ class FiberAnalyze( object ):
         self.filt_fluor_data = notch_filt_y
         return notch_filt_y
 
-    def get_chunks_not_during_events(self, 
-                                     fluor_data, 
-                                     event_times, 
-                                     end_times):
-        """
-        Returns a time series from which all event periods have been removed
-        """
-        time_chunks = np.zeros(0)
-        time_stamp_chunks = np.zeros(0)
-
-        for i in range(len(event_times)):
-            e = event_times[i]
-            if i == 0:
-                n = 0
-            else:
-                n = event_times[i-1]
-           # try:
-            e_idx = np.where(e<self.time_stamps)[0][0]
-            n_idx = np.where(n<self.time_stamps)[0][0]
-
-            chunk = fluor_data[range((n_idx),(e_idx))]
-                #print [range((e_idx-window_indices[0]),(e_idx+window_indices[1]))]
-            time_chunks = np.append(time_chunks, chunk)
-            time_stamp_chunks = np.append(time_stamp_chunks, self.time_stamps[range((n_idx),(e_idx))])
-
-            #except:
-             #   print "Unable to extract window:", [(e-window_indices[0]),(e+window_indices[1])]
-        return (time_chunks, time_stamp_chunks)
-
-    def plot_chunk_periodogram( self, 
-                                time_stamps, 
-                                data, 
-                                out_path=None, 
-                                plot_type="log", 
-                                window_len=20, 
-                                peak_index=None, 
-                                title=None):
-        """
-        Given a time series or section of a 
-        time series, plot the frequency content 
-        """
-
-        fft = sp.fft(data)
-        fft = fft[:]
-
-        n = data.size
-        timestep = np.max(time_stamps[1:] - time_stamps[:-1])
-        fft_freq = np.fft.fftfreq(n, d=timestep)
-
-        Y = np.abs(fft)**2
-        freq = fft_freq
-
-        s = np.r_[Y[window_len-1:0:-1],Y,Y[-1:-window_len:-1]] #periodic boundary
-        w = np.bartlett(window_len)
-        Y = np.convolve(w/w.sum(), s, mode='valid')
-
-        num_values = int(min(len(Y), len(freq))*.5) #Cut off negative frequencies
-        #start_freq = 0.25*(num_values/100) #i.e. start at 0.25 Hz
-        start_freq = 0#(num_values/100) #i.e. start at 0.25 Hz
-        freq_vals = freq[range(num_values)]
-        Y = Y[range(num_values)]
-
-        pl.plot( freq_vals[start_freq:num_values], 
-                    np.log(Y[start_freq:num_values]), 'k-')
-        pl.ylabel('Log(Spectral Density) (a.u.)')
-        pl.xlabel('Frequency (Hz)')
-        pl.title(self.input_path)
-        #pl.axis([1, 100, 0, 1.1*np.log(np.max(Y[start_freq:num_values]))])
-        pl.axis([0, 100, -5, 10])
-        
-        if out_path is None:
-            pl.show()
-        else:
-            print "Saving periodogram..."
-            if title is not None:
-                pl.savefig(out_path + "periodogram_" + title + ".pdf")
-                pl.savefig(out_path + "periodogram_" + title + ".png")
-
-            if peak_index is None:
-                pl.savefig(out_path + "periodogram.pdf")
-                pl.savefig(out_path + "periodogram.png")
-            else:
-                pl.savefig(out_path + "periodogram_" + peak_index + ".pdf")
-                pl.savefig(out_path + "periodogram_" + peak_index + ".png")
-
-        return (freq_vals, Y)
-
-
-    def plot_full_periodogram( self, out_path = None, plot_type="log", window_len = 20):
-        """
-        Plot periodogram of fluoroscence data.
-        """
-        print "Plotting periodogram"
-        pl.clf()
-        
+    def get_fft(self):
+        print "getting fft."
         if self.filt_fluor_data is None:
             rawsignal = self.fluor_data
         else:
             rawsignal = self.filt_fluor_data
-            
-        if self.fft is None:
-            self.get_fft()
-
-        Y = np.abs(self.fft)**2 #power spectral density
-        freq = self.fft_freq
         
-        ## Smooth spectral density 
-        s = np.r_[Y[window_len-1:0:-1],Y,Y[-1:-window_len:-1]] #periodic boundary
-        w = np.bartlett(window_len)
-        Y = np.convolve(w/w.sum(), s, mode='valid')
-                                     
-        num_values = int(min(len(Y), len(freq))*.5) #Cut off negative frequencies
-        start_freq = 0.25*(num_values/100) #i.e. start at 0.25 Hz
-        freq_vals = freq[range(num_values)]
-        Y = Y[range(num_values)]
+        print "calculating fft."
+        fft = sp.fft(rawsignal)
+        self.fft = fft[:]
 
-        #plot 
-        pl.figure()
-        if plot_type == "standard":
-            pl.plot( freq_vals[start_freq:num_values], Y[start_freq:num_values], 'k-')
-            pl.ylabel('Spectral Density (a.u.)')
-            pl.xlabel('Frequency (Hz)')
-            pl.title(self.input_path)
-            pl.axis([1, 100, 0, 1.1*np.max(Y[start_freq:num_values])])
-        elif plot_type == "log": 
-            pl.plot( freq_vals[start_freq:num_values], np.log(Y[start_freq:num_values]), 'k-')
-            pl.ylabel('Log(Spectral Density) (a.u.)')
-            pl.xlabel('Frequency (Hz)')
-            pl.title(self.input_path)
-            #pl.axis([1, 100, 0, 1.1*np.log(np.max(Y[start_freq:num_values]))])
-            pl.axis([1, 100, -5, 10])
-        else:
-            print "Currently only 'standard' and 'log' plot types are available"
-
-        if out_path is None:
-            pl.show()
-        else:
-            print "Saving periodogram..."
-          #  pl.savefig(os.path.join(out_path,'periodogram'))
-            pl.savefig(out_path + "periodogram.pdf")
-        
-    def plot_peak_data( self, out_path=None ):
-        """
-        Plot fluorescent data with chosen peak_inds overlayed as lines.
-        """
-        print "plot_peak_data"
-        pl.clf()
-        lines = np.zeros(len(self.fluor_data))
-        lines[self.peak_inds] = 1.0
-        pl.plot(self.fluor_data)
-        pl.plot(lines)
-        if self.fluor_normalization == "deltaF":
-            pl.ylabel(r'$\delta F/F$')
-        else:
-            pl.ylabel('Fluorescence Intensity (a.u.)')
-        pl.xlabel('Time (samples)')
-
-        if out_path is None:
-            pl.show()
-        else:
-          #  pl.savefig(os.path.join(out_path,'peak_finding'))
-            pl.savefig(out_path + "peak_finding.pdf")
-            pl.savefig(out_path + "peak_finding.png")
-
+        n = rawsignal.size
+        print "rawsignal.size", n
+        timestep = np.max(self.time_stamps[1:] - self.time_stamps[:-1])
+        self.fft_freq = np.fft.fftfreq(n, d=timestep)
 
     def get_time_chunks_around_events(self, 
                                       data, 
@@ -957,21 +765,6 @@ class FiberAnalyze( object ):
         else:
             print "No event times loaded. Cannot plot perievent."        
 
-    def get_fft(self):
-        print "getting fft."
-        if self.filt_fluor_data is None:
-            rawsignal = self.fluor_data
-        else:
-            rawsignal = self.filt_fluor_data
-        
-        print "calculating fft."
-        fft = sp.fft(rawsignal)
-        self.fft = fft[:]
-
-        n = rawsignal.size
-        print "rawsignal.size", n
-        timestep = np.max(self.time_stamps[1:] - self.time_stamps[:-1])
-        self.fft_freq = np.fft.fftfreq(n, d=timestep)
 
     def get_event_times( self, edge="rising", nseconds=0, exp_type=None):
         """
@@ -1020,138 +813,6 @@ class FiberAnalyze( object ):
         else:            
             print "No event times loaded. Cannot find edges."        
             return [-1]
-
-    def get_peaks_convolve( self, window, out_path=None, type="sucrose"):
-        """
-        Find peaks based on the difference in signal integrated
-        over a window of nseconds before and nseconds after
-        each time point
-        """
-
-        nindex_after = self.convert_seconds_to_index(window[1])
-        nindex_before = self.convert_seconds_to_index(window[0])
-        mask = np.ones(nindex_after)
-        mask = np.append(mask, -np.ones(nindex_before))
-
-        time_vals = self.time_stamps[range(len(self.fluor_data))]
-        smoothed_gradient = np.convolve(self.fluor_data, mask)
-        smoothed_gradient = smoothed_gradient[nindex-1:]/(2*nindex)
-
-        diff_nseconds = 0.1
-        diff_nindex = self.convert_seconds_to_index(0.1)
-        diff_mask = np.ones(diff_nindex)
-        diff_mask = np.append(diff_mask, -np.ones(diff_nindex))
-        smoothed_curve = np.convolve(smoothed_gradient, diff_mask)
-
-
-        type = self.exp_type
-   
-        event_times = self.get_event_times(edge="rising", exp_type=type)
-
-
-        window = [25, 25]
-        fluor_chunks = self.get_time_chunks_around_events(self.fluor_data, event_times, window, baseline_window=window)
-        grad_chunks = self.get_time_chunks_around_events(smoothed_gradient, event_times, window, baseline_window=window)
-        curve_chunks = self.get_time_chunks_around_events(smoothed_curve, event_times, window, baseline_window=window)
-
-
-        window_indices = [ self.convert_seconds_to_index(window[0]),
-                           self.convert_seconds_to_index(window[1]) ]
-
-        time_arr = np.asarray(fluor_chunks).T
-        grad_arr = np.asarray(grad_chunks).T
-        curve_arr = np.asarray(curve_chunks).T
-        x = self.time_stamps[0:time_arr.shape[0]]-self.time_stamps[window_indices[0]] ###IS THIS RIGHT?
-    
-        ymax = np.max(time_arr)
-        ymax += 0.1*ymax
-        ymin = np.min(time_arr)
-        #ymin -= 0.1*ymin
-        ymin = -1
-       
-        for i in xrange(time_arr.shape[1]):
-
-            grad_peaks = [time_vals[i] for k in range(len(curve_arr[:,i])) if (np.round(10000*curve_arr[k, i]) == 0)]
-
-            fig = pl.figure()
-            ax = fig.add_subplot(111)
-            ax.plot(x, time_arr[:,i], color=pl.cm.winter(255-255*i/time_arr.shape[1]), alpha=0.75, linewidth=1)
-            ax.plot(x, grad_arr[:,i], 'r')
-            ax.plot(x, 1000*curve_arr[:,i], 'k')
-            x.shape = (len(x),1) 
-            x_padded = np.vstack([x[0], x, x[-1]])
-            time_vec = time_arr[:,i]; time_vec.shape = (len(time_vec),1)
-            time_vec_padded = np.vstack([0, time_vec,0]) 
-            pl.fill(x_padded, time_vec_padded, facecolor=pl.cm.winter(255-255*i/time_arr.shape[1]), alpha=0.25 )   
-            #pl.ylim([0,ymax])
-            pl.ylim([ymin, ymax])
-            
-            for j in range(len(grad_peaks)):
-                pl.axvline(x=grad_peaks[j], color='r', linewidth=1)
-            # add a line for the event onset time
-            pl.axvline(x=0,color='black',linewidth=1,linestyle='--')
-
-            # label the plot axes
-            if self.fluor_normalization == "deltaF":
-                pl.ylabel(r'$\delta F/F$')
-            else:
-                pl.ylabel('Fluorescence Intensity (a.u.)')
-            pl.xlabel('Time from onset of social bout (seconds)')
-
-        # show plot now or save of an output path was specified
-        if out_path is None:
-            pl.show()
-        #else:
-          #  print "Saving peri-event time series..."
-            #pl.savefig(os.path.join(out_path,'perievent_tseries'))
-          #  pl.savefig(out_path + "smoothed_perievent_tseries.png")
-
-
-       ##TO DO >>>>>>>>
-
-        # print np.shape(smoothed_gradient)
-        # print np.shape(time_vals)
-        # print np.shape(self.fluor_data)
-        # pl.plot(time_vals, self.fluor_data)
-        # pl.plot(time_vals, smoothed_gradient, 'r')
-        # pl.ylabel('Gradient of time series')
-        # pl.xlabel('Time [s]')
-        # if out_path is not None:
-        #      pl.savefig(out_path + "smoothed_gradient.png")
-        # else:
-        #      pl.show()
-
-        return smoothed_gradient
-
-    def get_lick_density_vs_time( self, window_after, out_path=None, plot_it=False):
-        """
-        For each time point, plot the number of licks occuring
-        in the window_after (in seconds) after that time point.
-        """
-
-        nindex = self.convert_seconds_to_index(window_after)
-        mask = np.ones(nindex)
-        self.trigger_data = np.floor(self.trigger_data)
-
-        time_vals = self.time_stamps[range(len(self.trigger_data))]
-        density = np.convolve(self.trigger_data, mask)
-        density = density[nindex-1:]
-
-        if (plot_it):
-            pl.figure()
-            pl.plot(time_vals, density)
-            pl.fill(time_vals, 100*self.trigger_data, facecolor='r', alpha=0.5)
-            pl.ylabel('Density of licks calculated over window of ' + str(nseconds))
-            pl.xlabel('Time [s]')
-            pl.title('Density of licks')
-            if out_path is not None:
-                 pl.savefig(out_path + "lick_density.png")
-            else:
-                 pl.show()
-
-        return density
-
-
 
     def get_sucrose_event_times( self, nseconds=15, density=None, edge="rising"):
         """
@@ -1262,7 +923,6 @@ class FiberAnalyze( object ):
             print out_path + "_debleached.npz"
             print ""
 
-
         if self.save_and_exit:
             sys.exit(0)
 
@@ -1288,18 +948,6 @@ class FiberAnalyze( object ):
 
         return areas
 
-    def plot_area_under_curve_wrapper( self, window, edge="rising", normalize=True, out_path=None):
-        """
-        Wrapper for plot_area_under_curve vs. time plots specialized for
-        loaded event data that comes as a list of pairs of
-        event start and end times (in seconds)
-        """
-        start_times = self.get_event_times(edge="rising", exp_type=self.exp_type)
-        end_times = self.get_event_times(edge="falling", exp_type=self.exp_type)
-        if start_times != -1:
-            self.plot_area_under_curve( start_times, end_times, window, normalize, out_path=out_path )
-        else:
-            print "No event times loaded. Cannot plot perievent."  
 
     def get_peak( self, start_time, end_time, exp_type=None ):
         """
@@ -1361,87 +1009,6 @@ class FiberAnalyze( object ):
                     maxvalues = (xp, pxp, x0, y0, c, k, r2, yxp)
 
         return maxvalues
-
-    def fit_peak(self, peak_index=None, type="sucrose", out_path=None):
-        """
-        Fits each individual peak using an inverse gamma function.
-        Currently works moderately well, however there is an issue 
-        with accurately choosing when the peak actually begins.
-        """
-
-        type = self.exp_type
-
-        event_times = self.get_event_times(edge="rising", exp_type=type)
-
-        event_lengths = np.array(end_times) - np.array(event_times)
-        window = [0, np.max(event_lengths) + 10] #10 is right now an arbitrary buffer
-        baseline_window = [np.max(event_lengths) + 10, np.max(event_lengths) + 10]
-        time_chunks = self.get_time_chunks_around_events(self.fluor_data, event_times, window, baseline_window=baseline_window)
-
-        window_indices = [self.convert_seconds_to_index( window[0]),
-                              self.convert_seconds_to_index( window[1])]
-
-        time_arr = np.asarray(time_chunks).T
-        x = self.time_stamps[0:time_arr.shape[0]]-self.time_stamps[window_indices[0]]
-
-        if peak_index is None:
-            for i in range(len(event_times)):
-                self.fit_invgamma(x, time_arr[:, i], out_path, i)
-        else:
-            self.fit_invgamma(x, time_arr[:, peak_index], out_path, peak_index)
-           
-
-    def fit_invgamma(self, x, y, out_path=None, peak_index=0):
-        print "fitting invgamma"
-        
-        mask = np.ones(1000)
-        yorig = y
-      #  y = np.convolve(y, mask)
-      #  y = y[len(mask)-1:]/len(mask)
-
-        x = x - x[0]
-        y = y/(np.sum(y)*(x[1]-x[0]))
-        print np.sum(y)*(x[1]-x[0])
-
-        max_r2 = -1
-        maxvalues = ()
-
-
-        b_parameters = range(0, 100)#[0.1, 1, 1.5, 2, 3, 5, 7, 8, 11, 20, 100, 500, 1000]
-        a_parameters = [0.01]#, 0.1, 0.5, 1, 2, 5]
-        for b in b_parameters:
-                fit_alpha,fit_loc,fit_beta=ss.invgamma.fit(y, loc=0, scale=b)
-                rv = ss.invgamma(fit_alpha, fit_loc, fit_beta)
-                yxp = rv.pdf(x)
-
-
-                sstot = np.sum(np.multiply(y - np.mean(y), y - np.mean(y)))
-                sserr = np.sum(np.multiply(y[1:] - yxp[1:], y[1:] - yxp[1:]))
-                r2 = 1 - sserr/sstot
-                #print  "sstot: ", sstot, "sserr: ", sserr, "r2: ", r2
-
-                if max_r2 == -1:
-                    maxvalues = (fit_alpha, fit_loc, fit_beta)
-                if r2 > max_r2:
-                    max_r2 = r2
-                    maxvalues = (fit_alpha, fit_loc, fit_beta)
-
-        print "maxvalues", maxvalues, "max_r2: ", max_r2
-        rv = ss.invgamma(maxvalues[0], maxvalues[1], maxvalues[2])
-        pl.figure()
-        pl.plot(x, yorig/(np.sum(yorig)*(x[1]-x[0])), 'b')
-        pl.plot(x, y, 'k')
-        fitplot, = pl.plot(x,rv.pdf(x), 'r')
-        pl.title('Inverse gamma distribution model of calcium dynamics')
-        pl.xlabel('Time since onset of licking epoch (seconds)')
-        pl.ylabel('Fluorescence (normalized deltaF/F)')
-        pl.legend([fitplot], [ r"$\alpha$ = " + "{0:.2f}".format(maxvalues[0]) + r", $\beta $= " + "{0:.2f}".format(maxvalues[2]) +  
-                                r", $r^2 = $" + "{0:.2f}".format(max_r2)])
-        if out_path is None:
-            pl.show()
-        else:
-            pl.savefig(out_path + "inv_gamma_spike_" + str(peak_index) +  ".pdf")
-            pl.savefig(out_path + "inv_gamma_spike_" + str(peak_index) +  ".png")
 
     def fit_linear(self, x, y):
         A = np.array([x, np.ones(len(x))])
@@ -1524,6 +1091,439 @@ class FiberAnalyze( object ):
 #-----------------------------------------------------------------------------------------
 #-----------------------BEGIN: TO POSSIBLY DELETE------------------------------------------------
 #-----------------------------------------------------------------------------------------
+#-----------------------------------------------------------------------------------------
+#-----------------------------------------------------------------------------------------
+
+#-----------------------------------------------------------------------------------------
+#-----------------------BEGIN: NOT USED NOW BUT COULD BE USEFUL LATER---------------------
+#-----------------------------------------------------------------------------------------
+    def get_peaks_convolve( self, window, out_path=None, type="sucrose"):
+        """
+        Find peaks based on the difference in signal integrated
+        over a window of nseconds before and nseconds after
+        each time point
+        """
+
+        nindex_after = self.convert_seconds_to_index(window[1])
+        nindex_before = self.convert_seconds_to_index(window[0])
+        mask = np.ones(nindex_after)
+        mask = np.append(mask, -np.ones(nindex_before))
+
+        time_vals = self.time_stamps[range(len(self.fluor_data))]
+        smoothed_gradient = np.convolve(self.fluor_data, mask)
+        smoothed_gradient = smoothed_gradient[nindex-1:]/(2*nindex)
+
+        diff_nseconds = 0.1
+        diff_nindex = self.convert_seconds_to_index(0.1)
+        diff_mask = np.ones(diff_nindex)
+        diff_mask = np.append(diff_mask, -np.ones(diff_nindex))
+        smoothed_curve = np.convolve(smoothed_gradient, diff_mask)
+
+
+        type = self.exp_type
+   
+        event_times = self.get_event_times(edge="rising", exp_type=type)
+
+
+        window = [25, 25]
+        fluor_chunks = self.get_time_chunks_around_events(self.fluor_data, event_times, window, baseline_window=window)
+        grad_chunks = self.get_time_chunks_around_events(smoothed_gradient, event_times, window, baseline_window=window)
+        curve_chunks = self.get_time_chunks_around_events(smoothed_curve, event_times, window, baseline_window=window)
+
+
+        window_indices = [ self.convert_seconds_to_index(window[0]),
+                           self.convert_seconds_to_index(window[1]) ]
+
+        time_arr = np.asarray(fluor_chunks).T
+        grad_arr = np.asarray(grad_chunks).T
+        curve_arr = np.asarray(curve_chunks).T
+        x = self.time_stamps[0:time_arr.shape[0]]-self.time_stamps[window_indices[0]] ###IS THIS RIGHT?
+    
+        ymax = np.max(time_arr)
+        ymax += 0.1*ymax
+        ymin = np.min(time_arr)
+        #ymin -= 0.1*ymin
+        ymin = -1
+       
+        for i in xrange(time_arr.shape[1]):
+
+            grad_peaks = [time_vals[i] for k in range(len(curve_arr[:,i])) if (np.round(10000*curve_arr[k, i]) == 0)]
+
+            fig = pl.figure()
+            ax = fig.add_subplot(111)
+            ax.plot(x, time_arr[:,i], color=pl.cm.winter(255-255*i/time_arr.shape[1]), alpha=0.75, linewidth=1)
+            ax.plot(x, grad_arr[:,i], 'r')
+            ax.plot(x, 1000*curve_arr[:,i], 'k')
+            x.shape = (len(x),1) 
+            x_padded = np.vstack([x[0], x, x[-1]])
+            time_vec = time_arr[:,i]; time_vec.shape = (len(time_vec),1)
+            time_vec_padded = np.vstack([0, time_vec,0]) 
+            pl.fill(x_padded, time_vec_padded, facecolor=pl.cm.winter(255-255*i/time_arr.shape[1]), alpha=0.25 )   
+            #pl.ylim([0,ymax])
+            pl.ylim([ymin, ymax])
+            
+            for j in range(len(grad_peaks)):
+                pl.axvline(x=grad_peaks[j], color='r', linewidth=1)
+            # add a line for the event onset time
+            pl.axvline(x=0,color='black',linewidth=1,linestyle='--')
+
+            # label the plot axes
+            if self.fluor_normalization == "deltaF":
+                pl.ylabel(r'$\delta F/F$')
+            else:
+                pl.ylabel('Fluorescence Intensity (a.u.)')
+            pl.xlabel('Time from onset of social bout (seconds)')
+
+        # show plot now or save of an output path was specified
+        if out_path is None:
+            pl.show()
+        #else:
+          #  print "Saving peri-event time series..."
+            #pl.savefig(os.path.join(out_path,'perievent_tseries'))
+          #  pl.savefig(out_path + "smoothed_perievent_tseries.png")
+
+
+       ##TO DO >>>>>>>>
+
+        # print np.shape(smoothed_gradient)
+        # print np.shape(time_vals)
+        # print np.shape(self.fluor_data)
+        # pl.plot(time_vals, self.fluor_data)
+        # pl.plot(time_vals, smoothed_gradient, 'r')
+        # pl.ylabel('Gradient of time series')
+        # pl.xlabel('Time [s]')
+        # if out_path is not None:
+        #      pl.savefig(out_path + "smoothed_gradient.png")
+        # else:
+        #      pl.show()
+
+        return smoothed_gradient
+
+
+    def get_lick_density_vs_time( self, window_after, out_path=None, plot_it=False):
+        """
+        For each time point, plot the number of licks occuring
+        in the window_after (in seconds) after that time point.
+        """
+
+        nindex = self.convert_seconds_to_index(window_after)
+        mask = np.ones(nindex)
+        self.trigger_data = np.floor(self.trigger_data)
+
+        time_vals = self.time_stamps[range(len(self.trigger_data))]
+        density = np.convolve(self.trigger_data, mask)
+        density = density[nindex-1:]
+
+        if (plot_it):
+            pl.figure()
+            pl.plot(time_vals, density)
+            pl.fill(time_vals, 100*self.trigger_data, facecolor='r', alpha=0.5)
+            pl.ylabel('Density of licks calculated over window of ' + str(nseconds))
+            pl.xlabel('Time [s]')
+            pl.title('Density of licks')
+            if out_path is not None:
+                 pl.savefig(out_path + "lick_density.png")
+            else:
+                 pl.show()
+
+        return density
+
+
+
+    def plot_chunk_periodogram( self, 
+                            time_stamps, 
+                            data, 
+                            out_path=None, 
+                            plot_type="log", 
+                            window_len=20, 
+                            peak_index=None, 
+                            title=None):
+        """
+        Given a time series or section of a 
+        time series, plot the frequency content 
+        """
+
+        fft = sp.fft(data)
+        fft = fft[:]
+
+        n = data.size
+        timestep = np.max(time_stamps[1:] - time_stamps[:-1])
+        fft_freq = np.fft.fftfreq(n, d=timestep)
+
+        Y = np.abs(fft)**2
+        freq = fft_freq
+
+        s = np.r_[Y[window_len-1:0:-1],Y,Y[-1:-window_len:-1]] #periodic boundary
+        w = np.bartlett(window_len)
+        Y = np.convolve(w/w.sum(), s, mode='valid')
+
+        num_values = int(min(len(Y), len(freq))*.5) #Cut off negative frequencies
+        #start_freq = 0.25*(num_values/100) #i.e. start at 0.25 Hz
+        start_freq = 0#(num_values/100) #i.e. start at 0.25 Hz
+        freq_vals = freq[range(num_values)]
+        Y = Y[range(num_values)]
+
+        pl.plot( freq_vals[start_freq:num_values], 
+                    np.log(Y[start_freq:num_values]), 'k-')
+        pl.ylabel('Log(Spectral Density) (a.u.)')
+        pl.xlabel('Frequency (Hz)')
+        pl.title(self.input_path)
+        #pl.axis([1, 100, 0, 1.1*np.log(np.max(Y[start_freq:num_values]))])
+        pl.axis([0, 100, -5, 10])
+        
+        if out_path is None:
+            pl.show()
+        else:
+            print "Saving periodogram..."
+            if title is not None:
+                pl.savefig(out_path + "periodogram_" + title + ".pdf")
+                pl.savefig(out_path + "periodogram_" + title + ".png")
+
+            if peak_index is None:
+                pl.savefig(out_path + "periodogram.pdf")
+                pl.savefig(out_path + "periodogram.png")
+            else:
+                pl.savefig(out_path + "periodogram_" + peak_index + ".pdf")
+                pl.savefig(out_path + "periodogram_" + peak_index + ".png")
+
+        return (freq_vals, Y)
+
+
+    def plot_full_periodogram( self, out_path = None, plot_type="log", window_len = 20):
+        """
+        Plot periodogram of fluoroscence data.
+        """
+        print "Plotting periodogram"
+        pl.clf()
+        
+        if self.filt_fluor_data is None:
+            rawsignal = self.fluor_data
+        else:
+            rawsignal = self.filt_fluor_data
+            
+        if self.fft is None:
+            self.get_fft()
+
+        Y = np.abs(self.fft)**2 #power spectral density
+        freq = self.fft_freq
+        
+        ## Smooth spectral density 
+        s = np.r_[Y[window_len-1:0:-1],Y,Y[-1:-window_len:-1]] #periodic boundary
+        w = np.bartlett(window_len)
+        Y = np.convolve(w/w.sum(), s, mode='valid')
+                                     
+        num_values = int(min(len(Y), len(freq))*.5) #Cut off negative frequencies
+        start_freq = 0.25*(num_values/100) #i.e. start at 0.25 Hz
+        freq_vals = freq[range(num_values)]
+        Y = Y[range(num_values)]
+
+        #plot 
+        pl.figure()
+        if plot_type == "standard":
+            pl.plot( freq_vals[start_freq:num_values], Y[start_freq:num_values], 'k-')
+            pl.ylabel('Spectral Density (a.u.)')
+            pl.xlabel('Frequency (Hz)')
+            pl.title(self.input_path)
+            pl.axis([1, 100, 0, 1.1*np.max(Y[start_freq:num_values])])
+        elif plot_type == "log": 
+            pl.plot( freq_vals[start_freq:num_values], np.log(Y[start_freq:num_values]), 'k-')
+            pl.ylabel('Log(Spectral Density) (a.u.)')
+            pl.xlabel('Frequency (Hz)')
+            pl.title(self.input_path)
+            #pl.axis([1, 100, 0, 1.1*np.log(np.max(Y[start_freq:num_values]))])
+            pl.axis([1, 100, -5, 10])
+        else:
+            print "Currently only 'standard' and 'log' plot types are available"
+
+        if out_path is None:
+            pl.show()
+        else:
+            print "Saving periodogram..."
+          #  pl.savefig(os.path.join(out_path,'periodogram'))
+            pl.savefig(out_path + "periodogram.pdf")
+
+    def fit_peak(self, peak_index=None, type="sucrose", out_path=None):
+        """
+        Fits each individual peak using an inverse gamma function.
+        Currently works moderately well, however there is an issue 
+        with accurately choosing when the peak actually begins.
+        """
+
+        type = self.exp_type
+
+        event_times = self.get_event_times(edge="rising", exp_type=type)
+
+        event_lengths = np.array(end_times) - np.array(event_times)
+        window = [0, np.max(event_lengths) + 10] #10 is right now an arbitrary buffer
+        baseline_window = [np.max(event_lengths) + 10, np.max(event_lengths) + 10]
+        time_chunks = self.get_time_chunks_around_events(self.fluor_data, event_times, window, baseline_window=baseline_window)
+
+        window_indices = [self.convert_seconds_to_index( window[0]),
+                              self.convert_seconds_to_index( window[1])]
+
+        time_arr = np.asarray(time_chunks).T
+        x = self.time_stamps[0:time_arr.shape[0]]-self.time_stamps[window_indices[0]]
+
+        if peak_index is None:
+            for i in range(len(event_times)):
+                self.fit_invgamma(x, time_arr[:, i], out_path, i)
+        else:
+            self.fit_invgamma(x, time_arr[:, peak_index], out_path, peak_index)
+
+    def fit_invgamma(self, x, y, out_path=None, peak_index=0):
+        print "fitting invgamma"
+        
+        mask = np.ones(1000)
+        yorig = y
+      #  y = np.convolve(y, mask)
+      #  y = y[len(mask)-1:]/len(mask)
+
+        x = x - x[0]
+        y = y/(np.sum(y)*(x[1]-x[0]))
+        print np.sum(y)*(x[1]-x[0])
+
+        max_r2 = -1
+        maxvalues = ()
+
+
+        b_parameters = range(0, 100)#[0.1, 1, 1.5, 2, 3, 5, 7, 8, 11, 20, 100, 500, 1000]
+        a_parameters = [0.01]#, 0.1, 0.5, 1, 2, 5]
+        for b in b_parameters:
+                fit_alpha,fit_loc,fit_beta=ss.invgamma.fit(y, loc=0, scale=b)
+                rv = ss.invgamma(fit_alpha, fit_loc, fit_beta)
+                yxp = rv.pdf(x)
+
+
+                sstot = np.sum(np.multiply(y - np.mean(y), y - np.mean(y)))
+                sserr = np.sum(np.multiply(y[1:] - yxp[1:], y[1:] - yxp[1:]))
+                r2 = 1 - sserr/sstot
+                #print  "sstot: ", sstot, "sserr: ", sserr, "r2: ", r2
+
+                if max_r2 == -1:
+                    maxvalues = (fit_alpha, fit_loc, fit_beta)
+                if r2 > max_r2:
+                    max_r2 = r2
+                    maxvalues = (fit_alpha, fit_loc, fit_beta)
+
+        print "maxvalues", maxvalues, "max_r2: ", max_r2
+        rv = ss.invgamma(maxvalues[0], maxvalues[1], maxvalues[2])
+        pl.figure()
+        pl.plot(x, yorig/(np.sum(yorig)*(x[1]-x[0])), 'b')
+        pl.plot(x, y, 'k')
+        fitplot, = pl.plot(x,rv.pdf(x), 'r')
+        pl.title('Inverse gamma distribution model of calcium dynamics')
+        pl.xlabel('Time since onset of licking epoch (seconds)')
+        pl.ylabel('Fluorescence (normalized deltaF/F)')
+        pl.legend([fitplot], [ r"$\alpha$ = " + "{0:.2f}".format(maxvalues[0]) + r", $\beta $= " + "{0:.2f}".format(maxvalues[2]) +  
+                                r", $r^2 = $" + "{0:.2f}".format(max_r2)])
+        if out_path is None:
+            pl.show()
+        else:
+            pl.savefig(out_path + "inv_gamma_spike_" + str(peak_index) +  ".pdf")
+            pl.savefig(out_path + "inv_gamma_spike_" + str(peak_index) +  ".png")
+
+
+    def get_peaks( self, window_in_seconds=1 ):
+        """
+        Heuristic for finding local peaks in the calcium data. 
+        """
+        print "get_peaks"
+       # peak_widths = np.array([100,250,500,750,1000])
+        window_in_indices = self.convert_seconds_to_index(window_in_seconds)
+        print "window_in_indices", window_in_indices
+        peak_widths = np.array([window_in_indices])
+        self.peak_inds = signal.find_peaks_cwt(self.fluor_data, widths=peak_widths, wavelet=None, max_distances=None, gap_thresh=None, min_length=None, min_snr=5, noise_perc=50)
+        self.peak_vals = self.fluor_data[self.peak_inds]
+        self.peak_times = self.time_stamps[self.peak_inds]
+        return self.peak_inds, self.peak_vals, self.peak_times
+
+    def plot_peak_data( self, out_path=None ):
+        """
+        Plot fluorescent data with chosen peak_inds overlayed as lines.
+        """
+        print "plot_peak_data"
+        pl.clf()
+        lines = np.zeros(len(self.fluor_data))
+        lines[self.peak_inds] = 1.0
+        pl.plot(self.fluor_data)
+        pl.plot(lines)
+        if self.fluor_normalization == "deltaF":
+            pl.ylabel(r'$\delta F/F$')
+        else:
+            pl.ylabel('Fluorescence Intensity (a.u.)')
+        pl.xlabel('Time (samples)')
+
+        if out_path is None:
+            pl.show()
+        else:
+          #  pl.savefig(os.path.join(out_path,'peak_finding'))
+            pl.savefig(out_path + "peak_finding.pdf")
+            pl.savefig(out_path + "peak_finding.png")
+
+
+    def low_pass_filter(self, cutoff):
+        """
+        Low pass filter the data with frequency cutoff: 'cutoff'.
+        """
+
+        if self.filt_fluor_data is None:
+            rawsignal = self.fluor_data
+        else:
+            rawsignal = self.filt_fluor_data
+
+        if self.fft is None:
+            self.get_fft()
+        bp = self.fft
+
+        for i in range(len(bp)):
+            if self.fft_freq[i]>= cutoff: bp[i] = 0
+        self.fft = bp #update fft of the class to the filtered version
+
+        ibp = sp.ifft(bp)
+        low_pass_y = np.real(ibp)
+        low_pass_y += np.median(self.fluor_data) - np.median(low_pass_y)
+        self.filt_fluor_data = low_pass_y
+        return low_pass_y
+
+
+    def get_chunks_not_during_events(self, 
+                             fluor_data, 
+                             event_times, 
+                             end_times):
+        """
+        Returns a time series from which all event periods have been removed
+        """
+        time_chunks = np.zeros(0)
+        time_stamp_chunks = np.zeros(0)
+
+        for i in range(len(event_times)):
+            e = event_times[i]
+            if i == 0:
+                n = 0
+            else:
+                n = event_times[i-1]
+           # try:
+            e_idx = np.where(e<self.time_stamps)[0][0]
+            n_idx = np.where(n<self.time_stamps)[0][0]
+
+            chunk = fluor_data[range((n_idx),(e_idx))]
+                #print [range((e_idx-window_indices[0]),(e_idx+window_indices[1]))]
+            time_chunks = np.append(time_chunks, chunk)
+            time_stamp_chunks = np.append(time_stamp_chunks, self.time_stamps[range((n_idx),(e_idx))])
+
+            #except:
+             #   print "Unable to extract window:", [(e-window_indices[0]),(e+window_indices[1])]
+        return (time_chunks, time_stamp_chunks)
+
+
+#-----------------------------------------------------------------------------------------
+#-----------------------END: NOT USED NOW BUT COULD BE USEFUL LATER---------------------
+#-----------------------------------------------------------------------------------------
+
+#-----------------------------------------------------------------------------------------
+#-----------------------BEGIN: SHOULD PROBABLY BE REWRITTEN ANYWAYS-----------------------
+#-----------------------------------------------------------------------------------------
+
 
     def analyze_spectrum( self, peak_index=None, out_path=None ):
         """
@@ -1572,6 +1572,20 @@ class FiberAnalyze( object ):
             else:
                 return 0   
 
+
+    def plot_area_under_curve_wrapper( self, window, edge="rising", normalize=True, out_path=None):
+        """
+        Wrapper for plot_area_under_curve vs. time plots specialized for
+        loaded event data that comes as a list of pairs of
+        event start and end times (in seconds)
+        """
+        start_times = self.get_event_times(edge="rising", exp_type=self.exp_type)
+        end_times = self.get_event_times(edge="falling", exp_type=self.exp_type)
+        if start_times != -1:
+            self.plot_area_under_curve( start_times, end_times, window, normalize, out_path=out_path )
+        else:
+            print "No event times loaded. Cannot plot perievent."  
+            
 
     def plot_area_under_curve( self, start_times, end_times, window, normalize=False, out_path=None):
         """
@@ -1897,7 +1911,9 @@ class FiberAnalyze( object ):
 
         pl.show()
 
-
+#-----------------------------------------------------------------------------------------
+#-----------------------END: SHOULD PROBABLY BE REWRITTEN ANYWAYS-----------------------
+#-----------------------------------------------------------------------------------------
 
 #-----------------------------------------------------------------------------------------
 #------------------------END: TO POSSIBLY DELETE-------------------------------------------
@@ -1929,8 +1945,6 @@ def test_FiberAnalyze(options):
    # FA.get_sucrose_event_times(5, "falling")
 #    FA.event_vs_baseline_barplot(out_path = options.output_path)
 
-
-    
 
     #FA.plot_area_under_curve_wrapper( window=[0, 1], edge="rising", normalize=False, out_path = options.output_path)
     #FA.plot_peaks_vs_time(out_path = options.output_path)
