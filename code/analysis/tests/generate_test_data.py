@@ -20,6 +20,10 @@ class TimeSeriesSimulator( object ):
 	def __init__(self, options):
 
 		self.output_path = options.output_path
+		self.mouse_type = options.mouse_type
+		self.exp_date = options.exp_date
+		self.exp_type = options.exp_type
+		self.mouse_number = options.mouse_number
 
 		# acquisition parameters from fiberkontrol_LED.py
 		self.SampleFrequency = 250.0 #in Hz
@@ -28,8 +32,7 @@ class TimeSeriesSimulator( object ):
 		self.numDataPoints = int(self.SampleFrequency*self.totalTime)
 		self.time_stamps = np.arange(self.numDataPoints+1)*self.totalTime/self.numDataPoints
 
-		self.exp_type = options.exp_type
-		self.mouse_number = options.mouse_number
+
 
 		if self.exp_type == 'social':
 			self.no_event_lambda = 200
@@ -44,11 +47,33 @@ class TimeSeriesSimulator( object ):
 		based on the provided statistics.
 		"""
 		if self.mouse_number == '0001':
-			start_times = [49.8, 100]
-			end_times = [50.7, 101.5]
+			if self.exp_type == 'social':
+				start_times = [49.8, 100]
+				end_times = [50.7, 101.5]
+			elif self.exp_type == 'novel':
+				start_times = [50.8, 100]
+				end_times = [51.8, 101.5]
 		elif self.mouse_number == '0002':
-			start_times = [40.8, 44.6, 110]
-			end_times = [42.3, 45.1, 111.5]
+			if self.exp_type == 'social':
+				start_times = [40.8, 44.6, 110]
+				end_times = [42.3, 45.1, 111.5]
+			elif self.exp_type == 'novel':
+				start_times = [41.8, 74.6, 115]
+				end_times = [42.8, 75.6, 116.5]
+		elif self.mouse_number == '0003':
+			if self.exp_type == 'social':
+				start_times = [41.8, 45.6, 116.0]
+				end_times = [43.1, 46.1, 117.5]
+			elif self.exp_type == 'novel':
+				start_times = [41.8, 90.6, 112.0]
+				end_times = [43.1, 91.4, 113.5]
+		elif self.mouse_number == '0004':
+			if self.exp_type == 'social':
+				start_times = [ 45.6,51.9, 108.0]
+				end_times = [ 46.8, 53.1, 109.5]
+			elif self.exp_type == 'novel':
+				start_times = [50.9,  100.0]
+				end_times = [51.9, 101.1]
 
 		start_indices = self.SecondsToIndices(start_times)
 		end_indices = self.SecondsToIndices(end_times)
@@ -147,20 +172,22 @@ class TimeSeriesSimulator( object ):
 		resolution = 10
 		plt.plot(self.time_stamps[::resolution], self.fluor[::resolution])
 		plt.plot(self.time_stamps[::resolution], event_indicator[::resolution]*np.max(self.fluor), 'r')
-		directory = '20130524/figs'
+		directory = self.exp_date+'/figs'
+		if not os.path.isdir(self.output_path + self.exp_date):
+		    os.mkdir(self.output_path + self.exp_date)
 		if not os.path.isdir(self.output_path + directory):
 		    os.mkdir(self.output_path + directory)
-		plt.savefig(self.output_path + directory + '/20130524-GC5-homecage' + self.exp_type + '-'+self.mouse_number+'-600patch_test.png')
+		plt.savefig(self.output_path + directory + '/'+self.exp_date+'-'+self.mouse_type+'-homecage' + self.exp_type + '-'+self.mouse_number+'-600patch_test.png')
 
 
 	def save(self):
 		self.out_arr = np.tile(self.fluor, (4, 1)).T;
 		print "out_arr", self.out_arr, np.shape(self.out_arr)
-		outfile = self.output_path + '20130524/20130524-GC5-homecage' + self.exp_type + '-'+self.mouse_number+'-600patch_test'
+		outfile = self.output_path + self.exp_date+'/'+self.exp_date+'-'+self.mouse_type+'-homecage' + self.exp_type + '-'+self.mouse_number+'-600patch_test'
 		np.savez(outfile, data=self.out_arr, time_stamps=self.time_stamps)
 
-		np.savez(self.output_path + '20130524/GC5_'+self.mouse_number+'_'+self.exp_type+'_s', self.start_times)
-		np.savez(self.output_path + '20130524/GC5_'+self.mouse_number+'_'+self.exp_type+'_e', self.end_times)
+		np.savez(self.output_path + self.exp_date+'/'+self.mouse_type+'_'+self.mouse_number+'_'+self.exp_type+'_s', self.start_times)
+		np.savez(self.output_path + self.exp_date+'/'+self.mouse_type+'_'+self.mouse_number+'_'+self.exp_type+'_e', self.end_times)
 
 
 if __name__ == "__main__":
@@ -174,6 +201,10 @@ if __name__ == "__main__":
                   help="Specify the experiment type 'social', or 'novel'.")
 	parser.add_option("", "--mouse-number", dest="mouse_number", default='0001',
                    help="Specify the mouse number (stick to 0001, 0002...).")
+	parser.add_option("", "--mouse-type", dest="mouse_type", default='GC5',
+                   help="Specify the mouse type (GC5, GC5_NAcprojection).")
+	parser.add_option("", "--exp-date", dest="exp_date", default='20130524',
+                   help="Specify the experiment date.")
 	(options, args) = parser.parse_args()
 
 

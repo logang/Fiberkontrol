@@ -167,7 +167,8 @@ if __name__ == '__main__':
     parser = OptionParser()
 
     parser.add_option("-o", "--out-path", dest="out_path", default=None, 
-                      help="Specify the path to the output HDF5 file.")
+                      help="Specify the path to the output HDF5 file. This also"
+                            " specifies which HDF5 file to change.")
 
     parser.add_option("", "--save-debleach", action="store_true", default=False, 
                       dest="save_debleach", 
