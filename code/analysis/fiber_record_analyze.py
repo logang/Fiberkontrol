@@ -946,8 +946,8 @@ class FiberAnalyze( object ):
             else: 
                 areas.append(sum(chunk)/len(chunk))
 
-        return areas
 
+        return areas
 
     def get_peak( self, start_time, end_time, exp_type=None ):
         """

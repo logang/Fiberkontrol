@@ -13,7 +13,6 @@ from state_space import denoise
 
 from fiber_record_analyze import FiberAnalyze
 
-
 def group_iter_list(all_data, options, 
                     exp_type=None, 
                     animal_id=None, 
@@ -97,7 +96,6 @@ def group_regression_plot(all_data,
                           time_window=[-1,1],
                           metric="integrated",
                           ):
-
     """
     Plot fits of regression lines on data from home cage or novel social 
     fiber photometry data, with points corresponding to bout and bout number.
@@ -105,15 +103,22 @@ def group_regression_plot(all_data,
     TODO: write better description of function. Clean up code. Have figure save to output_path. 
     """
 
+    exp_type = options.exp_type
+    time_window = np.asarray(options.time_window.split(':'),dtype=np.int)
+
     # Create figure
     fig = pl.figure()
     ax = fig.add_subplot(1,1,1)
 
     i=0 # color counter
+    num_animals = 6.
+    num_bouts = 10
+    slopes = []
     for animal_id in all_data.keys():
 
         # load data from hdf5 file by animal-date-exp_type
         animal = all_data[animal_id]
+
         for dates in animal.keys():
             date = animal[dates]
 
@@ -168,12 +173,65 @@ def group_regression_plot(all_data,
                     #ax.plot(np.log(peak_intensity), np.log(onset_next_vals),'o')
                     print "No values to plot for", animal_id, dates, exp_type
 
-#    pl.xlabel("log peak intensity in first second after interaction onset")
-    pl.xlabel("log integrated intensity in first second after interaction onset")
+
+                FA, success = loadFiberAnalyze(options, animal_id, dates, exp_type)
+
+                # get intensity and next_val values for this animal
+                if success != -1:
+                    peak_intensity, onset_next_vals = FA.plot_next_event_vs_intensity(intensity_measure="peak", 
+                                                                    next_event_measure="onset", 
+                                                                    window=time_window, out_path=None, 
+                                                                    plotit=False)
+
+                    # fit a robust regression
+                    if len(onset_next_vals) > 0:
+                        X = np.nan_to_num( np.vstack( ( np.log(peak_intensity), np.ones((len(onset_next_vals),))) ) )
+                        if X.shape[1] > 2:
+
+                            X = X[0:min(num_bouts,X.shape[1]),:]
+                            lm_model = sm.OLS(np.log(onset_next_vals), X.T)
+                            lm_results = lm_model.fit()
+                            print "-------------------------------------"
+                            print animal_id, dates
+                            try:
+                                print "\t--> Slope:",lm_results.params[0]
+            #                    print "\t--> Intercept:",lm_results.params[1]
+            #                    print "\t--> Confidence Interval for Slope:", lm_results.conf_int()[0,:]
+                                print "\t--> P-value for Slope:", lm_results.pvalues[0]
+            #                    print "\t--> Confidence Interval for Intercept:", lm_results.conf_int()[1,:]
+            #                    print "\t--> P-value Interval for Intercept:", lm_results.pvalues[1]
+                                print "\t--> R-squared", lm_results.rsquared
+                            except:
+                                pass
+                            try:
+                                print "\t--> R-squared Adjusted:", lm_results.rsquared_adj
+                            except:
+                                print "\t--> Could not calculate adjusted R-squared."
+                            yhat = lm_results.fittedvalues
+                            slopes.append( lm_results.params[0] )
+            #                fig = pl.figure()
+            #                ax = fig.add_subplot(1,1,1)
+            #                ax.loglog(peak_intensity,onset_next_vals,'o')
+
+                            ax.plot(np.log(peak_intensity), np.log(onset_next_vals),'o',color=cm.jet(float(i+1)/num_animals))
+            #                ax.plot(peak_intensity, onset_next_vals,'o',color=cm.jet(float(i)/10.))
+                            ax.plot(np.log(peak_intensity), yhat, '-', color=cm.jet(float(i+1)/num_animals) )
+
+            #                pl.show()
+                            i+=1 # increment color counter
+                        else:
+                            #ax.plot(np.log(peak_intensity), np.log(onset_next_vals),'o')
+                            print "No values to plot for", animal_id, dates, exp_type
+
+    pl.xlabel("log peak intensity in first 2 seconds after interaction onset")
+#    pl.xlabel("Log integrated intensity in first 2 seconds after interaction onset")
     
-    pl.ylabel("log time until next interaction")
+    pl.ylabel("Log time in seconds until next interaction")
 #    pl.ylabel("log length of next interaction")
     pl.show()
+
+    print "Slopes:",slopes
+    return slopes
 
 #------------------------------------------------------------------------------
 
@@ -337,25 +395,70 @@ def group_bout_heatmaps(all_data,
     #                         else:
     #                             pl.show()
 
-
 #----------------------------------------------------------------------------------------
 
-def group_bout_ci(all_data, options, exp_type, time_window, 
-                  df_max=0.35, event_edge="rising"):
+def group_bout_ci(all_data, options, 
+                  df_max=0.35, event_edge="rising",num_bouts=5):
     """
     Save out plots of mean or median activity with confidence intervals. 
     """
+    exp_type = options.exp_type
+    time_window = np.asarray(options.time_window.split(':'),dtype=np.int)
+    time_window = [0,3]
+    # Create figure
+    fig = pl.figure()
+    ax = fig.add_subplot(1,1,1)
+
     i=0 # color counter
     exp_types = ['homecagesocial', 'homecagenovel']
-    for animal_id in all_data.keys():
-        # load data from hdf5 file by animal-date-exp_type
-        animal = all_data[animal_id]
-        for dates in animal.keys():
-            # Create figure
-            fig = pl.figure()
-            ax = fig.add_subplot(1,1,1)
-            for exp_type in exp_types:
-                date = animal[dates]
+    exp_arrays = []
+    for exp_type in exp_types:
+        median_time_series = []
+        for animal_id in all_data.keys():
+            # load data from hdf5 file by animal-date-exp_type
+            animal = all_data[animal_id]
+            if animal.attrs['mouse_type'] == options.mouse_type:
+                for dates in animal.keys():
+
+                    date = animal[dates]               
+                    FA, success = loadFiberAnalyze(options, animal_id, dates, exp_type)
+
+                    if exp_type in animal[dates].keys():
+    #                    if(FA.load(file_type="hdf5") != -1):
+                        if(success != -1):
+                            event_times = FA.get_event_times(event_edge, int(options.event_spacing))
+                            print "len(event_times)", len(event_times)
+                            time_arr = np.asarray( FA.get_time_chunks_around_events(FA.fluor_data, 
+                                                                                    event_times, 
+                                                                                    time_window) )
+
+                            if num_bouts is not None:
+                                time_arr = time_arr[:num_bouts,:]
+                            
+                            median_time_series.append( np.median(time_arr, axis=0) )
+
+        # XXX HACK: the time series aren't quite the same length so we truncate them 
+        # to the same length in order to stack them
+        truncate = 1e10
+        for i in xrange(len(median_time_series)):
+            truncate = min( truncate, len(median_time_series[i]) )
+
+        exp_array = np.zeros((len(median_time_series), truncate))
+        for i in xrange(len(median_time_series)):
+            exp_array[i,:] = median_time_series[i][:truncate]
+
+        exp_arrays.append(exp_array)
+
+    fmt = 'r-'
+    for a in exp_arrays:
+        e = np.std(a,axis=0)
+#        for i in xrange(a.shape[0]):
+#            ax.plot(a[i,:],fmt)
+#        ax.plot(np.median(a,axis=0))
+        ax.errorbar(range(a.shape[1]), np.mean(a,axis=0),yerr=e, fmt=fmt)
+        ax.set_aspect('auto')
+        fmt = 'b-'
+    pl.show()
 
                 FA = FiberAnalyze(options)
                 [FA, success] = loadFiberAnalyze(FA,
@@ -584,6 +687,33 @@ def score_of_chunks(ts_arr, metric='area', start_event_times=None, end_event_tim
 
         i = i + 1
     return scores
+
+
+def loadFiberAnalyze(options, animal_id, exp_date, exp_type):
+    """
+    Load an instance of the fiberAnalyze class, initialized
+    to an experimental trial identified by the id# of the animal,
+    the date of the experiment, and the type of the experiment (i.e. 
+        homecagesocial or homecagenovel)
+    """
+
+    FA = FiberAnalyze( options )
+    FA.subject_id = str(animal_id)
+    FA.exp_date = str(exp_date)
+    FA.exp_type = str(exp_type)
+    print FA.subject_id, " ", FA.exp_date, " ", FA.exp_type
+    try:
+        success = FA.load(file_type="hdf5") 
+    except:
+        success = -1
+    print "success: ", success
+#    print "np.shape(FA.fluor_data) before denoise: ",FA.fluor_data
+    if(success != -1):
+        print "denoise"
+        FA.fluor_data = np.asarray(denoise(FA.fluor_data))
+#    print "np.shape(FA.fluor_data) after denoise: ", FA.fluor_data
+
+    return [FA, success]
 
 def compileAnimalScoreDictIntoArray(pair_avg_scores):
     """
@@ -1385,7 +1515,6 @@ if __name__ == "__main__":
     all_data = h5py.File(options.input_path,'r')
     # [before,after] event in seconds 
     time_window = np.array(options.time_window.split(':'), dtype='float32') 
-
 
     to_plot = 'compare_epochs'
 
