@@ -9,22 +9,9 @@ import json
 import h5py
 import numpy as np
 import os
+from load_configuration import load_configuration
 
-def load_configuration():
-    config_file = 'tests/test_configuration.json'
-    config_dict = json.loads(open(config_file).read())
-    config_dict = dict((str(k), str(v) if isinstance(v, unicode) else v) for k, v in config_dict.items())
-    print config_dict
-    return config_dict
-
-    # cfg = {};
-    # with open('tests/test_configuration.txt', 'rb') as f:
-    #     reader = csv.reader(f, delimiter='=', quoting=csv.QUOTE_NONE)
-    #     for row in reader:
-    #         cfg[str(row[0].strip())] = row[1].strip()
-    #return cfg
             
-
 class Test_read_filenames():
     def setup(self):
         cfg = load_configuration()
@@ -71,7 +58,7 @@ class Test_generate_hdf5_file():
 
 
     def tearDown(self):
-        self.f.close()
+        #self.f.close()
         os.remove(self.path_to_hdf5)
 
     def test_add_multiple_animals(self):
@@ -139,12 +126,12 @@ class Test_add_flattened_files_to_hdf5():
         prp.generate_hdf5_file(self.analysis_filenames,self.path_to_hdf5)
 
     def tearDown(self):
-        self.f.close()
+        #self.f.close()
         os.remove(self.path_to_hdf5)
 
     def test_add_flat_files(self):
-        flat_directories = str(self.path_to_flat_data)
-        prp.add_flattened_files_to_hdf5(flat_directories, self.path_to_hdf5)
+#        flat_directories = str(self.path_to_flat_data)
+        prp.add_flattened_files_to_hdf5(self.path_to_flat_data, self.path_to_hdf5)
 
         self.f = h5py.File(self.path_to_hdf5)
         f = self.f
@@ -172,7 +159,8 @@ class Test_add_flattened_files_to_hdf5():
 
 
 
-class Test_debleach():
+# class Test_debleach():
+#     pass
     #TODO
     #TODO
     #TODO

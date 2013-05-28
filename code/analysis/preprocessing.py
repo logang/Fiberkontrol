@@ -69,8 +69,9 @@ def generate_hdf5_file(analysis_filenames,out_path):
             cmd += ' --mouse-type=' + info[1]
             result = run_command_wrapper(cmd)
             print ""
-            print cmd
-            print result
+            if result[0] == False:
+                print cmd
+                print result
 
 #------------------------------------------------------------------------------
 
@@ -114,18 +115,20 @@ def add_flattened_files_to_hdf5(flat_directories, out_path):
     """
     Adds debleached files to the hdf5 file specified.
     """
-    for d in flat_directories:
-        cmd = 'python add_files_to_hdf5.py -f '
-        cmd += d 
-        cmd += ' -n flat'
-        cmd += ' --hdfpath='
-        cmd += out_path
-        #Note that --add-new flag remains False
-        print cmd
-        
-        #result = run_command_wrapper(cmd)
-        #print result
-        os.system(cmd)
+   # for d in flat_directories:
+    d = flat_directories
+    
+    cmd = 'python add_files_to_hdf5.py -f '
+    cmd += d 
+    cmd += ' -n flat'
+    cmd += ' --hdfpath='
+    cmd += out_path
+    #Note that --add-new flag remains False
+    print cmd
+    
+    result = run_command_wrapper(cmd)
+    print result
+    #os.system(cmd)
 
 def read_filenames(filenames_file, path_to_filenames=None):
     """
@@ -151,6 +154,9 @@ def get_flat_directories(experiment_dates, path_to_npz_data):
     listed in the experiment_dates file
     These dates should correspond to all files
     to be analyzed in analysis_files
+
+    This should be deprecated. Use a single Flat/ directory to hold
+    all flat files
     """
 
     flat_dirs = []
@@ -184,6 +190,10 @@ if __name__ == '__main__':
                       default=False, dest="add_flattened_files", 
                       help=("Add flattened files to hdf5 for each "
                             "trial, as dataset labeled 'flat' "))
+
+    parser.add_option("", "--path-to-flat-data", default=None, 
+                       dest="path_to_flat_data", 
+                      help=("Add path to folder containing all flattened data"))
 
     parser.add_option("-f", "--analysis-filenames-file", 
                       dest="analysis_filenames_file", 
@@ -229,7 +239,13 @@ if __name__ == '__main__':
         generate_hdf5_file(analysis_filenames, out_path)
 
     if options.add_flattened_files:
-        flat_directories = get_flat_directories(experiment_dates, path_to_npz_data)
+        if options.path_to_flat_data is None:
+            print "NEED TO SPECIFY location of Flat files. The attempted method is deprecated."
+            flat_directories = get_flat_directories(experiment_dates, path_to_npz_data)
+            #Change this so that flat_directories are loaded from a single directory 'Flat'
+        else:
+            flat_directories = [str(options.path_to_flat_data)]
+
         add_flattened_files_to_hdf5(flat_directories, out_path)
     
     if options.save_debleach:

@@ -17,7 +17,7 @@ and complete filenames like:
    in the Fiberkontrol/code/analysis directory
    You can always adjust the directory the files with a search and replace all    command in analysis_filesnames.txt
 
-3) Run
+3) To flatten data: run
 
 python preprocessing.py --save-debleach -f analysis_filenames.txt
 
@@ -27,16 +27,17 @@ python preprocessing.py --save-debleach -f analysis_filenames.txt
 
 5) Run
 
-python preprocessing.py 'path_to_npz' --generate-hdf5 -f analysis_filenames.txt
+python preprocessing.py 'path_to_npz' --generate-hdf5 -f analysis_filenames.txt -o 'path_to_hdf5'
 
-6) Make sure that experiment_dates.txt contains
-   all the dates of all experiments you desire to include
+# Deprecated 6) Make sure that experiment_dates.txt contains
+# 	        all the dates of all experiments you desire to include
 
 7) Run
 
-python preprocessing.py 'path_to_npz' --add-flattened-files -f analysis_filenames.txt -d experiment_dates.txt
+#python preprocessing.py 'path_to_npz' --add-flattened-files -f analysis_filenames.txt -d experiment_dates.txt -o 'path_to_hdf5'
 
-~if data is located at end of a different path, add --path-to-npz-data='/Users/isaackauvar/Dropbox/Fiberkontrol/Fiberkontrol_Data/Lisa_Data/' (with the correct path)
+python preprocessing.py 'path_to_npz' --add-flattened-files -f analysis_filenames.txt -o 'path_to_hdf5' --path-to-flat-data 'path_to_folder_with_flat_data'
+
 
 8) Now you should have a single hdf5 file that contains both the original
    raw data stored in 'time_series_arr', which has the fluorescence data,
