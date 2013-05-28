@@ -270,6 +270,7 @@ def group_bout_heatmaps(all_data,
                                          animal_id, 
                                          date, 
                                          exp_type)
+        
         [df_max, df_min] = FA.get_plot_ylim(exp_type, 
                                             FA.fluor_normalization,
                                             ymax_setting,

@@ -1,0 +1,8 @@
+20130524/20130524-GC5-homecagesocial-0001-600patch_test.npz
+20130524/20130524-GC5-homecagenovel-0001-600patch_test.npz
+20130524/20130524-GC5-homecagesocial-0002-600patch_test.npz
+20130524/20130524-GC5-homecagenovel-0002-600patch_test.npz
+20130523/20130523-GC5_NAcprojection-homecagesocial-0003-600patch_test.npz
+20130523/20130523-GC5_NAcprojection-homecagenovel-0003-600patch_test.npz
+20130523/20130523-GC5_NAcprojection-homecagesocial-0004-600patch_test.npz
+20130523/20130523-GC5_NAcprojection-homecagenovel-0004-600patch_test.npz

@@ -69,7 +69,7 @@ class FiberAnalyze( object ):
         """
         Load time series and events from NPZ or HDF5 file. 
         """
-
+        print "Loading"
         self.time_tuples = None
         if file_type == "npz":
             print ""
@@ -1524,461 +1524,70 @@ class FiberAnalyze( object ):
 #-----------------------BEGIN: SHOULD PROBABLY BE REWRITTEN ANYWAYS-----------------------
 #-----------------------------------------------------------------------------------------
 
-
-    def analyze_spectrum( self, peak_index=None, out_path=None ):
-        """
-        Compares the spectrum during lick epochs vs not during lick epochs
-        -->Still in progress
-        """
-
-        type = self.exp_type
-
-        event_times = self.get_event_times(edge="rising", exp_type=type)
-
-        event_lengths = np.array(end_times) - np.array(event_times)
-        window = [0, np.max(event_lengths) + 10] #10 is right now an arbitrary buffer (not seconds but indices)
-        baseline_window = [np.max(event_lengths) + 10, np.max(event_lengths) + 10]
-        time_chunks = self.get_time_chunks_around_events(self.fluor_data, event_times, window, baseline_window=baseline_window )
-
-        window_indices = [self.convert_seconds_to_index( window[0]),
-                              self.convert_seconds_to_index( window[1])]
-
-        time_arr = np.asarray(time_chunks).T
-        x = self.time_stamps[0:time_arr.shape[0]]-self.time_stamps[window_indices[0]]
-
-        if peak_index is None:
-            for i in range(len(event_times)):
-                self.plot_chunk_periodogram(x, time_arr[:, i], out_path=out_path)
-        else:
-            self.plot_chunk_periodogram(x, time_arr[:, peak_index], out_path=out_path, peak_index=peak_index)
-
-
-        no_events_chunk, no_events_times = self.get_chunks_not_during_events(self.fluor_data, event_times, end_times)
-        self.plot_chunk_periodogram(no_events_times, no_events_chunk, out_path=out_path)    
-
-
-
-    def get_sucrose_peak(self, start_time, end_time):
-        """
-        Return the maximum fluorescence value found between
-        start_time and end_time (in seconds)
-
-        """
-        start_time_index = self.convert_seconds_to_index(start_time)
-        end_time_index = self.convert_seconds_to_index(end_time)
-        if start_time != end_time:
-            if start_time_index < end_time_index:
-                return np.max(self.fluor_data[start_time_index : end_time_index])
-            else:
-                return 0   
-
-
-    def plot_area_under_curve_wrapper( self, window, edge="rising", normalize=True, out_path=None):
-        """
-        Wrapper for plot_area_under_curve vs. time plots specialized for
-        loaded event data that comes as a list of pairs of
-        event start and end times (in seconds)
-        """
-        start_times = self.get_event_times(edge="rising", exp_type=self.exp_type)
-        end_times = self.get_event_times(edge="falling", exp_type=self.exp_type)
-        if start_times != -1:
-            self.plot_area_under_curve( start_times, end_times, window, normalize, out_path=out_path )
-        else:
-            print "No event times loaded. Cannot plot perievent."  
-            
-
-    def plot_area_under_curve( self, start_times, end_times, window, normalize=False, out_path=None):
-        """
-        Plots of area under curve for each event_time 
-        with before and after event durationsspecified in window as 
-        [before, after] (in seconds).
-        -- we decided to use a 1s window because it captures the median length
-        of both social and novel object interaction events
-
-        """
-        
-        print "plot_area_under_curve"
-        #change the normalization depending on whether you wish to divide (normalize)
-        # by the maximum fluorescence value in the window following
-        # each event
-
-        areas = self.get_areas_under_curve(start_times, window, baseline_window=window)
-
-        window_indices = [ self.convert_seconds_to_index(window[0]),
-                           self.convert_seconds_to_index(window[1]) ]
-        #Plot the area vs the time of each event
-        pl.clf()
-        ymax = 1.1*np.max(areas) + 0.1
-        ymin = 1.1*np.min(areas) - 0.1
-        pl.stem( start_times, areas, linefmt='k-', markerfmt='ko', basefmt='k-')
-        pl.plot([0, start_times[-1]], [0, 0], 'k-')
-        pl.ylim([ymin,ymax])
-        pl.xlim([0, np.max(self.time_stamps)])
-
-        if self.fluor_normalization == "deltaF":
-            if normalize:
-                pl.ylabel('Sharpness of peak: ' r'$\frac{\sum\delta F/F}{\max(peak)}}$' + ' with window of ' + "{0:.2f}".format(self.time_stamps[window_indices[1]]) + ' s')
-            else:
-                pl.ylabel('Sharpness of peak: ' r'$\sum\delta F/F}$' + ' with window of ' + "{0:.2f}".format(self.time_stamps[window_indices[1]]) + ' s')
-        else:
-            pl.ylabel('Fluorescence Intensity (a.u.) integrated over window of ' + "0:.2f}".format(self.time_stamps[window_indices[1]]) + ' s')
-        pl.xlabel('Time in trial (seconds)')
-        pl.title(out_path)
-
-        if out_path is None:
-            pl.title("No output path given")
-            pl.show()
-        else:
-            if normalize:
-                pl.savefig(out_path + "plot_area_under_curve_normal" + str(int(10*self.time_stamps[window_indices[1]])) + "s.pdf")
-                np.savez(out_path + "normalized_area_under_peaks_" + str(int(10*self.time_stamps[window_indices[1]])) + "s.npz", scores=areas, event_times=start_times, end_times=end_times, window=self.time_stamps[window_indices[1]])
-                # Assume not using windows longer than a few seconds. Thus save the file so as to display one decimal point
-            else:
-                pl.savefig(out_path + "plot_area_under_curve_non_normal" + str(int(10*self.time_stamps[window_indices[1]])) + "s.pdf")
-                np.savez(out_path + "non-normalized_area_under_peaks_" + str(int(10*self.time_stamps[window_indices[1]]))+ "s.npz", scores=areas, event_times=start_times, end_times=end_times, window=self.time_stamps[window_indices[1]])
-
-
-    def invGamX(self, p, x):
-        a, b = p
-        #y = pow(b, a)/sp.special.gamma(a)*pow(x, -a-1)*np.exp(-b/x)
-        y = sp.stats.invgamma.pdf(x, a, scale=b)
-        return y
-
-    def invGamX_residuals(self, p, x, y):
-        return y - self.invGamX(p, x)
-
-    def fit_invGam(self, x, y, num_point=100):
-        aguess = [0, 1]
-        bguess = [0, 0.1, 0.5, 1.0, 10, 100, 500, 1000]
-        max_r2 = -1
-        maxvalues = ()
-        for ag in aguess:
-            print "ag", ag
-            for bg in bguess:
-                print "bg", bg
-                p_guess=(ag, bg)
-                p, cov, infodict, mesg, ier = sp.optimize.leastsq(
-                    self.invGamX_residuals, p_guess, args=(x, y), full_output=1)
-
-                a, b = p 
-                # print('''Reference data:\  
-                #         a {a}
-                #         b = {b}
-                #         '''.format(a=a,b=b))
-
-                numPoints = np.floor((np.max(x) - np.min(x))*num_points)
-                xp = np.linspace(np.min(x), np.max(x), numPoints)
-                #pxp = np.exp(-1*xp)
-                pxp = self.invGamX(p, xp)
-                yxp = self.invGamX(p, x)
-
-                sstot = np.sum(np.multiply(y - np.mean(y), y - np.mean(y)))
-                sserr = np.sum(np.multiply(y - yxp, y - yxp))
-                r2 = 1 - sserr/sstot
-                print "max_r2", max_r2
-                if max_r2 == -1:
-                    maxvalues = (xp, pxp, a, b, r2, yxp)
-                if r2 > max_r2:
-                    max_r2 = r2
-                    maxvalues = (xp, pxp, a, b, r2, yxp)
-
-        return maxvalues
-
-
-
-
-    def fit_lognorm(self, x, y):
-        print "fitting lognorm"
-        
-        mask = np.ones(1000)
-        yorig = y
-      #  y = np.convolve(y, mask)
-      #  y = y[len(mask)-1:]/len(mask)
-
-        x = x - x[0]
-        y = y/(np.sum(y)*(x[1]-x[0]))
-        print np.sum(y)*(x[1]-x[0])
-
-        max_r2 = -1
-        maxvalues = ()
-
-        a_parameters = [0.1, 1, 1.5, 2, 2.5, 3, 5, 10, 100, 500, 1000]
-        b_parameters = [0.01, 0.1, 0.5, 1, 2, 5]
-        for a in a_parameters:
-            for b in b_parameters:
-                logy = np.log(y - np.min(y) + 0.000001)
-                print np.exp(np.mean(logy))
-                fit_alpha,fit_loc,fit_beta=ss.lognorm.fit(y, shape=b*np.std(logy), scale=a*np.exp(np.mean(y)))
-                print(fit_alpha,fit_loc,fit_beta)
-
-                rv = ss.lognorm(fit_alpha, fit_loc, fit_beta)
-                yxp = rv.pdf(x)
-
-                sstot = np.sum(np.multiply(y - np.mean(y), y - np.mean(y)))
-                sserr = np.sum(np.multiply(y - yxp, y - yxp))
-                r2 = 1 - sserr/sstot
-
-                print  "sstot: ", sstot, "sserr: ", sserr, "r2: ", r2
-                if max_r2 == -1:
-                    maxvalues = (fit_alpha, fit_loc, fit_beta)
-                if r2 > max_r2:
-                    max_r2 = r2
-                    maxvalues = (fit_alpha, fit_loc, fit_beta)
-
-            print "maxvalues", maxvalues
-            rv = ss.lognorm(maxvalues[0], maxvalues[1], maxvalues[2])
-            pl.figure()
-            pl.plot(x, yorig/(np.sum(yorig)*(x[1]-x[0])), 'b')
-            pl.plot(x, y, 'k')
-            pl.plot(x,rv.pdf(x), 'r')
-
-        pl.show()
-
-
-    def plot_peak_statistics( self, peak_times, peak_vals ):
-        """
-        Plots showing statistics of calcium peak data.
-          --> Peak height as function of time since last peak
-          --> Histograms of peak times and vals
-        """
-        pass
-
-
-    def compare_before_and_after_event(self, window=[5, 5], metric="slice", slice_time=1, out_path=None):
-        """
-        Compares the fluorescence in the periods before and the onset of each bout.
-        Window is provided in seconds.
-        Can measure that fluorescence based on "slice": the fluorescence value at slice_time
-        before and after the onset; "area": the area under the curve in the window before and
-        after the onset; "peak": the peak value in the window before and after the onset.
-
-        """
-
-        print window
-        window_indices = [self.convert_seconds_to_index(window[0]), self.convert_seconds_to_index(window[1]) ]
-
-        type = self.exp_type
-        start_times = self.get_event_times(edge="rising", exp_type=type)
-        end_times = self.get_event_times(edge="falling", exp_type=type)
-        # else:
-        #     print "Experiment type not implemented. use --exp-type flag with 'sucrose', 'homecagenovel', or 'homecagesocial'."
-        #     sys.exit(0)
-
-
-        before_start_scores = []
-        after_start_scores = []
-
-        #initialize result arrays
-
-        if metric=="area":
-            before_start_scores = self.get_areas_under_curve( start_times, window=[window[0], 0], baseline_window=window, normalize=False)
-            after_start_scores = self.get_areas_under_curve( start_times, window=[0, window[1]], baseline_window=window, normalize=False)
-
-            num_entries = min(len(before_start_scores), len(after_start_scores)) -1 #in case the event is right at the end of the time series 
-            before_start_scores = before_start_scores[:num_entries]
-            after_start_scores = after_start_scores[:num_entries]
-
-        elif metric=="slice":
-            for i in range(len(start_times)):
-                t = start_times[i]
-                ind = self.convert_seconds_to_index(t)
-                if ind + window_indices[1] < len(self.fluor_data)-1 and ind - window_indices[0] > 0:
-                
-                    baseline = np.min(self.fluor_data[max(0, ind - window_indices[0]):min(len(self.fluor_data), ind + window_indices[1])])
-                    slice_ind = self.convert_seconds_to_index(slice_time)
-                    before_score = self.fluor_data[max(0, ind - slice_ind)] - baseline
-                    after_score = self.fluor_data[min(len(self.fluor_data), ind + slice_ind)] - baseline
-                    before_start_scores.append(before_score)
-                    after_start_scores.append(after_score)
-
-        elif metric=="peak":
-            for i in range(len(start_times)):
-                t = start_times[i]
-                ind = self.convert_seconds_to_index(t)
-                if ind + window_indices[1] < len(self.fluor_data)-1 and ind - window_indices[0] > 0:
-
-                    baseline = np.min(self.fluor_data[max(0, ind - window_indices[0]):min(len(self.fluor_data), ind + window_indices[1])])
-                    before_score = np.max(self.fluor_data[max(0, ind - window_indices[0]):ind]) - baseline
-                    after_score = np.max(self.fluor_data[ind:min(len(self.fluor_data), ind + window_indices[1])]) - baseline
-                    before_start_scores.append(before_score)
-                    after_start_scores.append(after_score)  
-        else:
-            print "metric ' " + metric + " ' has not yet been implemented. Please try 'area', 'slice', or 'peak'."
-
-
-        pl.figure()
-        before_plot, = pl.plot(range(len(before_start_scores)), before_start_scores, '-or')
-        after_plot, = pl.plot(range(len(after_start_scores)), after_start_scores, '-og')
-        pl.legend([before_plot, after_plot], [ "Before bout start", "After bout start"])
-        pl.title("Window: [" + str(window[0]) + "s, " + str(window[1]) + "s]")
-        pl.xlabel("Bout number")
-        if metric=="area":
-            pl.ylabel("Area under fluorescence curve [" + self.fluor_normalization + "]")
-        elif metric=="slice":
-            pl.ylabel("Fluorescence value at " + str(slice_time) + "s from bout start [" + self.fluor_normalization + "]")
-        elif metric=="peak":
-            pl.ylabel("Maximum fluorescence value [" + self.fluor_normalization + "]")
-        
-
-        if out_path is None:
-            pl.title("No output path given")
-            pl.show()
-        else:
-            save_path = out_path + "_before_and_after_window_" + str(window[0]) + "s_" + metric
-            if metric == "slice":
-                save_path += "_time_" + str(slice_time) + "s"
-            pdf_save_path = save_path + ".pdf"
-            png_save_path = save_path + ".png"
-            npz_save_path = save_path + ".npz"
-            txt_save_path = save_path + ".txt"
-
-
-            pl.savefig(pdf_save_path)
-            pl.savefig(png_save_path)
-            np.savez(npz_save_path, before=before_start_scores, after=after_start_scores)
-            np.savetxt(txt_save_path, (before_start_scores, after_start_scores))
-
-
-        return (before_start_scores, after_start_scores)
-
-
-
-    def wavelet_plot( self ):
-        wavelet=Morlet
-        maxscale=4
-        notes=16
-        scaling="log" #or "linear"
-        #scaling="linear"
-        plotpower2d=True
-
-        # set up some data
-        Ns=1024
-        #limits of analysis
-        Nlo=0 
-        Nhi=Ns
-        # sinusoids of two periods, 128 and 32.
-        x = self.time_stamps
-        A = self.fluor_data
-
-        # Wavelet transform the data
-        cw=wavelet(A,maxscale,notes,scaling=scaling)
-        scales=cw.getscales()     
-        cwt=cw.getdata()
-        # power spectrum
-        pwr=cw.getpower()
-        scalespec=np.sum(pwr,axis=1)/scales # calculate scale spectrum
-        # scales
-        y=cw.fourierwl*scales
-        x=np.arange(Nlo*1.0,Nhi*1.0,1.0)
-
-        fig=pl.figure(1)
-
-        # 2-d coefficient plot
-        ax=pl.axes([0.4,0.1,0.55,0.4])
-        pl.xlabel('Time [s]')
-        plotcwt=np.clip(np.fabs(cwt.real), 0., 1000.)
-        if plotpower2d: plotcwt=pwr
-        im=pl.imshow(plotcwt,cmap=pl.cm.jet,extent=[x[0],x[-1],y[-1],y[0]],aspect='auto')
-        #colorbar()
-        if scaling=="log": ax.set_yscale('log')
-        pl.ylim(y[0],y[-1])
-        ax.xaxis.set_ticks(np.arange(Nlo*1.0,(Nhi+1)*1.0,100.0))
-        ax.yaxis.set_ticklabels(["",""])
-        theposition=pl.gca().get_position()
-
-        # data plot
-        ax2=pl.axes([0.4,0.54,0.55,0.3])
-        pl.ylabel('Data')
-        pos=ax.get_position()
-        pl.plot(x,A,'b-')
-        pl.xlim(Nlo*1.0,Nhi*1.0)
-        ax2.xaxis.set_ticklabels(["",""])
-        pl.text(0.5,0.9,"Wavelet example with extra panes",
-             fontsize=14,bbox=dict(facecolor='green',alpha=0.2),
-             transform = fig.transFigure,horizontalalignment='center')
-
-        # projected power spectrum
-        ax3=pl.axes([0.08,0.1,0.29,0.4])
-        pl.xlabel('Power')
-        pl.ylabel('Period [s]')
-        vara=1.0
-        if scaling=="log":
-            pl.loglog(scalespec/vara+0.01,y,'b-')
-        else:
-            pl.semilogx(scalespec/vara+0.01,y,'b-')
-        pl.ylim(y[0],y[-1])
-        pl.xlim(1000.0,0.01)
-
-        pl.show()
-
-#-----------------------------------------------------------------------------------------
-#-----------------------END: SHOULD PROBABLY BE REWRITTEN ANYWAYS-----------------------
-#-----------------------------------------------------------------------------------------
-
 #-----------------------------------------------------------------------------------------
 #------------------------END: TO POSSIBLY DELETE-------------------------------------------
 #-----------------------------------------------------------------------------------------
 
-def test_FiberAnalyze(options):
-    """
-    Test the FiberAnalyze class.
-    """
-    FA = FiberAnalyze( options )
-    FA.load()
+# def test_FiberAnalyze(options):
+#     """
+#     Test the FiberAnalyze class.
+#     """
+#     FA = FiberAnalyze( options )
+#     FA.load()
 
-    if FA.plot_type == 'tseries':
-        if FA.time_range is None:
-            FA.plot_basic_tseries(out_path = options.output_path + "_full_")
-        else:
-            FA.plot_basic_tseries(out_path = options.output_path + "_" + str(int(FA.time_range.split(':')[0])) + 
-                                    "_" + str(int(FA.time_range.split(':')[1])) +"_" ) #,  resolution=res)
+#     if FA.plot_type == 'tseries':
+#         if FA.time_range is None:
+#             FA.plot_basic_tseries(out_path = options.output_path + "_full_")
+#         else:
+#             FA.plot_basic_tseries(out_path = options.output_path + "_" + str(int(FA.time_range.split(':')[0])) + 
+#                                     "_" + str(int(FA.time_range.split(':')[1])) +"_" ) #,  resolution=res)
 
 
-#    FA.plot_next_event_vs_intensity(intensity_measure="peak", next_event_measure="onset", window=[0, 1], out_path=None)
+# #    FA.plot_next_event_vs_intensity(intensity_measure="peak", next_event_measure="onset", window=[0, 1], out_path=None)
 
-#    FA.wavelet_plot()
-#    FA.notch_filter(10.0, 10.3)
-  #  FA.plot_periodogram(plot_type="log",out_path = options.output_path)
+# #    FA.wavelet_plot()
+# #    FA.notch_filter(10.0, 10.3)
+#   #  FA.plot_periodogram(plot_type="log",out_path = options.output_path)
 
   
-  #  FA.plot_lick_density_vs_time(1, out_path = options.output_path)
-   # FA.get_sucrose_event_times(5, "falling")
-#    FA.event_vs_baseline_barplot(out_path = options.output_path)
+#   #  FA.plot_lick_density_vs_time(1, out_path = options.output_path)
+#    # FA.get_sucrose_event_times(5, "falling")
+# #    FA.event_vs_baseline_barplot(out_path = options.output_path)
 
 
-    #FA.plot_area_under_curve_wrapper( window=[0, 1], edge="rising", normalize=False, out_path = options.output_path)
-    #FA.plot_peaks_vs_time(out_path = options.output_path)
+#     #FA.plot_area_under_curve_wrapper( window=[0, 1], edge="rising", normalize=False, out_path = options.output_path)
+#     #FA.plot_peaks_vs_time(out_path = options.output_path)
  
-  ####  FA.plot_peritrigger_edge(window=[1, 3], out_path = options.output_path + '_1_3_', edge="falling")
-  ####  FA.plot_peritrigger_edge(window=[5, 5], out_path = options.output_path + '_5_5_', edge="falling")
-  ####  FA.plot_peritrigger_edge(window=[30, 30], out_path = options.output_path + '_30_30_', edge="falling")
-  ####  FA.plot_peritrigger_edge(window=[10, 30], out_path = options.output_path + '_10_30_', edge="falling")
+#   ####  FA.plot_peritrigger_edge(window=[1, 3], out_path = options.output_path + '_1_3_', edge="falling")
+#   ####  FA.plot_peritrigger_edge(window=[5, 5], out_path = options.output_path + '_5_5_', edge="falling")
+#   ####  FA.plot_peritrigger_edge(window=[30, 30], out_path = options.output_path + '_30_30_', edge="falling")
+#   ####  FA.plot_peritrigger_edge(window=[10, 30], out_path = options.output_path + '_10_30_', edge="falling")
   
 
-  #  FA.plot_area_under_curve_wrapper( window=[0, 3], edge="rising", normalize=False, out_path = options.output_path)
-  #  FA.plot_peaks_vs_time(out_path = options.output_path)
-    #Dont use these anymore, use compare_before_and_after_event?
+#   #  FA.plot_area_under_curve_wrapper( window=[0, 3], edge="rising", normalize=False, out_path = options.output_path)
+#   #  FA.plot_peaks_vs_time(out_path = options.output_path)
+#     #Dont use these anymore, use compare_before_and_after_event?
 
-  #  FA.plot_peaks_vs_time(type="sucrose", out_path = options.output_path)
-  #  FA.debleach(out_path = options.output_path) #you want to use --fluor-normalization = 'raw' when debleaching!!!
-   # peak_inds, peak_vals, peak_times = FA.get_peaks(window_in_seconds)
-  #  FA.plot_peak_data()
+#   #  FA.plot_peaks_vs_time(type="sucrose", out_path = options.output_path)
+#   #  FA.debleach(out_path = options.output_path) #you want to use --fluor-normalization = 'raw' when debleaching!!!
+#    # peak_inds, peak_vals, peak_times = FA.get_peaks(window_in_seconds)
+#   #  FA.plot_peak_data()
 
-  #  FA.get_peaks_convolve([3, 3], out_path = options.output_path)
-  ##  FA.fit_peak( type="sucrose", out_path=options.output_path)
-###    FA.analyze_spectrum(type="sucrose", peak_index=None, out_path=None )
+#   #  FA.get_peaks_convolve([3, 3], out_path = options.output_path)
+#   ##  FA.fit_peak( type="sucrose", out_path=options.output_path)
+# ###    FA.analyze_spectrum(type="sucrose", peak_index=None, out_path=None )
 
-    # FA.compare_before_and_after_event(window=[5, 5], metric="slice", slice_time=1, out_path=options.output_path)
-    # FA.compare_before_and_after_event(window=[5, 5], metric="slice", slice_time=2, out_path=options.output_path)
+#     # FA.compare_before_and_after_event(window=[5, 5], metric="slice", slice_time=1, out_path=options.output_path)
+#     # FA.compare_before_and_after_event(window=[5, 5], metric="slice", slice_time=2, out_path=options.output_path)
 
-    # FA.compare_before_and_after_event(window=[5, 5], metric="area", out_path=options.output_path)
-    # FA.compare_before_and_after_event(window=[5, 5], metric="peak", out_path=options.output_path)
+#     # FA.compare_before_and_after_event(window=[5, 5], metric="area", out_path=options.output_path)
+#     # FA.compare_before_and_after_event(window=[5, 5], metric="peak", out_path=options.output_path)
 
-##    FA.compare_before_and_after_event(window=[3, 3], metric="slice", slice_time=1, out_path=options.output_path)
-##    FA.compare_before_and_after_event(window=[3, 3], metric="slice", slice_time=2, out_path=options.output_path)
+# ##    FA.compare_before_and_after_event(window=[3, 3], metric="slice", slice_time=1, out_path=options.output_path)
+# ##    FA.compare_before_and_after_event(window=[3, 3], metric="slice", slice_time=2, out_path=options.output_path)
 
- ##   FA.compare_before_and_after_event(window=[3, 3], metric="area", out_path=options.output_path)
- ##   FA.compare_before_and_after_event(window=[3, 3], metric="peak", out_path=options.output_path)
+#  ##   FA.compare_before_and_after_event(window=[3, 3], metric="area", out_path=options.output_path)
+#  ##   FA.compare_before_and_after_event(window=[3, 3], metric="peak", out_path=options.output_path)
 
 
 #-----------------------------------------------------------------------------------------
@@ -2023,7 +1632,10 @@ if __name__ == "__main__":
 
     (options, args) = parser.parse_args()
     
+    FA = FiberAnalyze( options )
+    FA.load()
+
     # Test the class
-    test_FiberAnalyze(options)
+#    test_FiberAnalyze(options)
     
 # EOF
