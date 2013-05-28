@@ -30,7 +30,7 @@ class FiberAnalyze( object ):
 
         # values from option parser
         self.smoothness = int(options.smoothness)
-        self.plot_type = options.plot_type
+        #self.plot_type = options.plot_type
         self.time_range = options.time_range
         self.fluor_normalization = options.fluor_normalization
         self.filter_freqs = options.filter_freqs
@@ -81,32 +81,32 @@ class FiberAnalyze( object ):
             
         elif file_type == "hdf5":
             print "hdf5 file to load: ", self.subject_id, self.exp_date, self.exp_type
-            #try:
-            h5_file = h5py.File( self.input_path, 'r' )
-            self.data = np.asarray( h5_file[self.subject_id][self.exp_date][self.exp_type]['time_series_arr'] )
-            if self.exp_type != 'sucrose':
-                self.time_tuples = np.asarray( h5_file[self.subject_id][self.exp_date][self.exp_type]['event_tuples'] )
-            else:
-                self.time_typles = None
+            try:
+                h5_file = h5py.File( self.input_path, 'r' )
+                self.data = np.asarray( h5_file[self.subject_id][self.exp_date][self.exp_type]['time_series_arr'] )
+                if self.exp_type != 'sucrose':
+                    self.time_tuples = np.asarray( h5_file[self.subject_id][self.exp_date][self.exp_type]['event_tuples'] )
+                else:
+                    self.time_typles = None
 
-            self.time_stamps = self.data[:,0]
-            self.trigger_data = self.data[:,1]
-            
-            if (self.load_flat):
-                try:
-                    self.fluor_data = np.asarray( h5_file[self.subject_id][self.exp_date][self.exp_type]['flat'] )[:, 0]
-                    print "--> Loading flattened data"
-                except:
-                    print "--> Flattened data UNAVAILABLE"
-                    self.fluor_data = self.data[:,2] 
-            else:
-                self.fluor_data = self.data[:,2] #to use unflattened, original data
-                print "--> Loading UNFLATTENED data"
+                self.time_stamps = self.data[:,0]
+                self.trigger_data = self.data[:,1]
+                
+                if (self.load_flat):
+                    try:
+                        self.fluor_data = np.asarray( h5_file[self.subject_id][self.exp_date][self.exp_type]['flat'] )[:, 0]
+                        print "--> Loading flattened data"
+                    except:
+                        print "--> Flattened data UNAVAILABLE"
+                        self.fluor_data = self.data[:,2] 
+                else:
+                    self.fluor_data = self.data[:,2] #to use unflattened, original data
+                    print "--> Loading UNFLATTENED data"
 
-            # except Exception, e:
-            #     print "Unable to open HDF5 file", self.subject_id, self.exp_date, self.exp_type, "due to error:"
-            #     print e
-            #     return -1
+            except Exception, e:
+                print "Unable to open HDF5 file", self.subject_id, self.exp_date, self.exp_type, "due to error:"
+                print e
+                return -1
 
         self.normalize_fluorescence_data()
         self.crop_data() #crop data to range specified at commmand line
@@ -1591,9 +1591,7 @@ class FiberAnalyze( object ):
 
 
 #-----------------------------------------------------------------------------------------
-
-if __name__ == "__main__":
-
+def add_command_line_options():
     # Parse command line options
     from optparse import OptionParser
 
@@ -1603,19 +1601,19 @@ if __name__ == "__main__":
     parser.add_option("-t", "--trigger-path", dest="trigger_path", default=None,
                       help="Specify path to files with trigger times, minus the '_s.npz' and '_e.npz' suffixes.")
     parser.add_option("-i", "--input-path", dest="input_path",
-                      help="Specify the input path.")
+                      help="Specify the input path (either to npz or hdf5 data).")
     parser.add_option("", "--time-range", dest="time_range",default='0:-1',
                       help="Specify a time window over which to analyze the time series in format start:end. -1 chooses the appropriate extremum")
-    parser.add_option('-p', "--plot-type", default = '', dest="plot_type",
-                      help="Type of plot to produce.")
+    # parser.add_option('-p', "--plot-type", default = '', dest="plot_type",
+    #                   help="Type of plot to produce.")
     parser.add_option('', "--fluor-normalization", default = 'deltaF', dest="fluor_normalization",
-                      help="Normalization of fluorescence trace. Can be a.u. between [0,1]: 'stardardize' or deltaF/F: 'deltaF' or 'raw'.")
+                      help="Normalization of fluorescence trace. Can be a.u. between [0,1]: 'standardize' or deltaF/F: 'deltaF' or 'raw'.")
     parser.add_option('-s', "--smoothness", default = 0, dest="smoothness",
                       help="Should the time series be smoothed, and how much.")
     parser.add_option("", "--save-txt", action="store_true", default=False, dest="save_txt",
                       help="Save data matrix out to a text file.")
     parser.add_option("", "--save-to-h5", default=None, dest="save_to_h5",
-                      help="Save data matrix to a dataset in an hdf5 file.")
+                      help="Provide the filepath to an hdf5 file. Saves data matrix to a dataset in this hdf5 file.")
     parser.add_option("", "--save-and-exit", action="store_true", default=False, dest="save_and_exit",
                       help="Exit immediately after saving data out.")
     parser.add_option("", "--save-debleach", action="store_true", default=False, dest="save_debleach",
@@ -1630,6 +1628,13 @@ if __name__ == "__main__":
                        help="Specify the type of virus injected in the mouse (GC5, GC3, EYFP)")
 
 
+    return parser
+
+
+
+if __name__ == "__main__":
+
+    parser = add_command_line_options()
     (options, args) = parser.parse_args()
     
     FA = FiberAnalyze( options )
