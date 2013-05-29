@@ -13,8 +13,6 @@ from load_configuration import load_configuration
 from optparse import OptionParser
 
 
-
-
 def setup_module(module):
     cfg = load_configuration()
     filenames_file = str(cfg['analysis_filenames_file'])
@@ -89,7 +87,7 @@ class Test_load():
         assert(np.abs(FA.time_stamps[end_last_event_index + 1] - 101.5) < 0.00001)
 
 
-    def test_load_hdf5(self):
+    def test_load_hdf5_deltaF(self):
         parser = fra.add_command_line_options()
         (options, args) = parser.parse_args([]) #override sys.argv with an empty argument list
 
@@ -128,19 +126,108 @@ class Test_load():
         assert(np.abs(FA.time_stamps[end_last_event_index + 1] - 101.5) < 0.00001)
 
 
+    def test_normalize_fluorescence_data_raw(self):
+        parser = fra.add_command_line_options()
+        (options, args) = parser.parse_args([]) #override sys.argv with an empty argument list
+
+        options.smoothness = 0
+        options.time_range = '0:-1'
+        options.fluor_normalization = 'raw'
+        options.filter_freqs = None
+        options.exp_type = 'homecagesocial'
+        options.event_spacing = 0
+        options.mouse_type = 'GC5'
+
+        options.input_path = self.path_to_hdf5
+        options.output_path = self.test_output_directory
+
+        options.save_txt = False
+        options.save_to_h5 = None
+        options.save_and_exit = False
+        options.save_debleach = False
+
+        FA = fra.FiberAnalyze( options )
+        FA.subject_id = '0001'
+        FA.exp_date = '20130524'
+        FA.exp_type = 'homecagesocial'
+        FA.load(file_type="hdf5")
+
+        assert(np.max(FA.fluor_data) > 8.6 and np.max(FA.fluor_data) < 8.7) #eyeballed dF/F based on plot of fluorescence
+        assert(np.abs(np.max(FA.time_stamps) - 150) < 0.01)
+        assert(np.abs(np.min(FA.time_stamps) - 0) < 0.01)
+
+    def test_normalize_fluorescence_data_deltaF(self):
+        parser = fra.add_command_line_options()
+        (options, args) = parser.parse_args([]) #override sys.argv with an empty argument list
+
+        options.smoothness = 0
+        options.time_range = '20:-1'
+        options.fluor_normalization = 'deltaF'
+        options.filter_freqs = None
+        options.exp_type = 'homecagenovel'
+        options.event_spacing = 0
+        options.mouse_type = 'GC5'
+
+        options.input_path = self.path_to_hdf5
+        options.output_path = self.test_output_directory
+
+        options.save_txt = False
+        options.save_to_h5 = None
+        options.save_and_exit = False
+        options.save_debleach = False
+
+        FA = fra.FiberAnalyze( options )
+        FA.subject_id = '0001'
+        FA.exp_date = '20130524'
+        FA.exp_type = 'homecagenovel'
+        FA.load(file_type="hdf5")
+
+        assert(np.max(FA.fluor_data) > 0.2 and np.max(FA.fluor_data) < 0.3) #eyeballed dF/F based on plot of fluorescence
+        assert(np.abs(np.max(FA.time_stamps) - 150) < 0.01)
+        assert(np.abs(np.min(FA.time_stamps) - 20) < 0.01)
+
+    def test_normalize_fluorescence_data_standardize(self):
+        parser = fra.add_command_line_options()
+        (options, args) = parser.parse_args([]) #override sys.argv with an empty argument list
+
+        options.smoothness = 0
+        options.time_range = '20:-1'
+        options.fluor_normalization = 'standardize'
+        options.filter_freqs = None
+        options.exp_type = 'homecagesocial'
+        options.event_spacing = 0
+        options.mouse_type = 'GC5'
+
+        options.input_path = self.path_to_hdf5
+        options.output_path = self.test_output_directory
+
+        options.save_txt = False
+        options.save_to_h5 = None
+        options.save_and_exit = False
+        options.save_debleach = False
+
+        FA = fra.FiberAnalyze( options )
+        FA.subject_id = '0001'
+        FA.exp_date = '20130524'
+        FA.exp_type = 'homecagesocial'
+        FA.load(file_type="hdf5")
+
+        print "np.min(FA.fluor_data)", np.min(FA.fluor_data)
+        assert(np.max(FA.fluor_data) > 0.99 and np.max(FA.fluor_data) < 1.001) #should be standardized to between 0 and 1
+        assert(np.min(FA.fluor_data) > -0.001 and np.min(FA.fluor_data) < 0.03) 
+        assert(np.abs(np.max(FA.time_stamps) - 150) < 0.01)
+        assert(np.abs(np.min(FA.time_stamps) - 20) < 0.01)
+
+
 
 class Test_crop_data():
+    #should be tested
     pass
 
 
 class Test_load_trigger_data():
+    #should be tested
     pass
-
-
-
-class Test_normalize_fluorescence_data():
-    pass
-
 
 class Test_load_event_data():
     pass

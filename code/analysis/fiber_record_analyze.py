@@ -108,8 +108,8 @@ class FiberAnalyze( object ):
                 print e
                 return -1
 
-        self.normalize_fluorescence_data()
         self.crop_data() #crop data to range specified at commmand line
+        self.normalize_fluorescence_data()
 
         if self.smoothness != 0:
             print "--> Smoothing data with parameter: ", self.smoothness
@@ -131,6 +131,9 @@ class FiberAnalyze( object ):
                                   h5_filename=self.save_to_h5)
         if self.save_debleach:
             self.debleach(self.output_path)
+
+        print "np.min(self.fluor_data)", np.min(self.fluor_data)
+        print "np.max(self.fluor_data)", np.max(self.fluor_data)
 
         return self.fluor_data, self.trigger_data
 
@@ -221,10 +224,11 @@ class FiberAnalyze( object ):
             self.fluor_data = (self.fluor_data-median)/median #dF/F
             
         elif self.fluor_normalization == "standardize":
-            print "--> Normalization: standardized to between 0 and 1. Max of raw fluorescent data: ", np.max(self.fluor_data)
             self.fluor_data -= np.min(self.fluor_data)
             self.fluor_data /= np.max(self.fluor_data)
             self.fluor_data +=0.0000001 # keep strictly positive
+            print "--> Normalization: standardized to between 0 and 1. Max of raw fluorescent data: ", np.max(self.fluor_data), "min: ", np.min(self.fluor_data)
+
 
         elif self.fluor_normalization == "raw":
             print "--> Normalization: raw (no normalization). Max of raw fluorescent data: ", np.max(self.fluor_data)
