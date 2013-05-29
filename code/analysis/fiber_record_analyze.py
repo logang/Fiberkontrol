@@ -155,9 +155,12 @@ class FiberAnalyze( object ):
             self.t_start = 0 if tlist[0] == '-1' else int(self.convert_seconds_to_index(int(tlist[0])))
             self.t_end = len(self.fluor_data) if tlist[1] == '-1' else int(self.convert_seconds_to_index(int(tlist[1])))
             
-            self.fluor_data = self.fluor_data[self.t_start:self.t_end]
-            self.trigger_data = self.trigger_data[self.t_start:self.t_end]
-            self.time_stamps = self.time_stamps[self.t_start:self.t_end]
+            if self.t_start < self.t_end:
+                self.fluor_data = self.fluor_data[self.t_start:self.t_end]
+                self.trigger_data = self.trigger_data[self.t_start:self.t_end]
+                self.time_stamps = self.time_stamps[self.t_start:self.t_end]
+            else:
+                print "--> Data not cropped. (End - start) time must be positive."
         else:
             print "--> Data not cropped. No range has been specified."
 
@@ -267,7 +270,6 @@ class FiberAnalyze( object ):
             resolution = 40
            #resolution=100
 
-
         print "--> Resolution: ", resolution
         return resolution
 
@@ -275,29 +277,31 @@ class FiberAnalyze( object ):
         """
         Can set ymax_setting to 'small' or 'large'
         """
+        ymin = -1
+        ymax = 3.0
 
         if exp_type == 'sucrose':
             if ymax_setting == 'small':
                 ymax = 1.0
-            if ymax_setting == 'large' or max_val > ymax:
+            if ymax_setting == 'large' or (ymax_setting == 'small' and max_val > ymax):
                 ymax = 3.0
             ymin = -1
         elif exp_type == 'homecagesocial':
             if ymax_setting == 'small':
                 ymax = 0.35
-            if ymax_setting == 'large' or max_val > ymax:
+            if ymax_setting == 'large' or (ymax_setting == 'small' and max_val > ymax):
                 ymax = 1.2
             ymin = -ymax/3.0
         elif exp_type == 'homecagenovel':
             if ymax_setting == 'small':
                 ymax = 0.35
-            if ymax_setting == 'large' or max_val > ymax:
+            if ymax_setting == 'large' or (ymax_setting == 'small' and max_val > ymax):
                 ymax = 1.2
             ymin = -ymax/3.0
         elif exp_type == 'EPM':
             if ymax_setting == 'small':
                 ymax = 0.35
-            if ymax_setting == 'large' or max_val > ymax:
+            if ymax_setting == 'large' or (ymax_setting == 'small' and max_val > ymax):
                 ymax = 1.2
             ymin = -ymax/3.0
 
@@ -323,7 +327,8 @@ class FiberAnalyze( object ):
 
         Setting plot_all_trigger_data=True plots the whole 
         trigger timeseries, as opposed to just when the 
-        trigger is high.
+        trigger is high. This leads to large plot file
+        sizes, however
         """
         # clear figure
         pl.clf()
@@ -352,21 +357,24 @@ class FiberAnalyze( object ):
 
 
         trigger_low = min(trigger_data) + 0.2
-        trigger_high_locations = [time_vals[i] for i in range(len(trigger_data)) 
-                                    if trigger_data[i] > trigger_low]
-        #print "trigger_low", trigger_low
-        #print "trigger_data", trigger_data
+        if self.exp_type != 'sucrose':
+            trigger_high_locations = [time_vals[i] for i in range(len(trigger_data)) 
+                                        if trigger_data[i] > trigger_low]
+        elif self.exp_type == 'sucrose':
+            trigger_high_locations = [time_vals[i] for i in range(len(trigger_data)) 
+                                        if trigger_data[i] < trigger_low]
+        
         ## Be careful whether event is recorded 
-        ## by trigger high or trigger low (i.e. > or < trigger_low)
+        ## by trigger high or trigger low (i.e. > or < trigger_low).
+        ## Sucrose is recorded differently. 
 
-        # if plot_all_trigger_data:
-        #     pl.fill( time_vals[::2], 10*trigger_data[::2] - 2, 
-        #              color='r', alpha=0.3 )
-        # else:
-      #  pl.vlines(trigger_high_locations, -.05, 0, 
-       #           edgecolor='r', linewidth=0.5, facecolor='r' )
-        pl.plot(trigger_high_locations, -0.1*np.ones(len(trigger_high_locations)), 'r.', markersize=0.1)
-        print "--> Resolution: ", resolution
+        if plot_all_trigger_data:
+            pl.fill( time_vals[::2], 10*trigger_data[::2] - 2, 
+                     color='r', alpha=0.3 )
+        else:
+            pl.plot(trigger_high_locations, -0.1*np.ones(len(trigger_high_locations)), 
+                     'r.', markersize=0.1 )
+
         pl.plot( time_vals[::resolution], fluor_data[::resolution], 'k-') 
 
         pl.ylim([ymin,ymax])
@@ -385,6 +393,8 @@ class FiberAnalyze( object ):
         else:
             pl.savefig(out_path + "basic_time_series.pdf")
             pl.savefig(out_path + "basic_time_series.png")
+
+        return (fluor_data, trigger_high_locations)
 
     def save_time_series( self, save_path='.', output_type="txt", h5_filename=None ):
         """
@@ -493,6 +503,8 @@ class FiberAnalyze( object ):
           -- peak intensity of last event (peak)
           -- integrated intensity of last event (integrated)
           -- integrated intensity over history window (window)
+
+          TODO: Add a metric that is simply the time of the event
         """
         start_times = self.get_event_times(edge="rising", exp_type=self.exp_type)
         end_times = self.get_event_times(edge="falling", exp_type=self.exp_type)
@@ -772,11 +784,13 @@ class FiberAnalyze( object ):
 
     def get_event_times( self, edge="rising", nseconds=0, exp_type=None):
         """
-        Extracts a list of the times (in seconds) corresponding to
-        interaction events to be time-locked with the signal
-        specialized for loaded event data that comes as a list of 
-        pairs of event start and end times.
-        nseconds defines a minimum distance between the end of one event
+        Returns a list of either the start ('rising') or end ('falling')
+        times of events. For sucrose data, uses the lick density
+        as a way to split up licking sessions into events. For homecagesocial
+        and homecagenovel, the events are defined by a pair of start and 
+        end times directly from the hand-scoring. 
+
+        'nseconds' defines a minimum distance between the end of one event
         and the start of a previous event. if you do not wish to impose
         such a restriction, set nseconds=None.
         """
@@ -795,7 +809,6 @@ class FiberAnalyze( object ):
                 return end_times
             else:
                 raise ValueError("Edge type must be 'rising' or 'falling'.")
-
 
         if self.event_spacing is not None:
             nseconds = self.event_spacing
