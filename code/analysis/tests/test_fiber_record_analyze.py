@@ -384,11 +384,213 @@ class Test_plot_basic_tseries():
         assert(np.max(FA.fluor_data) > 0.9 and np.max(FA.fluor_data) < 1.1)
 
 
-class Test_save_time_series():
-    pass
+class Test_get_event_times():
+    #Still need to test sucrose!
+    def setup(self):
+        cfg = load_configuration()
+        self.filenames_file = str(cfg['analysis_filenames_file'])
+        self.path_to_raw_data = str(cfg['path_to_raw_data'])
+        self.path_to_hdf5 = str(cfg['path_to_hdf5'])
+        self.path_to_flat_data = str(cfg['path_to_flat_data'])
 
+        self.test_output_directory = self.path_to_raw_data + 'test_output/'
+        if not os.path.isdir(self.test_output_directory):
+            os.mkdir(self.test_output_directory)
+
+        parser = fra.add_command_line_options()
+        (self.options, args) = parser.parse_args([]) #override sys.argv with an empty argument list
+        self.options.smoothness = 0
+        self.options.filter_freqs = None
+
+        self.options.fluor_normalization = 'deltaF'
+        self.options.event_spacing = 0
+        self.options.mouse_type = 'GC5'
+        self.options.time_range = '0:-1'
+
+        self.options.input_path = self.path_to_hdf5
+        self.options.output_path = self.test_output_directory
+        self.options.exp_type = 'homecagesocial'
+
+        self.options.save_txt = False
+        self.options.save_to_h5 = None
+        self.options.save_and_exit = False
+        self.options.save_debleach = False
+
+
+    def tearDown(self):
+        for f in os.listdir(self.test_output_directory):
+            file_path = os.path.join(self.test_output_directory, f)
+            try:
+                os.unlink(file_path)
+            except Exception, e:
+                print e
+
+        os.rmdir(self.test_output_directory)
+
+
+    def test_get_event_times_no_spacing(self):
+        FA = fra.FiberAnalyze( self.options )
+        FA.subject_id = '0001'
+        FA.exp_date = '20130524'
+        FA.exp_type = 'homecagesocial'
+        FA.load(file_type="hdf5")
+
+        event_times = FA.get_event_times( edge="rising", exp_type='homecagesocial')
+
+        assert(np.abs(event_times[0] - 49.8) < 0.01)
+        assert(np.abs(event_times[1] - 100) < 0.01)
+
+        event_times = FA.get_event_times( edge="falling", exp_type='homecagesocial')
+        assert(np.abs(event_times[0] - 50.7) < 0.01)
+        assert(np.abs(event_times[1] - 101.5) < 0.01)
+
+        FA = fra.FiberAnalyze( self.options )
+        FA.subject_id = '0002'
+        FA.exp_date = '20130524'
+        FA.exp_type = 'homecagesocial'
+        FA.load(file_type="hdf5")
+
+        event_times = FA.get_event_times( edge='rising', exp_type='homecagesocial')
+        assert(np.abs(event_times[0] - 40.8) < 0.01)
+        assert(np.abs(event_times[1] - 44.6) < 0.01)
+        assert(np.abs(event_times[2] - 110) < 0.01)
+
+        event_times = FA.get_event_times( edge='falling', exp_type='homecagesocial')
+        assert(np.abs(event_times[0] - 42.3) < 0.01)
+        assert(np.abs(event_times[1] - 45.1) < 0.01)
+        assert(np.abs(event_times[2] - 111.5) < 0.01)
+
+
+    def test_get_event_times_with_spacing(self):
+        self.options.event_spacing = 2.4
+
+        FA = fra.FiberAnalyze( self.options )
+        FA.subject_id = '0002'
+        FA.exp_date = '20130524'
+        FA.exp_type = 'homecagesocial'
+        FA.load(file_type="hdf5")
+
+
+        event_times = FA.get_event_times( edge='rising', exp_type='homecagesocial')
+        print "event_times", event_times
+        assert(np.max(np.shape(event_times)) == 2)
+        assert(np.abs(event_times[1] - 110) < 0.01)
+
+
+
+    def test_get_event_times_sucrose(self):
+        #TO DO
+        pass
+
+    
 
 class Test_plot_next_event_vs_intensity():
+    def setup(self):
+        cfg = load_configuration()
+        self.filenames_file = str(cfg['analysis_filenames_file'])
+        self.path_to_raw_data = str(cfg['path_to_raw_data'])
+        self.path_to_hdf5 = str(cfg['path_to_hdf5'])
+        self.path_to_flat_data = str(cfg['path_to_flat_data'])
+        self.test_output_directory = self.path_to_raw_data + 'test_output/'
+        if not os.path.isdir(self.test_output_directory):
+            os.mkdir(self.test_output_directory)
+        parser = fra.add_command_line_options()
+        (self.options, args) = parser.parse_args([]) #override sys.argv with an empty argument list
+        self.options.smoothness = 0
+        self.options.filter_freqs = None
+        self.options.save_txt = False
+        self.options.save_to_h5 = None
+        self.options.save_and_exit = False
+        self.options.save_debleach = False
+
+
+        self.options.fluor_normalization = 'deltaF'
+        self.options.event_spacing = 0
+        self.options.mouse_type = 'GC5'
+        self.options.time_range = '0:-1'
+        self.options.event_spacing = 0
+
+
+
+        self.options.input_path = self.path_to_hdf5
+        self.options.output_path = self.test_output_directory
+        self.options.exp_type = 'homecagesocial'
+
+    def test_deterministic_time_series(self):
+        FA = fra.FiberAnalyze( self.options )
+        FA.subject_id = '0005'
+        FA.exp_date = '20130524'
+        FA.exp_type = 'homecagesocial'
+        FA.load(file_type="hdf5")
+
+        (intensity, next_vals) = FA.plot_next_event_vs_intensity(
+                                        intensity_measure="peak", 
+                                        next_event_measure="onset", 
+                                        window=[0, 1], 
+                                        out_path=None, 
+                                        plotit=False)
+
+        assert(np.abs(intensity[0] - 1.0) < 0.000001 )
+        assert(np.abs(intensity[1] - 0.5) < 0.000001 )
+        assert(np.abs(intensity[2] - 1.0/3.0) < 0.000001 )
+
+        assert(np.abs(next_vals[0] - 5.1) < 0.000001 )
+        assert(np.abs(next_vals[1] - 19) < 0.000001 )
+        assert(np.abs(next_vals[2] - 34.3) < 0.000001 )
+
+
+        (intensity, next_vals) = FA.plot_next_event_vs_intensity(
+                                        intensity_measure="integrated", 
+                                        next_event_measure="onset", 
+                                        window=[0, 1], 
+                                        out_path=None, 
+                                        plotit=False)
+
+        print "intensity", intensity
+        assert(np.abs(intensity[0] - 1.0) < 0.000001 )
+        assert(np.abs(intensity[1] - 0.5) < 0.000001 )
+        assert(np.abs(intensity[2] - 1.0/3.0) < 0.000001 )
+
+        assert(np.abs(next_vals[0] - 5.1) < 0.000001 )
+        assert(np.abs(next_vals[1] - 19) < 0.000001 )
+        assert(np.abs(next_vals[2] - 34.3) < 0.000001 )
+
+        (intensity, next_vals) = FA.plot_next_event_vs_intensity(
+                                intensity_measure="integrated", 
+                                next_event_measure="onset", 
+                                window=[1, 1], 
+                                out_path=None, 
+                                plotit=False)
+
+        assert(np.abs(intensity[0] - 1.0/2.0) < 0.01 )
+        assert(np.abs(intensity[1] - 0.5/2.0) < 0.01 )
+        assert(np.abs(intensity[2] - 1.0/3.0/2.0) < 0.01 )
+
+        assert(np.abs(next_vals[0] - 5.1) < 0.000001 )
+        assert(np.abs(next_vals[1] - 19) < 0.000001 )
+        assert(np.abs(next_vals[2] - 34.3) < 0.000001 )
+
+        (intensity, next_vals) = FA.plot_next_event_vs_intensity(
+                                intensity_measure="integrated", 
+                                next_event_measure="length", 
+                                window=[0, 1], 
+                                out_path=None, 
+                                plotit=False)
+
+        assert(np.abs(intensity[0] - 1.0) < 0.000001 )
+        assert(np.abs(intensity[1] - 0.5) < 0.000001 )
+        assert(np.abs(intensity[2] - 1.0/3.0) < 0.000001 )
+
+        assert(np.abs(next_vals[0] - 1.2) < 0.000001 )
+        assert(np.abs(next_vals[1] - 1.6) < 0.000001 )
+        assert(np.abs(next_vals[2] - 1.5) < 0.000001 )
+
+
+
+
+
+
+
     pass
 
 
@@ -406,8 +608,7 @@ class Test_plot_peaks_vs_time():
 class Test_plot_perievent_hist():
     pass
 
-class Test_get_event_times():
-    pass
+
 
 class Test_convert_seconds_to_index():
     pass
@@ -415,6 +616,14 @@ class Test_convert_seconds_to_index():
 
 class Test_get_areas_under_curve():
     pass
+
+class Test_save_time_series():
+    #This function is tested in test_preprocessing
+    pass
+
+
+
+
 
 
 class Test_notch_filter():

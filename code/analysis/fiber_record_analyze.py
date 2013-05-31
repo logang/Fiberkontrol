@@ -498,40 +498,70 @@ class FiberAnalyze( object ):
                                       plotit=True):
         """
         Generate a plot of next event onset delay (onset) or 
-        event length (length) as a function of an intensity 
+        length of next event (length) as a function of an intensity 
         measure that can be one of
           -- peak intensity of last event (peak)
           -- integrated intensity of last event (integrated)
-          -- integrated intensity over history window (window)
+#          -- integrated intensity over history window (window)
+#                (I'm not sure what this one means)
 
-          TODO: Add a metric that is simply the time of the event
+        Set window = [0,0] to use the entire event length as the
+            (variable) window length.
+
+        Returns: (intensity, next_vals), where:
+            intensity = a vector of length (num_events - 1) 
+                        whose entries are the metric for each event
+            next_vals = the time until the next event
+
+          #TODO: Add a metric that is simply the time of the event
+
+          This should be refactored to use score_of_chunks() from group_analysis
+          on chunks from FA.get_time_chunks_around_events()
+
         """
         start_times = self.get_event_times(edge="rising", exp_type=self.exp_type)
         end_times = self.get_event_times(edge="falling", exp_type=self.exp_type)
         if start_times == -1:
             raise ValueError("Event times seem to have failed to load.")
 
+        end_event_times = None
+        if window == [0,0]:
+            end_event_times = end_times
+        ts_arr = self.get_time_chunks_around_events(data=self.fluor_data, 
+                                              event_times = start_times, 
+                                              window=window, 
+                                              baseline_window=-1, 
+                                              end_event_times=end_event_times)
+        print "ts_arr", ts_arr
+
+        print "intensity_measure", intensity_measure
+        intensity = self.score_of_chunks(ts_arr, 
+                                        metric=intensity_measure,
+                                        start_event_times=start_times, 
+                                        end_event_times=end_times)
+
         # get intensity values
-        if intensity_measure == "peak":
-            intensity = np.zeros(len(start_times))
-            for i in xrange(len(start_times)):
-                peak = self.get_peak(start_times[i]-window[0], 
-                                     start_times[i]+window[1], 
-                                     self.exp_type) # end_times[i])
-                intensity[i] = peak
-        elif intensity_measure == "integrated":
-            intensity = self.get_areas_under_curve( start_times, 
-                                                    window, 
-                                                    baseline_window=window, 
-                                                    normalize=False)
-        elif intensity_measure == "window":
-            window[1] = 0
-            intensity = self.get_areas_under_curve( start_times, 
-                                                    window, 
-                                                    baseline_window=window, 
-                                                    normalize=False)
-        else:
-            raise ValueError("The entered intensity_measure is not one of peak, integrated, or window.")
+        # if intensity_measure == "peak":
+        #     intensity = np.zeros(len(start_times))
+        #     for i in xrange(len(start_times)):
+        #         peak = self.get_peak(start_times[i]-window[0], 
+        #                              start_times[i]+window[1], 
+        #                              self.exp_type) # end_times[i])
+        #         intensity[i] = peak
+        # elif intensity_measure == "integrated":
+        #     intensity = self.get_areas_under_curve( start_times, 
+        #                                             window, 
+        #                                             baseline_window=-1, 
+        #                                             normalize=False)
+        # # elif intensity_measure == "window":
+        # #     window[1] = 0
+        # #     intensity = self.get_areas_under_curve( start_times, 
+        # #                                             window, 
+        # #                                             baseline_window=-1, 
+        # #                                             normalize=False)
+        # else:
+        #     raise ValueError("The entered intensity_measure is not one of peak, integrated, or window.")
+       
         # get next event values
         if next_event_measure == "onset":
             next_vals = np.zeros(len(start_times)-1)
@@ -650,15 +680,17 @@ class FiberAnalyze( object ):
         sets the minimum value in a chunk to 0)
         Set baseline_window = -1 for no baseline normalization
 
-        To use the entire epoch as the window, set window=[0,0]
-        and provide end_event_times. If end_event_times is not None,
+        To use the entire epoch as the window, provide end_event_times.
+
+        That is, if end_event_times != None, then
         this function will ignore the provide 'window', instead
         using the entire epoch.
         """
         window_indices = [self.convert_seconds_to_index( window[0]),
                           self.convert_seconds_to_index( window[1])]
 
-        if baseline_window is not None and isinstance(baseline_window, int) and baseline_window != -1:
+        if baseline_window is not None and ((not isinstance(baseline_window, int) and len(baseline_window) == 2) 
+                                             or (isinstance(baseline_window, int) and baseline_window != -1)):
             baseline_indices = [self.convert_seconds_to_index( baseline_window[0]),
                                 self.convert_seconds_to_index( baseline_window[1])]
 
@@ -675,8 +707,9 @@ class FiberAnalyze( object ):
             e_idx = np.where(e<self.time_stamps)[0][0]
             if (e_idx + window_indices[1] < len(data)-1) and (e_idx - window_indices[0] > 0):
                 chunk = data[range(max(0, (e_idx-window_indices[0])),min(len(data)-1, (e_idx+window_indices[1])))]
-                if baseline_window is not None and isinstance(baseline_window, int) and baseline_window != -1:
-                    baseline_chunk = data[range(max(0, (e_idx-window_indices[0])), min(len(data)-1, (e_idx+window_indices[1])))]
+                if baseline_window is not None and ((not isinstance(baseline_window, int) and len(baseline_window) == 2) or 
+                         (isinstance(baseline_window, int)  and baseline_window != -1)):
+                    baseline_chunk = data[range(max(0, (e_idx-baseline_indices[0])), min(len(data)-1, (e_idx+baseline_indices[1])))]
                     baseline = np.min(baseline_chunk)
                 elif isinstance(baseline_window, int) and baseline_window == -1:
                     baseline = 0
@@ -686,12 +719,53 @@ class FiberAnalyze( object ):
                     #baseline = np.min(chunk)
                     baseline = np.min(smooth_chunk)
 
-
-
                 time_chunks.append(chunk - baseline)
             #except:
              #   print "Unable to extract window:", [(e-window_indices[0]),(e+window_indices[1])]
         return time_chunks
+
+    def score_of_chunks(self, ts_arr, metric='area', start_event_times=None, end_event_times=None):
+        """
+        Given an array of time series chunks, return an array
+        holding a score for each of these chunks
+
+        metric can be
+        'area' (average value of curve),
+        'peak' (peak fluorescence value), 
+        'spacing', (time from end of current epoch to beginning of the next)
+        'epoch_length' (time from beginning of epoch to end of epoch)
+
+        TODO: Add a metric that is simply the time of the event
+        """
+        scores = []
+        i=0
+        for ts in ts_arr:
+            if metric == 'area' or metric == 'integrated':
+                scores.append(np.sum(ts)/len(ts))
+            elif metric == 'peak':
+                scores.append(np.max(ts))
+            elif metric == 'spacing':
+                if start_event_times is None or end_event_times is None:
+                    raise ValueError( "start_event_times and end_event_times were not passed to score_of_chunks() in group_analysis.")
+                else:
+                    if i == len(start_event_times) - 1:
+                        scores.append(0)
+                    else:
+                        scores.append(start_event_times[i+1] - end_event_times[i])
+            elif metric == 'epoch_length':
+                if start_event_times is None or end_event_times is None:
+                    raise ValueError( "start_event_times and end_event_times were not passed to score_of_chunks() in group_analysis.")
+                else:
+                    if i == len(start_event_times) - 1:
+                        scores.append(0)
+                    else:
+                        scores.append(end_event_times[i] - start_event_times[i])
+            else:
+                raise ValueError( "The entered metric is not one of peak, area, or spacing, epoch_length, or time.")
+
+            i = i + 1
+
+        return scores
 
     def plot_perievent_hist( self, 
                              event_times, 
@@ -782,7 +856,7 @@ class FiberAnalyze( object ):
             print "No event times loaded. Cannot plot perievent."        
 
 
-    def get_event_times( self, edge="rising", nseconds=0, exp_type=None):
+    def get_event_times( self, edge="rising", exp_type=None):
         """
         Returns a list of either the start ('rising') or end ('falling')
         times of events. For sucrose data, uses the lick density
@@ -790,9 +864,9 @@ class FiberAnalyze( object ):
         and homecagenovel, the events are defined by a pair of start and 
         end times directly from the hand-scoring. 
 
-        'nseconds' defines a minimum distance between the end of one event
-        and the start of a previous event. if you do not wish to impose
-        such a restriction, set nseconds=None.
+        Set event_spacing as a parser option to enforce a
+        minimum time between events. 
+
         """
 
         if exp_type == 'sucrose':
@@ -812,6 +886,8 @@ class FiberAnalyze( object ):
 
         if self.event_spacing is not None:
             nseconds = self.event_spacing
+        else:
+            nseconds = 0
 
         if self.time_tuples is not None:
             print "self.time_tuples: ", self.time_tuples
@@ -819,6 +895,8 @@ class FiberAnalyze( object ):
             for i in range(len(self.time_tuples)):
                 pair = self.time_tuples[i]
 
+                print "diff", (self.time_tuples[i][0] - self.time_tuples[i-1][1])
+                print "nseconds", nseconds
                 if i==0 or nseconds is None or (self.time_tuples[i][0] - self.time_tuples[i-1][1] >= nseconds):
                     if edge == "rising":
                         event_times.append(pair[0])
@@ -953,6 +1031,7 @@ class FiberAnalyze( object ):
         print "window: ", window
         time_chunks = self.get_time_chunks_around_events(self.fluor_data, start_times, window, baseline_window)
         
+        print "len(time_chunks)", len(time_chunks)
         areas = []
         for chunk in time_chunks:
             if normalize:

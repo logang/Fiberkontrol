@@ -651,43 +651,44 @@ def get_novel_social_pairs(all_data, exp1, exp2, mouse_type = 'GC5'):
 
     return pairs
 
-def score_of_chunks(ts_arr, metric='area', start_event_times=None, end_event_times=None):
-    """
-    Given an array of time series chunks, return an array
-    holding a score for each of these chunks
+# def score_of_chunks(ts_arr, metric='area', start_event_times=None, end_event_times=None):
+#     """
+#       MOVED THIS INTO FIBERANALYZE
+#     Given an array of time series chunks, return an array
+#     holding a score for each of these chunks
 
-    metric can be
-    'area' (area under curve),
-    'peak' (peak fluorescence value), 
-    'spacing', (time from end of current epoch to beginning of the next)
-    'epoch_length' (time from beginning of epoch to end of epoch)
-    """
-    scores = []
-    i=0
-    for ts in ts_arr:
-        if metric == 'area':
-            scores.append(np.sum(ts)/len(ts))
-        elif metric == 'peak':
-            scores.append(np.max(ts))
-        elif metric == 'spacing':
-            if start_event_times is None or end_event_times is None:
-                raise ValueError( "start_event_times and end_event_times were not passed to score_of_chunks() in group_analysis.")
-            else:
-                if i == len(start_event_times) - 1:
-                    scores.append(0)
-                else:
-                    scores.append(start_event_times[i+1] - end_event_times[i])
-        elif metric == 'epoch_length':
-            if start_event_times is None or end_event_times is None:
-                raise ValueError( "start_event_times and end_event_times were not passed to score_of_chunks() in group_analysis.")
-            else:
-                if i == len(start_event_times) - 1:
-                    scores.append(0)
-                else:
-                    scores.append(end_event_times[i] - start_event_times[i])
+#     metric can be
+#     'area' (average value of curve),
+#     'peak' (peak fluorescence value), 
+#     'spacing', (time from end of current epoch to beginning of the next)
+#     'epoch_length' (time from beginning of epoch to end of epoch)
+#     """
+#     scores = []
+#     i=0
+#     for ts in ts_arr:
+#         if metric == 'area':
+#             scores.append(np.sum(ts)/len(ts))
+#         elif metric == 'peak':
+#             scores.append(np.max(ts))
+#         elif metric == 'spacing':
+#             if start_event_times is None or end_event_times is None:
+#                 raise ValueError( "start_event_times and end_event_times were not passed to score_of_chunks() in group_analysis.")
+#             else:
+#                 if i == len(start_event_times) - 1:
+#                     scores.append(0)
+#                 else:
+#                     scores.append(start_event_times[i+1] - end_event_times[i])
+#         elif metric == 'epoch_length':
+#             if start_event_times is None or end_event_times is None:
+#                 raise ValueError( "start_event_times and end_event_times were not passed to score_of_chunks() in group_analysis.")
+#             else:
+#                 if i == len(start_event_times) - 1:
+#                     scores.append(0)
+#                 else:
+#                     scores.append(end_event_times[i] - start_event_times[i])
 
-        i = i + 1
-    return scores
+#         i = i + 1
+#     return scores
 
 
 def loadFiberAnalyze(options, animal_id, exp_date, exp_type):
@@ -708,11 +709,9 @@ def loadFiberAnalyze(options, animal_id, exp_date, exp_type):
     except:
         success = -1
     print "success: ", success
-#    print "np.shape(FA.fluor_data) before denoise: ",FA.fluor_data
     if(success != -1):
         print "denoise"
         FA.fluor_data = np.asarray(denoise(FA.fluor_data))
-#    print "np.shape(FA.fluor_data) after denoise: ", FA.fluor_data
 
     return [FA, success]
 
@@ -835,9 +834,9 @@ def compare_start_and_end_of_epoch(all_data, options,
                                                                             baseline_window=-1 ))
 
 
-                start_scores = np.array(score_of_chunks(start_time_arr, metric))
-                before_scores = np.array(score_of_chunks(before_time_arr, metric))
-                end_scores = np.array(score_of_chunks(end_time_arr, metric))
+                start_scores = np.array(FA.score_of_chunks(start_time_arr, metric))
+                before_scores = np.array(FA.score_of_chunks(before_time_arr, metric))
+                end_scores = np.array(FA.score_of_chunks(end_time_arr, metric))
                 scores_diff = end_scores - start_scores
                 if compare_before_after_end:
                     scores_diff = end_scores - before_scores
@@ -990,7 +989,7 @@ def compare_epochs(all_data,
     two behavioral experiments (exp1 and exp2). Fluorescence can be 
     quantified (or, scored) using metrics such as 
     'peak' (maximum fluorescence value during epoch),
-    'area'  (sum of fluorescence during epoch),
+    'area'  (average fluorescence during epoch),
     'spacing', (time from end of current epoch to beginning of the next)
 
 
@@ -1074,7 +1073,7 @@ def compare_epochs(all_data,
                                             window = time_window, 
                                             baseline_window=-1))
 
-                scores = np.array(score_of_chunks(start_time_arr, metric, 
+                scores = np.array(FA.score_of_chunks(start_time_arr, metric, 
                                                     start_event_times, end_event_times))
                 pair_scores[animal_id][exp_type] = scores
                 if max_bout_number>0:
@@ -1348,7 +1347,7 @@ def compare_decay(all_data,
 
     Metric can be:
     'peak' (maximum fluorescence value during epoch),
-    'area'  (sum of fluorescence during epoch),
+    'area'  (average fluorescence during epoch),
     'spacing', (time from end of current epoch to beginning of the next)
 
     TODO: Fit with an exponential?

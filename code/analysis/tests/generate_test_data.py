@@ -48,8 +48,8 @@ class TimeSeriesSimulator( object ):
 		"""
 		if self.mouse_number == '0001':
 			if self.exp_type == 'social':
-				start_times = [49.8, 100]
-				end_times = [50.7, 101.5]
+				start_times = [49.8, 100] #don't change this
+				end_times = [50.7, 101.5] #don't change this
 			elif self.exp_type == 'novel':
 				start_times = [50.8, 100]
 				end_times = [51.8, 101.5]
@@ -74,6 +74,13 @@ class TimeSeriesSimulator( object ):
 			elif self.exp_type == 'novel':
 				start_times = [50.9,  100.0]
 				end_times = [51.9, 101.1]
+		elif self.mouse_number == '0005':
+			if self.exp_type == 'social':
+				start_times = [ 45.6,51.9, 72.1, 108.0]
+				end_times = [ 46.8, 53.1, 73.7, 109.5]
+			elif self.exp_type == 'novel':
+				start_times = [50.9, 62.1, 100.0]
+				end_times = [51.9, 63.2, 101.1]
 
 		start_indices = self.SecondsToIndices(start_times)
 		end_indices = self.SecondsToIndices(end_times)
@@ -130,12 +137,18 @@ class TimeSeriesSimulator( object ):
 
 
 
-	def GenerateTimeSeries(self):
+	def GenerateTimeSeries(self, type='point_process', tail=0):
 		"""
 		Returns a single time series that represents
 		the sum of the binary time series of individual
 		neurons convolved with an approximation of
 		the decay profile of GCaMP.
+
+		'type' can be 'simple' (which is completely deterministic)
+		or 'point_process' (which looks more realistic)
+
+		'tail': for 'simple' simulation, add 'tail' seconds of activity
+		past the end of the event
 		"""
 
 		start_times, end_times, event_indicator, \
@@ -143,33 +156,45 @@ class TimeSeriesSimulator( object ):
 		self.start_times = start_times
 		self.end_times = end_times
 
-		prev_index = 0
-		all_time_series = np.zeros((self.numNeurons, 1))
-		for i in range(len(start_indices)):
-			start_index = start_indices[i]
-			end_index = end_indices[i]
+		if type=='point_process':
+			prev_index = 0
+			all_time_series = np.zeros((self.numNeurons, 1))
+			for i in range(len(start_indices)):
+				start_index = start_indices[i]
+				end_index = end_indices[i]
 
-			no_event_time_series = self.GetSpikeTimeSeries(self.no_event_lambda, 
-											start_index - prev_index, self.numNeurons)
-			event_time_series = self.GetSpikeTimeSeries(self.event_lambda, 
-											end_index - start_index, self.numNeurons)
-			all_time_series = np.hstack((all_time_series, no_event_time_series, event_time_series))
-
-			prev_index = end_index
-
-			if i == len(start_indices) -1:
 				no_event_time_series = self.GetSpikeTimeSeries(self.no_event_lambda, 
-											self.numDataPoints - prev_index, self.numNeurons)
-				all_time_series = np.hstack((all_time_series, no_event_time_series))
+												start_index - prev_index, self.numNeurons)
+				event_time_series = self.GetSpikeTimeSeries(self.event_lambda, 
+												end_index - start_index, self.numNeurons)
+				all_time_series = np.hstack((all_time_series, no_event_time_series, event_time_series))
+
+				prev_index = end_index
+
+				if i == len(start_indices) -1:
+					no_event_time_series = self.GetSpikeTimeSeries(self.no_event_lambda, 
+												self.numDataPoints - prev_index, self.numNeurons)
+					all_time_series = np.hstack((all_time_series, no_event_time_series))
 
 
-		all_time_series = self.ConvolveWithFluorescenceDecay(all_time_series, 4)
-		#t = np.tile(range(self.numDataPoints+1), (self.numNeurons,1))
-		#y = np.sum(np.cumsum(indiv_time_series, axis = 1), axis = 0)
-		self.fluor = np.sum(all_time_series, axis = 0)
-		self.fluor = self.fluor/self.numNeurons
+			all_time_series = self.ConvolveWithFluorescenceDecay(all_time_series, 4)
+			#t = np.tile(range(self.numDataPoints+1), (self.numNeurons,1))
+			#y = np.sum(np.cumsum(indiv_time_series, axis = 1), axis = 0)
+			self.fluor = np.sum(all_time_series, axis = 0)
+			self.fluor = self.fluor/self.numNeurons
+		elif type == 'simple':
+			ts = np.zeros(self.numDataPoints + 1)
+			for i in range(len(start_indices)):
+				tail_ind = self.SecondsToIndices(tail)
+				print "tail_ind", tail_ind
+				ts[start_indices[i]:end_indices[i]+tail_ind] = 1.0/(i+1);
+
+			ts = ts + 1;
+			self.fluor = ts;
 
 		resolution = 10
+		print "np.shape(self.fluor)", np.shape(self.fluor)
+		print "np.shape(self.time_stamps)", np.shape(self.time_stamps)
 		plt.plot(self.time_stamps[::resolution], self.fluor[::resolution])
 		plt.plot(self.time_stamps[::resolution], event_indicator[::resolution]*np.max(self.fluor), 'r')
 		directory = self.exp_date+'/figs'
@@ -178,6 +203,30 @@ class TimeSeriesSimulator( object ):
 		if not os.path.isdir(self.output_path + directory):
 		    os.mkdir(self.output_path + directory)
 		plt.savefig(self.output_path + directory + '/'+self.exp_date+'-'+self.mouse_type+'-homecage' + self.exp_type + '-'+self.mouse_number+'-600patch_test.png')
+
+	# def GenerateSimpleTimeSeries():
+	# 	start_times, end_times, event_indicator, \
+	# 		start_indices, end_indices = self.GenerateEventTimes(self.totalTime)
+	# 	self.start_times = start_times
+	# 	self.end_times = end_times
+
+	# 	ts = np.zeros(self.numDataPoints, 1)
+	# 	for i in range(len(start_indices)):
+	# 		ts[start_indices[i]:end_indices[i]] = 1.0/i;
+
+	# 	ts = ts + 1;
+	# 	self.fluor = ts;
+
+	# 	resolution = 10
+	# 	plt.plot(self.time_stamps[::resolution], self.fluor[::resolution])
+	# 	plt.plot(self.time_stamps[::resolution], event_indicator[::resolution]*np.max(self.fluor), 'r')
+	# 	directory = self.exp_date+'/figs'
+	# 	if not os.path.isdir(self.output_path + self.exp_date):
+	# 	    os.mkdir(self.output_path + self.exp_date)
+	# 	if not os.path.isdir(self.output_path + directory):
+	# 	    os.mkdir(self.output_path + directory)
+	# 	plt.savefig(self.output_path + directory + '/'+self.exp_date+'-'+self.mouse_type+'-homecage' + self.exp_type + '-'+self.mouse_number+'-600patch_test.png')
+
 
 
 	def save(self):
@@ -205,12 +254,17 @@ if __name__ == "__main__":
                    help="Specify the mouse type (GC5, GC5_NAcprojection).")
 	parser.add_option("", "--exp-date", dest="exp_date", default='20130524',
                    help="Specify the experiment date.")
+	parser.add_option("", "--ts-type", dest="ts_type", default='simple',
+               help="Specify the time-series type ('simple' or 'point_process'.")
+	parser.add_option("", "--tail", dest="tail", default=0,
+           help="For 'simple' time series, specify time in seconds of"
+           		"additional activity beyond the end of each event.")
 	(options, args) = parser.parse_args()
 
 
 	random.seed(1)
 	TSS = TimeSeriesSimulator(options)
-	TSS.GenerateTimeSeries()
+	TSS.GenerateTimeSeries(options.ts_type, int(options.tail))
 	TSS.save()
 
 

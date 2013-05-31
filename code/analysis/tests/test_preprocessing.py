@@ -24,7 +24,9 @@ class Test_read_filenames():
                                  '20130523/20130523-GC5_NAcprojection-homecagesocial-0003-600patch_test.npz',
                                  '20130523/20130523-GC5_NAcprojection-homecagenovel-0003-600patch_test.npz',
                                  '20130523/20130523-GC5_NAcprojection-homecagesocial-0004-600patch_test.npz',
-                                 '20130523/20130523-GC5_NAcprojection-homecagenovel-0004-600patch_test.npz'
+                                 '20130523/20130523-GC5_NAcprojection-homecagenovel-0004-600patch_test.npz',
+                                 '20130524/20130524-GC5-homecagesocial-0005-600patch_test.npz',
+                                 '20130524/20130524-GC5-homecagenovel-0005-600patch_test.npz',
                                 ]
 
     def tearDown(self):
@@ -78,6 +80,12 @@ class Test_generate_hdf5_file():
         assert(unicode('0002') in f.keys())
         assert(unicode('0003') in f.keys())
         assert(unicode('0004') in f.keys())
+        assert(unicode('0005') in f.keys())
+
+        assert(f['0005'].keys() == [unicode('20130524')])
+        assert(f['0005'].attrs['mouse_type'] == 'GC5')
+        assert(f['0005']['20130524']['homecagenovel'].keys() == 
+                        [unicode('event_tuples'), unicode('time_series_arr')])
 
         assert(f['0003'].keys() == [unicode('20130523')])
         assert(f['0003'].attrs['mouse_type'] == 'GC5_NAcprojection')
@@ -107,6 +115,13 @@ class Test_generate_hdf5_file():
 
         time_series_arr = np.array(f['0003']['20130523']['homecagenovel']['time_series_arr'])
         assert(np.shape(time_series_arr) == (37501, 3))
+
+        time_series_arr = np.array(f['0005']['20130524']['homecagesocial']['time_series_arr'])
+        print "shape time_series_arr", time_series_arr, np.shape(time_series_arr)
+        assert(np.shape(time_series_arr) == (37501, 3))
+        assert(np.abs(np.max(time_series_arr[:,0]) - 150.0) < self.epsilon) #max time of simulated data
+        assert(np.abs(np.max(time_series_arr[:,1]) - 3.0) < self.epsilon) #trigger data after processing in fiber_record_analyze
+        assert(np.abs(np.max(time_series_arr[:,2]) - 2.0) < 0.1)
      
 
 class Test_add_flattened_files_to_hdf5():
