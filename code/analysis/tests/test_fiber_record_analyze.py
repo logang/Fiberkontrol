@@ -10,7 +10,6 @@ import json
 import numpy as np
 import os
 from load_configuration import load_configuration
-from optparse import OptionParser
 
 
 def setup_module(module):
@@ -380,6 +379,7 @@ class Test_plot_next_event_vs_intensity(Configure_tests):
         Test various combinations of intensity_measure and 
         next_event_measure as inputs to 
         FA.plot_next_event_vs_intensity.
+        This also serves to test score_of_chunks()
         Use test data '0005', which is completely deterministic
         (albeit with non-realistic looking gcamp spikes).
         """
@@ -485,7 +485,33 @@ class Test_plot_next_event_vs_intensity(Configure_tests):
         assert(np.abs(next_vals[1] - 1.6) < 0.000001 )
         assert(np.abs(next_vals[2] - 1.5) < 0.000001 )
 
+        (intensity, next_vals) = FA.plot_next_event_vs_intensity(
+                        intensity_measure="spacing", 
+                        next_event_measure="length", 
+                        window=[0, 1], 
+                        out_path=None, 
+                        plotit=False)
 
+        assert(np.abs(intensity[0] - 5.1) < 0.000001 )
+        assert(np.abs(intensity[1] - 19) < 0.000001 )
+        assert(np.abs(intensity[2] - 34.3) < 0.000001 )
+
+        assert(np.abs(next_vals[0] - 1.2) < 0.000001 )
+        assert(np.abs(next_vals[1] - 1.6) < 0.000001 )
+        assert(np.abs(next_vals[2] - 1.5) < 0.000001 )
+
+
+
+        (intensity, next_vals) = FA.plot_next_event_vs_intensity(
+                intensity_measure="epoch_length", 
+                next_event_measure="length", 
+                window=[0, 1], 
+                out_path=None, 
+                plotit=False)
+
+        assert(np.abs(intensity[0] - 1.2) < 0.000001 )
+        assert(np.abs(intensity[1] - 1.2) < 0.000001 )
+        assert(np.abs(intensity[2] - 1.6) < 0.000001 )
 
 
 class Test_get_time_chunks_around_events(Configure_tests):
@@ -636,31 +662,85 @@ class Test_get_time_chunks_around_events(Configure_tests):
         assert(np.abs(np.max(np.shape(time_chunks[3])) - window_length) < 0.000001)
 
 
+class Test_plot_perievent_hist(Configure_tests):
+    def setup(self):
+        Configure_tests.__init__(self)
+
+        self.options.fluor_normalization = 'deltaF'
+        self.options.event_spacing = 0
+        self.options.mouse_type = 'GC5'
+        self.options.time_range = '0:-1'
+        self.options.exp_type = 'homecagesocial'
+
+    def tearDown(self):
+        Configure_tests.remove_output_directory(self)
+
+    def test_perievent(self):
+
+        FA = fra.FiberAnalyze( self.options )
+        FA.subject_id = '0005'
+        FA.exp_date = '20130524'
+        FA.exp_type = 'homecagesocial'
+        FA.load(file_type="hdf5")
+
+
+        event_times = FA.get_event_times(edge="rising", 
+                                         exp_type=FA.exp_type)
+
+        assert(np.abs(event_times[0] - 45.6) < 0.01)
+        assert(np.abs(event_times[1] - 51.9) < 0.01)
+        assert(np.abs(event_times[2] - 72.1) < 0.01)
+        assert(np.abs(event_times[3] - 108.0) < 0.01)
+        #Remember that there is a tail of 2 seconds of activity
+        #that extends past the end of the event
+
+        time_window = [4, 4]
+        baseline_window = 'full'
+        (time_arr, x) = FA.plot_perievent_hist(event_times, 
+                                             window=time_window, 
+                                             out_path=None,
+                                             plotit=False, 
+                                             subplot=None, 
+                                             baseline_window=baseline_window )
+
+        print "time_arr", time_arr[:][:]
+        print "x", x
+        assert(np.abs(x[0] - (-4.0))<0.00001)
+        assert(np.abs(x[-1] - 4.0)<0.01)
+        assert(np.abs(time_arr[0][0] - 0.0)<0.00001) #beginning of first time chunk
+        assert(np.abs(time_arr[0][-1] - 0.0)<0.00001)#end of first time chunk
+        assert(np.abs(time_arr[0][1] - 1.0)<0.00001) #Second time chunk
+
+        assert(np.abs(time_arr[time_arr.shape[0]/2+1][0] - 1.0)<0.00001) #middle of first chunk (at event onset)
+        assert(np.abs(time_arr[time_arr.shape[0]/2+1][1] - 0.5)<0.00001) #middle of second chunk (at event onset)
+        assert(np.abs(time_arr[time_arr.shape[0]/2+1][2] - 1.0/3.0)<0.00001)#middle of third chunk (at event onset)
+
+
+
+
+
+
+
+
+
+
+
+    pass
+
 
 class Test_plot_peaks_vs_time():
     pass
 
 
-class Test_plot_perievent_hist():
-    pass
+
+
+
+
 
 
 
 class Test_convert_seconds_to_index():
     pass
-
-
-class Test_get_areas_under_curve():
-    pass
-
-class Test_save_time_series():
-    #This function is tested in test_preprocessing
-    pass
-
-
-
-
-
 
 class Test_notch_filter():
     #Though are we using this function??
@@ -675,6 +755,12 @@ class Test_load_trigger_data():
     #need to add sucrose data
     pass
 
+class Test_get_areas_under_curve():
+    pass
+
+class Test_save_time_series():
+    #This function is tested in test_preprocessing
+    pass
 
 
 

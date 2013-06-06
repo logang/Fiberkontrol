@@ -279,7 +279,7 @@ def group_bout_heatmaps(all_data,
 
         if(success!=-1):
             event_times = FA.get_event_times(edge=event_edge, 
-                                             nseconds=float(options.event_spacing), 
+                                             #nseconds=float(options.event_spacing), 
                                              exp_type=exp_type)
             print "len(event_times)", len(event_times)
             if len(event_times) > 0:
@@ -474,7 +474,7 @@ def group_bout_ci(all_data, options,
 #                    if(FA.load(file_type="hdf5") != -1):
                     if(success != -1):
                         event_times = FA.get_event_times(edge=event_edge, 
-                                                         nseconds=int(options.event_spacing), 
+                                                         #nseconds=int(options.event_spacing), 
                                                          exp_type=exp_type)
                         print "len(event_times)", len(event_times)
                         time_arr = np.asarray( FA.get_time_chunks_around_events(FA.fluor_data, 
@@ -813,10 +813,10 @@ def compare_start_and_end_of_epoch(all_data, options,
             if(success != -1):
 
                 start_event_times = FA.get_event_times(edge="rising", 
-                                                       nseconds=float(options.event_spacing), 
+                                                       #nseconds=float(options.event_spacing), 
                                                        exp_type=exp_type)
                 end_event_times = FA.get_event_times(edge="falling", 
-                                                     nseconds=float(options.event_spacing), 
+                                                     #nseconds=float(options.event_spacing), 
                                                      exp_type=exp_type)
 
                 #--Get an array of time series chunks in a window around each event time
@@ -1048,10 +1048,10 @@ def compare_epochs(all_data,
                                              exp_type)
             if (success != -1):
                 start_event_times = FA.get_event_times(edge="rising", 
-                                                       nseconds=float(options.event_spacing),
+                                                       #nseconds=float(options.event_spacing),
                                                        exp_type=exp_type)
                 end_event_times = FA.get_event_times(edge="falling", 
-                                                     nseconds=float(options.event_spacing),
+                                                     #nseconds=float(options.event_spacing),
                                                      exp_type=exp_type)
 
                 print "start_event_times: ", start_event_times
@@ -1405,10 +1405,10 @@ def event_length_histogram(all_data,
         if (success != -1):
 
             start_event_times = np.array(FA.get_event_times(edge="rising", 
-                                                   nseconds=float(options.event_spacing), 
+                                                   #nseconds=float(options.event_spacing), 
                                                    exp_type=exp_type))
             end_event_times = np.array(FA.get_event_times(edge="falling", 
-                                                 nseconds=float(options.event_spacing), 
+                                                 #nseconds=float(options.event_spacing), 
                                                  exp_type=exp_type))
 
             lengths = end_event_times - start_event_times
@@ -1436,6 +1436,9 @@ def event_length_histogram(all_data,
 #-------------------------------------------------------------------------------------------
 
 def set_and_read_options_parser():
+
+   # FiberAnalyze.add_command_line_options()
+
         # Parse command line options
     from optparse import OptionParser
 
@@ -1494,6 +1497,7 @@ def set_and_read_options_parser():
 
     parser.add_option("", "--mouse-type", dest="mouse_type", default="GC5",
                        help="Specify the type of virus injected in the mouse (GC5, GC3, EYFP)")
+
 
     parser.add_option("", "--exp-date", dest="exp_date", default=None,
                        help="Limit group analysis to trials of a specific date ")

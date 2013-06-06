@@ -497,8 +497,8 @@ class FiberAnalyze( object ):
                                       out_path=None, 
                                       plotit=True):
         """
-        Generate a plot of next event onset delay (onset) or 
-        length of next event (length) as a function of an intensity 
+        Generate a plot of next event onset delay 'onset' (time until next event) or 
+        length of next event 'length' as a function of an intensity 
         measure that can be one of
           -- peak intensity of last event (peak)
           -- integrated intensity of last event (integrated)
@@ -516,9 +516,6 @@ class FiberAnalyze( object ):
             next_vals = the time until the next event
 
           #TODO TODO: Add a metric that is simply the time of the event
-
-          This should be refactored to use score_of_chunks() from group_analysis
-          on chunks from FA.get_time_chunks_around_events()
 
         """
         start_times = self.get_event_times(edge="rising", exp_type=self.exp_type)
@@ -803,6 +800,7 @@ class FiberAnalyze( object ):
         # plot each time window, colored by order
         time_arr = np.asarray(time_chunks).T
         x = self.time_stamps[0:time_arr.shape[0]]-self.time_stamps[window_indices[0]] ###IS THIS RIGHT?
+        print "x", x
         ymax = np.max(time_arr)
         ymax += 0.1*ymax
         ymin = np.min(time_arr)
@@ -837,6 +835,9 @@ class FiberAnalyze( object ):
                 print "Saving peri-event time series..."
                 pl.savefig(out_path + "perievent_tseries.pdf")
                 pl.savefig(out_path + "perievent_tseries.png")
+
+        return (time_arr, x)
+
 
     def plot_peritrigger_edge( self, window, edge="rising", out_path=None ):
         """
@@ -1019,29 +1020,28 @@ class FiberAnalyze( object ):
         if self.save_and_exit:
             sys.exit(0)
 
-    def get_areas_under_curve( self, start_times, window, baseline_window=None, normalize=False):
-        """
-        Returns a vector of the area under the fluorescence curve within the provided
-        window [before, after] (in seconds), that surrounds each start_time.
-        Normalize determines whether to divide the area by the maximum fluorescence
-        value of the window (this is more if you want to look at the "shape" of the curve)
-        """
-        print "window: ", window
-        time_chunks = self.get_time_chunks_around_events(self.fluor_data, start_times, window, baseline_window)
+    # def get_areas_under_curve( self, start_times, window, baseline_window=None, normalize=False):
+    #     """
+    #     Returns a vector of the area under the fluorescence curve within the provided
+    #     window [before, after] (in seconds), that surrounds each start_time.
+    #     Normalize determines whether to divide the area by the maximum fluorescence
+    #     value of the window (this is more if you want to look at the "shape" of the curve)
+    #     """
+    #     print "window: ", window
+    #     time_chunks = self.get_time_chunks_around_events(self.fluor_data, start_times, window, baseline_window)
         
-        print "len(time_chunks)", len(time_chunks)
-        areas = []
-        for chunk in time_chunks:
-            if normalize:
-                if max(chunk) < 0.01: 
-                    areas.append(sum(chunk)/len(chunk)/0.01)
-                else:
-                    areas.append(sum(chunk)/len(chunk)/(max(abs(chunk))))
-            else: 
-                areas.append(sum(chunk)/len(chunk))
+    #     print "len(time_chunks)", len(time_chunks)
+    #     areas = []
+    #     for chunk in time_chunks:
+    #         if normalize:
+    #             if max(chunk) < 0.01: 
+    #                 areas.append(sum(chunk)/len(chunk)/0.01)
+    #             else:
+    #                 areas.append(sum(chunk)/len(chunk)/(max(abs(chunk))))
+    #         else: 
+    #             areas.append(sum(chunk)/len(chunk))
 
-
-        return areas
+    #     return areas
 
     def get_peak( self, start_time, end_time, exp_type=None ):
         """
@@ -1157,7 +1157,6 @@ class FiberAnalyze( object ):
             pl.ylabel('Fluorescence [dF/F]')
             pl.title('Peak fluorescence of interaction event vs. event start time')
 
-
             try:
                 xp, pxp, x0, y0, c, k, r2, yxp = self.fit_exponential(start_times, peaks + 1)
                 ax.plot(xp, pxp-1)
@@ -1167,7 +1166,6 @@ class FiberAnalyze( object ):
                 ax.text(min(200, np.min(start_times)), np.max(peaks) + 0.1*np.max(peaks), "r^2 = " + str(r2))
             except:
                 print "Exponential Curve fit did not work"
-
 
 
             if out_path is None:
