@@ -647,15 +647,19 @@ class FiberAnalyze( object ):
                                       data, 
                                       event_times, 
                                       window, 
-                                      baseline_window=None, 
+                                      baseline_window=-1, 
                                       end_event_times=None):
         """
         Extracts chunks of fluorescence data around each event in 
         event_times, with before and after event durations
         specified in window as [before, after] (in seconds).
         Subtracts the baseline value from each chunk (i.e. 
-        sets the minimum value in a chunk to 0)
-        Set baseline_window = -1 for no baseline normalization
+        sets the minimum value in a chunk to 0).
+        Set baseline_window = -1 for no baseline normalization.
+        Set baseline_window ='full' to subtract the minimum of
+            a smoothed version of the chunk (if the chunk includes
+            no baseline values, then this will produce the wrong
+            result)
 
         To use the entire epoch as the window, provide end_event_times.
 
@@ -666,8 +670,14 @@ class FiberAnalyze( object ):
         window_indices = [self.convert_seconds_to_index( window[0]),
                           self.convert_seconds_to_index( window[1])]
 
-        if baseline_window is not None and ((not isinstance(baseline_window, int) and len(baseline_window) == 2) 
-                                             or (isinstance(baseline_window, int) and baseline_window != -1)):
+        # baseline_window_provided = (baseline_window is not None and 
+        #                             ((not isinstance(baseline_window, int) and len(baseline_window) == 2) 
+        #                               or (isinstance(baseline_window, int) and baseline_window != -1)))
+        baseline_window_provided = (baseline_window != 'smooth' and 
+                                    ((not isinstance(baseline_window, int) and len(baseline_window) == 2) 
+                                      or (isinstance(baseline_window, int) and baseline_window != -1)))
+
+        if baseline_window_provided:
             baseline_indices = [self.convert_seconds_to_index( baseline_window[0]),
                                 self.convert_seconds_to_index( baseline_window[1])]
 
@@ -684,17 +694,19 @@ class FiberAnalyze( object ):
             e_idx = np.where(e<self.time_stamps)[0][0]
             if (e_idx + window_indices[1] < len(data)-1) and (e_idx - window_indices[0] > 0):
                 chunk = data[range(max(0, (e_idx-window_indices[0])),min(len(data)-1, (e_idx+window_indices[1])))]
-                if baseline_window is not None and ((not isinstance(baseline_window, int) and len(baseline_window) == 2) or 
-                         (isinstance(baseline_window, int)  and baseline_window != -1)):
+                if baseline_window_provided:
                     baseline_chunk = data[range(max(0, (e_idx-baseline_indices[0])), min(len(data)-1, (e_idx+baseline_indices[1])))]
                     baseline = np.min(baseline_chunk)
-                elif isinstance(baseline_window, int) and baseline_window == -1:
-                    baseline = 0
-                else:
+                elif baseline_window=='full':
                     n = 10
                     smooth_chunk = np.convolve(chunk, np.ones(n)*1.0/n, mode='same')
                     #baseline = np.min(chunk)
-                    baseline = np.min(smooth_chunk)
+                    baseline = np.min(smooth_chunk[n+1:-n-1])
+                    print "baseline", baseline
+                elif isinstance(baseline_window, int) and baseline_window == -1:
+                    baseline = 0
+                else:
+                    baseline = 0
 
                 time_chunks.append(chunk - baseline)
             #except:
@@ -746,7 +758,6 @@ class FiberAnalyze( object ):
                     scores.append(start_event_times[i])
             elif metric == 'event_index':
                 scores.append(i+1)
-
 
 
             else:

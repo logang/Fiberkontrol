@@ -204,30 +204,6 @@ class TimeSeriesSimulator( object ):
 		    os.mkdir(self.output_path + directory)
 		plt.savefig(self.output_path + directory + '/'+self.exp_date+'-'+self.mouse_type+'-homecage' + self.exp_type + '-'+self.mouse_number+'-600patch_test.png')
 
-	# def GenerateSimpleTimeSeries():
-	# 	start_times, end_times, event_indicator, \
-	# 		start_indices, end_indices = self.GenerateEventTimes(self.totalTime)
-	# 	self.start_times = start_times
-	# 	self.end_times = end_times
-
-	# 	ts = np.zeros(self.numDataPoints, 1)
-	# 	for i in range(len(start_indices)):
-	# 		ts[start_indices[i]:end_indices[i]] = 1.0/i;
-
-	# 	ts = ts + 1;
-	# 	self.fluor = ts;
-
-	# 	resolution = 10
-	# 	plt.plot(self.time_stamps[::resolution], self.fluor[::resolution])
-	# 	plt.plot(self.time_stamps[::resolution], event_indicator[::resolution]*np.max(self.fluor), 'r')
-	# 	directory = self.exp_date+'/figs'
-	# 	if not os.path.isdir(self.output_path + self.exp_date):
-	# 	    os.mkdir(self.output_path + self.exp_date)
-	# 	if not os.path.isdir(self.output_path + directory):
-	# 	    os.mkdir(self.output_path + directory)
-	# 	plt.savefig(self.output_path + directory + '/'+self.exp_date+'-'+self.mouse_type+'-homecage' + self.exp_type + '-'+self.mouse_number+'-600patch_test.png')
-
-
 
 	def save(self):
 		self.out_arr = np.tile(self.fluor, (4, 1)).T;

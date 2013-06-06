@@ -241,7 +241,7 @@ def group_bout_heatmaps(all_data,
                         time_window, 
                         df_max=0.35, 
                         event_edge="rising", 
-                        baseline_window=None,
+                        baseline_window='full',
                         max_num_epochs=0,
                         ymax_setting='large'):
     """
@@ -399,7 +399,7 @@ def group_bout_heatmaps(all_data,
 #----------------------------------------------------------------------------------------
 
 def group_bout_ci(all_data, options, 
-                  df_max=0.35, event_edge="rising",num_bouts=5):
+                  df_max=0.35, event_edge="rising",num_bouts=5, baseline_window='full'):
     """
     Save out plots of mean or median activity with confidence intervals. 
     """
@@ -431,7 +431,8 @@ def group_bout_ci(all_data, options,
                             print "len(event_times)", len(event_times)
                             time_arr = np.asarray( FA.get_time_chunks_around_events(FA.fluor_data, 
                                                                                     event_times, 
-                                                                                    time_window) )
+                                                                                    time_window,
+                                                                                    baseline_window=baseline_window) )
 
                             if num_bouts is not None:
                                 time_arr = time_arr[:num_bouts,:]

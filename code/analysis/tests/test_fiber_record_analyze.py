@@ -488,14 +488,154 @@ class Test_plot_next_event_vs_intensity(Configure_tests):
 
 
 
-class Test_get_time_chunks_around_events():
+class Test_get_time_chunks_around_events(Configure_tests):
+    def setup(self):
+        Configure_tests.__init__(self)
+
+        self.options.fluor_normalization = 'deltaF'
+        self.options.event_spacing = 0
+        self.options.mouse_type = 'GC5'
+        self.options.time_range = '0:-1'
+        self.options.exp_type = 'homecagesocial'
+
+    def tearDown(self):
+        Configure_tests.remove_output_directory(self)
+
+    def test_windows(self):
+        """
+        Test various windows, baseline_windows as
+        inputs to FA.get_time_chunks_around_events().
+        Use test data '0005', which is completely deterministic.
+        """
+
+        FA = fra.FiberAnalyze( self.options )
+        FA.subject_id = '0005'
+        FA.exp_date = '20130524'
+        FA.exp_type = 'homecagesocial'
+        FA.load(file_type="hdf5")
+
+        event_times = FA.get_event_times(edge="rising", exp_type=FA.exp_type)
+        assert(np.abs(event_times[0] - 45.6) < 0.01)
+        assert(np.abs(event_times[1] - 51.9) < 0.01)
+        assert(np.abs(event_times[2] - 72.1) < 0.01)
+        assert(np.abs(event_times[3] - 108.0) < 0.01)
 
 
-    pass
+        test_window = [0,1]
+        baseline_window = -1
+        time_chunks = FA.get_time_chunks_around_events(
+                                        data=FA.fluor_data,
+                                        event_times=event_times,
+                                        window=test_window,
+                                        baseline_window=baseline_window)
+        window_length = FA.convert_seconds_to_index(test_window[1])
+        assert(np.abs(time_chunks[0][0] - 1.0) < 0.000001 )
+        assert(np.abs(time_chunks[0][-1] - 1.0) < 0.000001 )
+        assert(np.abs(time_chunks[1][0] - 0.5) < 0.000001 )
+        assert(np.abs(time_chunks[2][0] - 1.0/3.0) < 0.000001 )
+        assert(np.abs(time_chunks[3][0] - 1.0/4.0) < 0.000001 )
+        assert(np.abs(np.max(np.shape(time_chunks[0])) - window_length) < 0.000001)
+        assert(np.abs(np.max(np.shape(time_chunks[1])) - window_length) < 0.000001)
+        assert(np.abs(np.max(np.shape(time_chunks[2])) - window_length) < 0.000001)
 
 
-class Test_get_peak():
-    pass
+
+        test_window = [0,1]
+        baseline_window=[0, 1]
+        time_chunks = FA.get_time_chunks_around_events(
+                                        data=FA.fluor_data,
+                                        event_times=event_times,
+                                        window=test_window,
+                                        baseline_window=baseline_window)
+        window_length = FA.convert_seconds_to_index(test_window[1])
+        assert(np.abs(time_chunks[0][0] - 0.0) < 0.000001 )
+        assert(np.abs(time_chunks[1][0] - 0.0) < 0.000001 )
+        assert(np.abs(time_chunks[2][0] - 0.0) < 0.000001 )
+        assert(np.abs(time_chunks[3][0] - 0.0) < 0.000001 )
+        assert(np.abs(np.max(np.shape(time_chunks[0])) - window_length) < 0.000001)
+
+
+        test_window = [0,1]
+        baseline_window=[1, 1]
+        time_chunks = FA.get_time_chunks_around_events(
+                                        data=FA.fluor_data,
+                                        event_times=event_times,
+                                        window=test_window,
+                                        baseline_window=baseline_window)
+        window_length = FA.convert_seconds_to_index(test_window[1])
+        assert(np.abs(time_chunks[0][0] - 1.0) < 0.000001 )
+        assert(np.abs(time_chunks[1][0] - 0.5) < 0.000001 )
+        assert(np.abs(time_chunks[2][0] - 1.0/3.0) < 0.000001 )
+        assert(np.abs(time_chunks[3][0] - 1.0/4.0) < 0.000001 )
+        assert(np.abs(np.max(np.shape(time_chunks[0])) - window_length) < 0.000001)
+        assert(np.abs(np.max(np.shape(time_chunks[1])) - window_length) < 0.000001)
+        assert(np.abs(np.max(np.shape(time_chunks[2])) - window_length) < 0.000001)
+
+
+        test_window = [1,1]
+        baseline_window=[1, 1]
+        time_chunks = FA.get_time_chunks_around_events(
+                                        data=FA.fluor_data,
+                                        event_times=event_times,
+                                        window=test_window,
+                                        baseline_window=baseline_window)
+        window_length = FA.convert_seconds_to_index(sum(test_window))
+        assert(np.abs(time_chunks[0][0] - 0.0) < 0.000001 )
+        assert(np.abs(time_chunks[0][-1] - 1.0) < 0.000001 )
+        assert(np.abs(time_chunks[1][0] - 0.0) < 0.000001 )
+        assert(np.abs(time_chunks[2][0] - 0.0) < 0.000001 )
+        assert(np.abs(time_chunks[3][0] - 0.0) < 0.000001 )
+        assert(np.abs(np.max(np.shape(time_chunks[0])) - window_length) < 0.000001)
+
+
+        test_window = [0,1]
+        baseline_window='full'
+        time_chunks = FA.get_time_chunks_around_events(
+                                        data=FA.fluor_data,
+                                        event_times=event_times,
+                                        window=test_window,
+                                        baseline_window=baseline_window)
+        window_length = FA.convert_seconds_to_index(sum(test_window))
+        print "time_chunks[0]", time_chunks[0]
+        assert(np.abs(time_chunks[0][0] - 0.0) < 0.000001 )
+        assert(np.abs(time_chunks[0][-1] - 0.0) < 0.000001 )
+        assert(np.abs(time_chunks[1][0] - 0.0) < 0.000001 )
+        assert(np.abs(np.max(np.shape(time_chunks[0])) - window_length) < 0.000001)
+
+
+        test_window = [1,1]
+        baseline_window='full'
+        time_chunks = FA.get_time_chunks_around_events(
+                                        data=FA.fluor_data,
+                                        event_times=event_times,
+                                        window=test_window,
+                                        baseline_window=baseline_window)
+        window_length = FA.convert_seconds_to_index(sum(test_window))
+        assert(np.abs(time_chunks[0][0] - 0.0) < 0.000001 )
+        assert(np.abs(time_chunks[0][window_length/2 + 1] - 1.0) < 0.000001 )
+        assert(np.abs(time_chunks[0][-1] - 1.0) < 0.000001 )
+        assert(np.abs(time_chunks[1][-1] - 0.5) < 0.000001 )
+        assert(np.abs(np.max(np.shape(time_chunks[0])) - window_length) < 0.000001)
+
+
+        test_window = [0, 3.5] #There is a tail of 2 seconds of activity past the end of the stimulus
+        baseline_window=-1
+        time_chunks = FA.get_time_chunks_around_events(
+                                        data=FA.fluor_data,
+                                        event_times=event_times,
+                                        window=test_window,
+                                        baseline_window=baseline_window)
+        window_length = FA.convert_seconds_to_index(test_window[1])
+        assert(np.abs(time_chunks[0][-1] - 0.0) < 0.000001 )
+        assert(np.abs(time_chunks[1][-1] - 0.0) < 0.000001 )
+        assert(np.abs(time_chunks[2][-1] - 1.0/3.0) < 0.000001 )
+        assert(np.abs(time_chunks[3][-1] - 0.0) < 0.000001 )
+        assert(np.abs(np.max(np.shape(time_chunks[0])) - window_length) < 0.000001)
+        assert(np.abs(np.max(np.shape(time_chunks[1])) - window_length) < 0.000001)
+        assert(np.abs(np.max(np.shape(time_chunks[2])) - window_length) < 0.000001)
+        assert(np.abs(np.max(np.shape(time_chunks[3])) - window_length) < 0.000001)
+
+
 
 class Test_plot_peaks_vs_time():
     pass
