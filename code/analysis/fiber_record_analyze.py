@@ -502,6 +502,8 @@ class FiberAnalyze( object ):
         measure that can be one of
           -- peak intensity of last event (peak)
           -- integrated intensity of last event (integrated)
+          -- time of the event (event_time)
+          -- which number event it is in the trial (event_index)
 #          -- integrated intensity over history window (window)
 #                (I'm not sure what this one means)
 
@@ -513,7 +515,7 @@ class FiberAnalyze( object ):
                         whose entries are the metric for each event
             next_vals = the time until the next event
 
-          #TODO: Add a metric that is simply the time of the event
+          #TODO TODO: Add a metric that is simply the time of the event
 
           This should be refactored to use score_of_chunks() from group_analysis
           on chunks from FA.get_time_chunks_around_events()
@@ -532,36 +534,11 @@ class FiberAnalyze( object ):
                                               window=window, 
                                               baseline_window=-1, 
                                               end_event_times=end_event_times)
-        print "ts_arr", ts_arr
-
-        print "intensity_measure", intensity_measure
         intensity = self.score_of_chunks(ts_arr, 
                                         metric=intensity_measure,
                                         start_event_times=start_times, 
                                         end_event_times=end_times)
 
-        # get intensity values
-        # if intensity_measure == "peak":
-        #     intensity = np.zeros(len(start_times))
-        #     for i in xrange(len(start_times)):
-        #         peak = self.get_peak(start_times[i]-window[0], 
-        #                              start_times[i]+window[1], 
-        #                              self.exp_type) # end_times[i])
-        #         intensity[i] = peak
-        # elif intensity_measure == "integrated":
-        #     intensity = self.get_areas_under_curve( start_times, 
-        #                                             window, 
-        #                                             baseline_window=-1, 
-        #                                             normalize=False)
-        # # elif intensity_measure == "window":
-        # #     window[1] = 0
-        # #     intensity = self.get_areas_under_curve( start_times, 
-        # #                                             window, 
-        # #                                             baseline_window=-1, 
-        # #                                             normalize=False)
-        # else:
-        #     raise ValueError("The entered intensity_measure is not one of peak, integrated, or window.")
-       
         # get next event values
         if next_event_measure == "onset":
             next_vals = np.zeros(len(start_times)-1)
@@ -734,6 +711,8 @@ class FiberAnalyze( object ):
         'peak' (peak fluorescence value), 
         'spacing', (time from end of current epoch to beginning of the next)
         'epoch_length' (time from beginning of epoch to end of epoch)
+        'event_time' (starting time of event (in seconds))
+        'event_index' (bout number of the event within the trial, starting at 1)
 
         TODO: Add a metric that is simply the time of the event
         """
@@ -746,7 +725,7 @@ class FiberAnalyze( object ):
                 scores.append(np.max(ts))
             elif metric == 'spacing':
                 if start_event_times is None or end_event_times is None:
-                    raise ValueError( "start_event_times and end_event_times were not passed to score_of_chunks() in group_analysis.")
+                    raise ValueError( "start_event_times and end_event_times were not passed to score_of_chunks() in fiber_record_analyze.")
                 else:
                     if i == len(start_event_times) - 1:
                         scores.append(0)
@@ -754,12 +733,22 @@ class FiberAnalyze( object ):
                         scores.append(start_event_times[i+1] - end_event_times[i])
             elif metric == 'epoch_length':
                 if start_event_times is None or end_event_times is None:
-                    raise ValueError( "start_event_times and end_event_times were not passed to score_of_chunks() in group_analysis.")
+                    raise ValueError( "start_event_times and end_event_times were not passed to score_of_chunks() in fiber_record_analyze.")
                 else:
                     if i == len(start_event_times) - 1:
                         scores.append(0)
                     else:
                         scores.append(end_event_times[i] - start_event_times[i])
+            elif metric == 'event_time':
+                if start_event_times is None or end_event_times is None:
+                    raise ValueError( "start_event_times and end_event_times were not passed to score_of_chunks() in fiber_record_analyze.")
+                else:
+                    scores.append(start_event_times[i])
+            elif metric == 'event_index':
+                scores.append(i+1)
+
+
+
             else:
                 raise ValueError( "The entered metric is not one of peak, area, or spacing, epoch_length, or time.")
 
@@ -890,13 +879,11 @@ class FiberAnalyze( object ):
             nseconds = 0
 
         if self.time_tuples is not None:
-            print "self.time_tuples: ", self.time_tuples
             event_times = []
             for i in range(len(self.time_tuples)):
                 pair = self.time_tuples[i]
 
-                print "diff", (self.time_tuples[i][0] - self.time_tuples[i-1][1])
-                print "nseconds", nseconds
+
                 if i==0 or nseconds is None or (self.time_tuples[i][0] - self.time_tuples[i-1][1] >= nseconds):
                     if edge == "rising":
                         event_times.append(pair[0])

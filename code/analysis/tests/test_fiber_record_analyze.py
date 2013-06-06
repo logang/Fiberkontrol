@@ -30,20 +30,41 @@ def teardown_module(module):
     path_to_hdf5 = str(cfg['path_to_hdf5'])
     os.remove(path_to_hdf5)
 
-
-class Test_load():
-    def setup(self):
+class Configure_tests():
+    """
+    A helper class to maintain the initialization
+    of class variables that are set to the same 
+    values for each test
+    """
+    def __init__(self):
         cfg = load_configuration()
         self.filenames_file = str(cfg['analysis_filenames_file'])
         self.path_to_raw_data = str(cfg['path_to_raw_data'])
         self.path_to_hdf5 = str(cfg['path_to_hdf5'])
         self.path_to_flat_data = str(cfg['path_to_flat_data'])
-
         self.test_output_directory = self.path_to_raw_data + 'test_output/'
         if not os.path.isdir(self.test_output_directory):
             os.mkdir(self.test_output_directory)
 
-    def tearDown(self):
+        parser = fra.add_command_line_options()
+        (self.options, args) = parser.parse_args([]) #override sys.argv with an empty argument list
+        self.options.smoothness = 0
+        self.options.filter_freqs = None
+
+        self.options.save_txt = False
+        self.options.save_to_h5 = None
+        self.options.save_and_exit = False
+        self.options.save_debleach = False
+
+        self.options.input_path = self.path_to_hdf5
+        self.options.output_path = self.test_output_directory
+
+
+    def remove_output_directory(self):
+        """
+        Removes the test_output directory, 
+        which should be done after every test.
+        """
         for f in os.listdir(self.test_output_directory):
             file_path = os.path.join(self.test_output_directory, f)
             try:
@@ -52,29 +73,25 @@ class Test_load():
                 print e
         os.rmdir(self.test_output_directory)
 
+
+class Test_load(Configure_tests):
+    def setup(self):
+        Configure_tests.__init__(self)
+
+    def tearDown(self):
+        Configure_tests.remove_output_directory(self)
+
     def test_load_npz_deltaF(self):
-        parser = fra.add_command_line_options()
-        (options, args) = parser.parse_args([]) #override sys.argv with an empty argument list
+        self.options.time_range = '20:120'
+        self.options.fluor_normalization = 'deltaF'
+        self.options.exp_type = 'homecagesocial'
+        self.options.event_spacing = 0
+        self.options.mouse_type = 'GC5'
 
-        options.smoothness = 0
-        options.time_range = '20:120'
-        options.fluor_normalization = 'deltaF'
-        options.filter_freqs = None
-        options.exp_type = 'homecagesocial'
-        options.event_spacing = 0
-        options.mouse_type = 'GC5'
+        self.options.input_path = self.path_to_raw_data + '20130524/20130524-GC5-homecagesocial-0001-600patch_test.npz'
+        self.options.trigger_path = self.path_to_raw_data + '20130524/GC5_0001_social'
 
-        options.input_path = self.path_to_raw_data + '20130524/20130524-GC5-homecagesocial-0001-600patch_test.npz'
-        options.trigger_path = self.path_to_raw_data + '20130524/GC5_0001_social'
-        options.output_path = self.test_output_directory
-
-        options.save_txt = False
-        options.save_to_h5 = None
-        options.save_and_exit = False
-        options.save_debleach = False
-
-
-        FA = fra.FiberAnalyze( options )
+        FA = fra.FiberAnalyze( self.options )
         FA.load(file_type="npz")
 
         assert(np.max(FA.fluor_data) > 0.9 and np.max(FA.fluor_data) < 1.1) #eyeballed dF/F based on plot of fluorescence
@@ -93,26 +110,14 @@ class Test_load():
         assert(np.abs(FA.time_stamps[end_last_event_index + 1] - 101.5) < 0.00001)
 
     def test_load_hdf5_deltaF(self):
-        parser = fra.add_command_line_options()
-        (options, args) = parser.parse_args([]) #override sys.argv with an empty argument list
+        self.options.time_range = '10:-1'
+        self.options.fluor_normalization = 'deltaF'
+        self.options.exp_type = 'homecagesocial'
+        self.options.event_spacing = 0
+        self.options.mouse_type = 'GC5'
 
-        options.smoothness = 0
-        options.time_range = '10:-1'
-        options.fluor_normalization = 'deltaF'
-        options.filter_freqs = None
-        options.exp_type = 'homecagesocial'
-        options.event_spacing = 0
-        options.mouse_type = 'GC5'
 
-        options.input_path = self.path_to_hdf5
-        options.output_path = self.test_output_directory
-
-        options.save_txt = False
-        options.save_to_h5 = None
-        options.save_and_exit = False
-        options.save_debleach = False
-
-        FA = fra.FiberAnalyze( options )
+        FA = fra.FiberAnalyze( self.options )
         FA.subject_id = '0001'
         FA.exp_date = '20130524'
         FA.exp_type = 'homecagesocial'
@@ -132,26 +137,13 @@ class Test_load():
 
 
     def test_normalize_fluorescence_data_raw(self):
-        parser = fra.add_command_line_options()
-        (options, args) = parser.parse_args([]) #override sys.argv with an empty argument list
+        self.options.time_range = '0:-1'
+        self.options.fluor_normalization = 'raw'
+        self.options.exp_type = 'homecagesocial'
+        self.options.event_spacing = 0
+        self.options.mouse_type = 'GC5'
 
-        options.smoothness = 0
-        options.time_range = '0:-1'
-        options.fluor_normalization = 'raw'
-        options.filter_freqs = None
-        options.exp_type = 'homecagesocial'
-        options.event_spacing = 0
-        options.mouse_type = 'GC5'
-
-        options.input_path = self.path_to_hdf5
-        options.output_path = self.test_output_directory
-
-        options.save_txt = False
-        options.save_to_h5 = None
-        options.save_and_exit = False
-        options.save_debleach = False
-
-        FA = fra.FiberAnalyze( options )
+        FA = fra.FiberAnalyze( self.options )
         FA.subject_id = '0001'
         FA.exp_date = '20130524'
         FA.exp_type = 'homecagesocial'
@@ -162,26 +154,14 @@ class Test_load():
         assert(np.abs(np.min(FA.time_stamps) - 0) < 0.01)
 
     def test_normalize_fluorescence_data_deltaF(self):
-        parser = fra.add_command_line_options()
-        (options, args) = parser.parse_args([]) #override sys.argv with an empty argument list
+    
+        self.options.time_range = '20:-1'
+        self.options.fluor_normalization = 'deltaF'
+        self.options.exp_type = 'homecagenovel'
+        self.options.event_spacing = 0
+        self.options.mouse_type = 'GC5'
 
-        options.smoothness = 0
-        options.time_range = '20:-1'
-        options.fluor_normalization = 'deltaF'
-        options.filter_freqs = None
-        options.exp_type = 'homecagenovel'
-        options.event_spacing = 0
-        options.mouse_type = 'GC5'
-
-        options.input_path = self.path_to_hdf5
-        options.output_path = self.test_output_directory
-
-        options.save_txt = False
-        options.save_to_h5 = None
-        options.save_and_exit = False
-        options.save_debleach = False
-
-        FA = fra.FiberAnalyze( options )
+        FA = fra.FiberAnalyze( self.options )
         FA.subject_id = '0001'
         FA.exp_date = '20130524'
         FA.exp_type = 'homecagenovel'
@@ -192,26 +172,13 @@ class Test_load():
         assert(np.abs(np.min(FA.time_stamps) - 20) < 0.01)
 
     def test_normalize_fluorescence_data_standardize(self):
-        parser = fra.add_command_line_options()
-        (options, args) = parser.parse_args([]) #override sys.argv with an empty argument list
-        options.smoothness = 0
-        options.filter_freqs = None
+        self.options.time_range = '20:-1'
+        self.options.fluor_normalization = 'standardize'
+        self.options.exp_type = 'homecagesocial'
+        self.options.event_spacing = 0
+        self.options.mouse_type = 'GC5'
 
-        options.time_range = '20:-1'
-        options.fluor_normalization = 'standardize'
-        options.exp_type = 'homecagesocial'
-        options.event_spacing = 0
-        options.mouse_type = 'GC5'
-
-        options.input_path = self.path_to_hdf5
-        options.output_path = self.test_output_directory
-
-        options.save_txt = False
-        options.save_to_h5 = None
-        options.save_and_exit = False
-        options.save_debleach = False
-
-        FA = fra.FiberAnalyze( options )
+        FA = fra.FiberAnalyze( self.options )
         FA.subject_id = '0001'
         FA.exp_date = '20130524'
         FA.exp_type = 'homecagesocial'
@@ -223,44 +190,17 @@ class Test_load():
         assert(np.abs(np.min(FA.time_stamps) - 20) < 0.01)
 
 
-class Test_crop_data():
+class Test_crop_data(Configure_tests):
     def setup(self):
-        cfg = load_configuration()
-        self.filenames_file = str(cfg['analysis_filenames_file'])
-        self.path_to_raw_data = str(cfg['path_to_raw_data'])
-        self.path_to_hdf5 = str(cfg['path_to_hdf5'])
-        self.path_to_flat_data = str(cfg['path_to_flat_data'])
-
-        self.test_output_directory = self.path_to_raw_data + 'test_output/'
-        if not os.path.isdir(self.test_output_directory):
-            os.mkdir(self.test_output_directory)
-
-        parser = fra.add_command_line_options()
-        (self.options, args) = parser.parse_args([]) #override sys.argv with an empty argument list
-        self.options.smoothness = 0
-        self.options.filter_freqs = None
+        Configure_tests.__init__(self)
 
         self.options.fluor_normalization = 'deltaF'
         self.options.exp_type = 'homecagesocial'
         self.options.event_spacing = 0
         self.options.mouse_type = 'GC5'
 
-        self.options.input_path = self.path_to_hdf5
-        self.options.output_path = self.test_output_directory
-
-        self.options.save_txt = False
-        self.options.save_to_h5 = None
-        self.options.save_and_exit = False
-        self.options.save_debleach = False
-
     def tearDown(self):
-        for f in os.listdir(self.test_output_directory):
-            file_path = os.path.join(self.test_output_directory, f)
-            try:
-                os.unlink(file_path)
-            except Exception, e:
-                print e
-        os.rmdir(self.test_output_directory)
+        Configure_tests.remove_output_directory(self)
 
     def test_crop_data_start_equal_end(self):
         self.options.time_range = '10:10' #this should be invalid, should lead to no cropping
@@ -324,45 +264,17 @@ class Test_crop_data():
 
 
 
-class Test_plot_basic_tseries():
+class Test_plot_basic_tseries(Configure_tests):
     def setup(self):
-        cfg = load_configuration()
-        self.filenames_file = str(cfg['analysis_filenames_file'])
-        self.path_to_raw_data = str(cfg['path_to_raw_data'])
-        self.path_to_hdf5 = str(cfg['path_to_hdf5'])
-        self.path_to_flat_data = str(cfg['path_to_flat_data'])
-
-        self.test_output_directory = self.path_to_raw_data + 'test_output/'
-        if not os.path.isdir(self.test_output_directory):
-            os.mkdir(self.test_output_directory)
-
-        parser = fra.add_command_line_options()
-        (self.options, args) = parser.parse_args([]) #override sys.argv with an empty argument list
-        self.options.smoothness = 0
-        self.options.filter_freqs = None
+        Configure_tests.__init__(self)
 
         self.options.fluor_normalization = 'deltaF'
         self.options.event_spacing = 0
         self.options.mouse_type = 'GC5'
         self.options.time_range = '0:-1'
 
-        self.options.input_path = self.path_to_hdf5
-        self.options.output_path = self.test_output_directory
-
-        self.options.save_txt = False
-        self.options.save_to_h5 = None
-        self.options.save_and_exit = False
-        self.options.save_debleach = False
-
     def tearDown(self):
-        for f in os.listdir(self.test_output_directory):
-            file_path = os.path.join(self.test_output_directory, f)
-            try:
-                os.unlink(file_path)
-            except Exception, e:
-                print e
-
-        os.rmdir(self.test_output_directory)
+        Configure_tests.remove_output_directory(self)
 
 
     def test_plot_basic_tseries_homecagesocial(self):
@@ -384,48 +296,19 @@ class Test_plot_basic_tseries():
         assert(np.max(FA.fluor_data) > 0.9 and np.max(FA.fluor_data) < 1.1)
 
 
-class Test_get_event_times():
+class Test_get_event_times(Configure_tests):
     #Still need to test sucrose!
     def setup(self):
-        cfg = load_configuration()
-        self.filenames_file = str(cfg['analysis_filenames_file'])
-        self.path_to_raw_data = str(cfg['path_to_raw_data'])
-        self.path_to_hdf5 = str(cfg['path_to_hdf5'])
-        self.path_to_flat_data = str(cfg['path_to_flat_data'])
-
-        self.test_output_directory = self.path_to_raw_data + 'test_output/'
-        if not os.path.isdir(self.test_output_directory):
-            os.mkdir(self.test_output_directory)
-
-        parser = fra.add_command_line_options()
-        (self.options, args) = parser.parse_args([]) #override sys.argv with an empty argument list
-        self.options.smoothness = 0
-        self.options.filter_freqs = None
+        Configure_tests.__init__(self)
 
         self.options.fluor_normalization = 'deltaF'
         self.options.event_spacing = 0
         self.options.mouse_type = 'GC5'
         self.options.time_range = '0:-1'
-
-        self.options.input_path = self.path_to_hdf5
-        self.options.output_path = self.test_output_directory
         self.options.exp_type = 'homecagesocial'
 
-        self.options.save_txt = False
-        self.options.save_to_h5 = None
-        self.options.save_and_exit = False
-        self.options.save_debleach = False
-
-
     def tearDown(self):
-        for f in os.listdir(self.test_output_directory):
-            file_path = os.path.join(self.test_output_directory, f)
-            try:
-                os.unlink(file_path)
-            except Exception, e:
-                print e
-
-        os.rmdir(self.test_output_directory)
+        Configure_tests.remove_output_directory(self)
 
 
     def test_get_event_times_no_spacing(self):
@@ -436,13 +319,12 @@ class Test_get_event_times():
         FA.load(file_type="hdf5")
 
         event_times = FA.get_event_times( edge="rising", exp_type='homecagesocial')
-
         assert(np.abs(event_times[0] - 49.8) < 0.01)
         assert(np.abs(event_times[1] - 100) < 0.01)
-
         event_times = FA.get_event_times( edge="falling", exp_type='homecagesocial')
         assert(np.abs(event_times[0] - 50.7) < 0.01)
         assert(np.abs(event_times[1] - 101.5) < 0.01)
+
 
         FA = fra.FiberAnalyze( self.options )
         FA.subject_id = '0002'
@@ -454,7 +336,6 @@ class Test_get_event_times():
         assert(np.abs(event_times[0] - 40.8) < 0.01)
         assert(np.abs(event_times[1] - 44.6) < 0.01)
         assert(np.abs(event_times[2] - 110) < 0.01)
-
         event_times = FA.get_event_times( edge='falling', exp_type='homecagesocial')
         assert(np.abs(event_times[0] - 42.3) < 0.01)
         assert(np.abs(event_times[1] - 45.1) < 0.01)
@@ -470,12 +351,9 @@ class Test_get_event_times():
         FA.exp_type = 'homecagesocial'
         FA.load(file_type="hdf5")
 
-
         event_times = FA.get_event_times( edge='rising', exp_type='homecagesocial')
-        print "event_times", event_times
         assert(np.max(np.shape(event_times)) == 2)
         assert(np.abs(event_times[1] - 110) < 0.01)
-
 
 
     def test_get_event_times_sucrose(self):
@@ -484,39 +362,28 @@ class Test_get_event_times():
 
     
 
-class Test_plot_next_event_vs_intensity():
+class Test_plot_next_event_vs_intensity(Configure_tests):
     def setup(self):
-        cfg = load_configuration()
-        self.filenames_file = str(cfg['analysis_filenames_file'])
-        self.path_to_raw_data = str(cfg['path_to_raw_data'])
-        self.path_to_hdf5 = str(cfg['path_to_hdf5'])
-        self.path_to_flat_data = str(cfg['path_to_flat_data'])
-        self.test_output_directory = self.path_to_raw_data + 'test_output/'
-        if not os.path.isdir(self.test_output_directory):
-            os.mkdir(self.test_output_directory)
-        parser = fra.add_command_line_options()
-        (self.options, args) = parser.parse_args([]) #override sys.argv with an empty argument list
-        self.options.smoothness = 0
-        self.options.filter_freqs = None
-        self.options.save_txt = False
-        self.options.save_to_h5 = None
-        self.options.save_and_exit = False
-        self.options.save_debleach = False
-
+        Configure_tests.__init__(self)
 
         self.options.fluor_normalization = 'deltaF'
         self.options.event_spacing = 0
         self.options.mouse_type = 'GC5'
         self.options.time_range = '0:-1'
-        self.options.event_spacing = 0
-
-
-
-        self.options.input_path = self.path_to_hdf5
-        self.options.output_path = self.test_output_directory
         self.options.exp_type = 'homecagesocial'
 
+    def tearDown(self):
+        Configure_tests.remove_output_directory(self)
+
     def test_deterministic_time_series(self):
+        """
+        Test various combinations of intensity_measure and 
+        next_event_measure as inputs to 
+        FA.plot_next_event_vs_intensity.
+        Use test data '0005', which is completely deterministic
+        (albeit with non-realistic looking gcamp spikes).
+        """
+
         FA = fra.FiberAnalyze( self.options )
         FA.subject_id = '0005'
         FA.exp_date = '20130524'
@@ -555,6 +422,7 @@ class Test_plot_next_event_vs_intensity():
         assert(np.abs(next_vals[1] - 19) < 0.000001 )
         assert(np.abs(next_vals[2] - 34.3) < 0.000001 )
 
+
         (intensity, next_vals) = FA.plot_next_event_vs_intensity(
                                 intensity_measure="integrated", 
                                 next_event_measure="onset", 
@@ -569,6 +437,7 @@ class Test_plot_next_event_vs_intensity():
         assert(np.abs(next_vals[0] - 5.1) < 0.000001 )
         assert(np.abs(next_vals[1] - 19) < 0.000001 )
         assert(np.abs(next_vals[2] - 34.3) < 0.000001 )
+
 
         (intensity, next_vals) = FA.plot_next_event_vs_intensity(
                                 intensity_measure="integrated", 
@@ -586,15 +455,42 @@ class Test_plot_next_event_vs_intensity():
         assert(np.abs(next_vals[2] - 1.5) < 0.000001 )
 
 
+        (intensity, next_vals) = FA.plot_next_event_vs_intensity(
+                                intensity_measure="event_time", 
+                                next_event_measure="length", 
+                                window=[0, 1], 
+                                out_path=None, 
+                                plotit=False)
+
+        assert(np.abs(intensity[0] - 45.6) < 0.000001 )
+        assert(np.abs(intensity[1] - 51.9) < 0.000001 )
+        assert(np.abs(intensity[2] - 72.1) < 0.000001 )
+
+        assert(np.abs(next_vals[0] - 1.2) < 0.000001 )
+        assert(np.abs(next_vals[1] - 1.6) < 0.000001 )
+        assert(np.abs(next_vals[2] - 1.5) < 0.000001 )
+
+        (intensity, next_vals) = FA.plot_next_event_vs_intensity(
+                                intensity_measure="event_index", 
+                                next_event_measure="length", 
+                                window=[0, 1], 
+                                out_path=None, 
+                                plotit=False)
+
+        assert(np.abs(intensity[0] - 1) < 0.000001 )
+        assert(np.abs(intensity[1] - 2) < 0.000001 )
+        assert(np.abs(intensity[2] - 3) < 0.000001 )
+
+        assert(np.abs(next_vals[0] - 1.2) < 0.000001 )
+        assert(np.abs(next_vals[1] - 1.6) < 0.000001 )
+        assert(np.abs(next_vals[2] - 1.5) < 0.000001 )
 
 
-
-
-
-    pass
 
 
 class Test_get_time_chunks_around_events():
+
+
     pass
 
 
