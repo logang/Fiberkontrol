@@ -147,6 +147,51 @@ class Test_group_regression_plot(Configure_tests):
         assert(np.abs(lm_results.rsquared - 0.99) < 0.01)
 
 
+        self.options.intensity_metric='event_time'
+        self.options.time_window = '1:1'
+        time_window = np.array(self.options.time_window.split(':'), dtype='float32') 
+        slopes, peak_intensity, onset_next_vals, lm_results = ga.group_regression_plot(self.all_data, self.options, 
+                                                                      exp_type=self.options.exp_type, 
+                                                                      time_window=time_window,
+                                                                      metric=self.options.intensity_metric)
+        print "slopes", slopes
+        print "peak_intensity", peak_intensity
+        print "onset_next_vals", onset_next_vals
+        print "lm_results", lm_results
+
+        assert(np.abs(peak_intensity[0] - 45.6) < 0.01)
+        assert(np.abs(peak_intensity[1] - 51.9) < 0.01)
+        assert(np.abs(peak_intensity[2] - 72.1) < 0.01)
+
+        assert(np.abs(onset_next_vals[0] - 5.1) < 0.000001)
+        assert(np.abs(onset_next_vals[1] - 19.0) < 0.000001)
+        assert(np.abs(onset_next_vals[2] - 34.3) < 0.000001)
+        assert(np.abs(lm_results.rsquared - 0.80) < 0.01)
+
+
+        self.options.intensity_metric='event_index'
+        self.options.time_window = '1:1'
+        time_window = np.array(self.options.time_window.split(':'), dtype='float32') 
+        slopes, peak_intensity, onset_next_vals, lm_results = ga.group_regression_plot(self.all_data, self.options, 
+                                                                      exp_type=self.options.exp_type, 
+                                                                      time_window=time_window,
+                                                                      metric=self.options.intensity_metric)
+        print "slopes", slopes
+        print "peak_intensity", peak_intensity
+        print "onset_next_vals", onset_next_vals
+        print "lm_results", lm_results
+
+        assert(np.abs(peak_intensity[0] - 1) < 0.01)
+        assert(np.abs(peak_intensity[1] - 2) < 0.01)
+        assert(np.abs(peak_intensity[2] - 3) < 0.01)
+
+        assert(np.abs(onset_next_vals[0] - 5.1) < 0.000001)
+        assert(np.abs(onset_next_vals[1] - 19.0) < 0.000001)
+        assert(np.abs(onset_next_vals[2] - 34.3) < 0.000001)
+        assert(lm_results.rsquared > 0.80)
+
+
+
 
 	pass
 
