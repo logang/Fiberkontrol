@@ -407,7 +407,7 @@ class Test_plot_next_event_vs_intensity(Configure_tests):
 
 
         (intensity, next_vals) = FA.plot_next_event_vs_intensity(
-                                        intensity_measure="integrated", 
+                                        intensity_measure="average", 
                                         next_event_measure="onset", 
                                         window=[0, 1], 
                                         out_path=None, 
@@ -424,7 +424,7 @@ class Test_plot_next_event_vs_intensity(Configure_tests):
 
 
         (intensity, next_vals) = FA.plot_next_event_vs_intensity(
-                                intensity_measure="integrated", 
+                                intensity_measure="average", 
                                 next_event_measure="onset", 
                                 window=[1, 1], 
                                 out_path=None, 
@@ -440,7 +440,7 @@ class Test_plot_next_event_vs_intensity(Configure_tests):
 
 
         (intensity, next_vals) = FA.plot_next_event_vs_intensity(
-                                intensity_measure="integrated", 
+                                intensity_measure="average", 
                                 next_event_measure="length", 
                                 window=[0, 1], 
                                 out_path=None, 
@@ -715,17 +715,6 @@ class Test_plot_perievent_hist(Configure_tests):
         assert(np.abs(time_arr[time_arr.shape[0]/2+1][1] - 0.5)<0.00001) #middle of second chunk (at event onset)
         assert(np.abs(time_arr[time_arr.shape[0]/2+1][2] - 1.0/3.0)<0.00001)#middle of third chunk (at event onset)
 
-
-
-
-
-
-
-
-
-
-
-    pass
 
 
 class Test_plot_peaks_vs_time():

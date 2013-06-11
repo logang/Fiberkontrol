@@ -21,9 +21,12 @@ and complete filenames like:
 
 python preprocessing.py --save-debleach -f analysis_filenames.txt
 
-4) Populate folders titled Flat/ 
-   for each day of the trial
-   based on the plots in Debleach/
+# Deprecated 4) Populate folders titled Flat/ 
+#   		for each day of the trial
+#   		based on the plots in Debleach/
+
+4) Populate a single folder title Flat/ with the flat
+	npz files of all data to be used
 
 5) Run
 

@@ -495,13 +495,14 @@ class FiberAnalyze( object ):
                                       next_event_measure="onset", 
                                       window=[1, 3], 
                                       out_path=None, 
-                                      plotit=True):
+                                      plotit=True,
+                                      baseline_window=-1):
         """
         Generate a plot of next event onset delay 'onset' (time until next event) or 
         length of next event 'length' as a function of an intensity 
         measure that can be one of
           -- peak intensity of last event (peak)
-          -- integrated intensity of last event (integrated)
+          -- average intensity of last event (average)
           -- time of the event (event_time)
           -- which number event it is in the trial (event_index)
 #          -- integrated intensity over history window (window)
@@ -524,12 +525,12 @@ class FiberAnalyze( object ):
             raise ValueError("Event times seem to have failed to load.")
 
         end_event_times = None
-        if window == [0,0]:
+        if window[0] == 0 and window[1] == 0: #if window == [0,0]:
             end_event_times = end_times
         ts_arr = self.get_time_chunks_around_events(data=self.fluor_data, 
                                               event_times = start_times, 
                                               window=window, 
-                                              baseline_window=-1, 
+                                              baseline_window=baseline_window, 
                                               end_event_times=end_event_times)
         intensity = self.score_of_chunks(ts_arr, 
                                         metric=intensity_measure,
@@ -670,7 +671,7 @@ class FiberAnalyze( object ):
         # baseline_window_provided = (baseline_window is not None and 
         #                             ((not isinstance(baseline_window, int) and len(baseline_window) == 2) 
         #                               or (isinstance(baseline_window, int) and baseline_window != -1)))
-        baseline_window_provided = (baseline_window != 'smooth' and 
+        baseline_window_provided = (baseline_window is not None  and baseline_window != 'smooth' and 
                                     ((not isinstance(baseline_window, int) and len(baseline_window) == 2) 
                                       or (isinstance(baseline_window, int) and baseline_window != -1)))
 
@@ -710,13 +711,13 @@ class FiberAnalyze( object ):
              #   print "Unable to extract window:", [(e-window_indices[0]),(e+window_indices[1])]
         return time_chunks
 
-    def score_of_chunks(self, ts_arr, metric='area', start_event_times=None, end_event_times=None):
+    def score_of_chunks(self, ts_arr, metric='average', start_event_times=None, end_event_times=None):
         """
         Given an array of time series chunks, return an array
         holding a score for each of these chunks
 
         metric can be
-        'area' (average value of curve),
+        'average' (average value of curve),
         'peak' (peak fluorescence value), 
         'spacing', (time from end of current epoch to beginning of the next)
         'epoch_length' (time from beginning of epoch to end of epoch)
@@ -727,8 +728,9 @@ class FiberAnalyze( object ):
         """
         scores = []
         i=0
+        print "metric", metric
         for ts in ts_arr:
-            if metric == 'area' or metric == 'integrated':
+            if metric == 'mean' or metric == 'average': # or metric == 'area' or metric == 'integrated': #the latter two are deprecated
                 scores.append(np.sum(ts)/len(ts))
             elif metric == 'peak':
                 scores.append(np.max(ts))
@@ -758,7 +760,7 @@ class FiberAnalyze( object ):
 
 
             else:
-                raise ValueError( "The entered metric is not one of peak, area, or spacing, epoch_length, or time.")
+                raise ValueError( "The entered metric is not one of peak, average, or spacing, epoch_length, or time.")
 
             i = i + 1
 
@@ -770,7 +772,7 @@ class FiberAnalyze( object ):
                              out_path=None,
                              plotit=True, 
                              subplot=None, 
-                             baseline_window=None ):
+                             baseline_window='full' ):
         """
         Peri-event time histogram for given event times.
         Plots the time series and their median over a time window around
@@ -800,7 +802,6 @@ class FiberAnalyze( object ):
         # plot each time window, colored by order
         time_arr = np.asarray(time_chunks).T
         x = self.time_stamps[0:time_arr.shape[0]]-self.time_stamps[window_indices[0]] ###IS THIS RIGHT?
-        print "x", x
         ymax = np.max(time_arr)
         ymax += 0.1*ymax
         ymin = np.min(time_arr)

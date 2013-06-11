@@ -3,13 +3,14 @@ test_group_analysis.py
 This module runs unit tests on 
 the group_analysis.py module.
 """
-
-import preprocessing as prp
-import fiber_record_analyze as fra 
 import json
 import numpy as np
 import os
+
+import preprocessing as prp
+import fiber_record_analyze as fra 
 from load_configuration import load_configuration
+import group_analysis as ga
 
 
 def setup_module(module):
@@ -57,70 +58,86 @@ class Configure_tests():
         self.options.input_path = self.path_to_hdf5
         self.options.output_path = self.test_output_directory
 
-        self.options.exp_date
+        self.options.exp_date = '20130524'
+
+    def remove_output_directory(self):
+        """
+        Removes the test_output directory, 
+        which should be done after every test.
+        """
+        for f in os.listdir(self.test_output_directory):
+            file_path = os.path.join(self.test_output_directory, f)
+            try:
+                os.unlink(file_path)
+            except Exception, e:
+                print e
+        os.rmdir(self.test_output_directory)
 
 
-class Test_group_bout_heatmaps():
-	 def setup(self):
+
+
+##MAKE PLOT TESTING FOR ARTIFACT IN group_regression:
+##i.e. set the score as the event_index, or event_time
+
+class Test_group_iter_list():
+
+    def setup(self):
         Configure_tests.__init__(self)
-
-        self.options.fluor_normalization = 'deltaF'
-        self.options.event_spacing = 0
-        self.options.mouse_type = 'GC5'
-        self.options.time_range = '0:-1'
-        self.options.exp_type = 'homecagesocial'
 
     def tearDown(self):
         Configure_tests.remove_output_directory(self)
 
-    def test_windows(self):
+    def test_load_npz_deltaF(self):
+
 
 	pass
-
-
-class Test_group_iter_list():
-	pass
-
 
 class Test_group_regression_plot():
-	pass
-
-
-class Test_group_bout_ci():
 	pass
 
 
 class Test_group_plot_time_series():
 	pass
 
-class Test_plot_representative_time_series():
+class Test_compare_epochs():
 	pass
-
 
 class Test_get_novel_social_pairs():
 	pass
 
-
-class Test_plot_compare_start_and_end():
+class Test_plot_representative_time_series():
 	pass
-
-
-class Test_compare_start_and_end_of_epoch():
-	pass
-
 
 class Test_statisticalTestOfComparison():
 	pass
-
-
-class Test_compare_epochs():
-	pass
-
 
 class Test_get_bout_averages():
 	pass
 
 class Test_plot_decay():
+	pass
+
+
+
+
+class Test_group_bout_heatmaps():
+	"""
+	Read through group_bout_heatmaps,
+	it should be fine if the underlying 
+	functions have been tested 
+	"""
+	pass
+
+class Test_compare_start_and_end_of_epoch():
+	"""
+	Are we using this in the paper?
+	"""
+	pass
+
+class Test_plot_compare_start_and_end():
+	"""
+	Are we using this in the paper?
+	"""
 	pass
 
 
@@ -133,4 +150,7 @@ class Test_loadFiberAnalyze():
 
 
 class Test_compileAnimalScoreDictIntoArray():
+	pass
+
+class Test_group_bout_ci():
 	pass
