@@ -6,6 +6,7 @@ the group_analysis.py module.
 import json
 import numpy as np
 import os
+import h5py
 
 import preprocessing as prp
 import fiber_record_analyze as fra 
@@ -59,6 +60,8 @@ class Configure_tests():
         self.options.output_path = self.test_output_directory
 
         self.options.exp_date = '20130524'
+        self.options.plot_format = '.png'
+
 
     def remove_output_directory(self):
         """
@@ -80,19 +83,71 @@ class Configure_tests():
 ##i.e. set the score as the event_index, or event_time
 
 class Test_group_iter_list():
+	pass
 
+class Test_group_regression_plot(Configure_tests):
     def setup(self):
         Configure_tests.__init__(self)
 
+        self.options.fluor_normalization = 'deltaF'
+        self.options.exp_type = 'homecagesocial'
+        self.options.event_spacing = 0
+        self.options.mouse_type = 'GC5'
+
+        self.all_data = h5py.File(self.options.input_path,'r')
+
     def tearDown(self):
-        Configure_tests.remove_output_directory(self)
+        #Configure_tests.remove_output_directory(self)
+        pass
 
-    def test_load_npz_deltaF(self):
+    def test_regression(self):
+
+        self.options.intensity_metric='peak'
+        self.options.time_window = '0:0'
+        time_window = np.array(self.options.time_window.split(':'), dtype='float32') 
+        slopes, peak_intensity, onset_next_vals, lm_results = ga.group_regression_plot(self.all_data, self.options, 
+                                                                      exp_type=self.options.exp_type, 
+                                                                      time_window=time_window,
+                                                                      metric=self.options.intensity_metric)
+        print "slopes", slopes
+        print "peak_intensity", peak_intensity
+        print "onset_next_vals", onset_next_vals
+        print "lm_results", lm_results
+
+        assert(np.abs(peak_intensity[0] - 1.0) < 0.000001)
+        assert(np.abs(peak_intensity[1] - 0.5) < 0.000001)
+        assert(np.abs(peak_intensity[2] - 1.0/3.0) < 0.000001)
+
+        assert(np.abs(onset_next_vals[0] - 5.1) < 0.000001)
+        assert(np.abs(onset_next_vals[1] - 19.0) < 0.000001)
+        assert(np.abs(onset_next_vals[2] - 34.3) < 0.000001)
+        assert(np.abs(lm_results.rsquared - 0.99) < 0.01)
 
 
-	pass
 
-class Test_group_regression_plot():
+        self.options.intensity_metric='average'
+        self.options.time_window = '1:1'
+        time_window = np.array(self.options.time_window.split(':'), dtype='float32') 
+        slopes, peak_intensity, onset_next_vals, lm_results = ga.group_regression_plot(self.all_data, self.options, 
+                                                                      exp_type=self.options.exp_type, 
+                                                                      time_window=time_window,
+                                                                      metric=self.options.intensity_metric)
+        print "slopes", slopes
+        print "peak_intensity", peak_intensity
+        print "onset_next_vals", onset_next_vals
+        print "lm_results", lm_results
+
+        assert(np.abs(peak_intensity[0] - 1.0/2.0) < 0.01)
+        assert(np.abs(peak_intensity[1] - 0.5/2.0) < 0.01)
+        assert(np.abs(peak_intensity[2] - 1.0/3.0/2.0) < 0.01)
+
+        assert(np.abs(onset_next_vals[0] - 5.1) < 0.000001)
+        assert(np.abs(onset_next_vals[1] - 19.0) < 0.000001)
+        assert(np.abs(onset_next_vals[2] - 34.3) < 0.000001)
+        assert(np.abs(lm_results.rsquared - 0.99) < 0.01)
+
+
+
 	pass
 
 

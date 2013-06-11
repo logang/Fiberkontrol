@@ -63,7 +63,7 @@ def group_iter_list(all_data, options,
                                 if exp_type_key not in exp_type_list:
                                     exp_type_list.append(exp_type_key)
 
-    print [iter_list, animal_id_list, date_list, exp_type_list]
+    print "iter_list", [iter_list, animal_id_list, date_list, exp_type_list]
     return [iter_list, animal_id_list, date_list, exp_type_list]
 
 
@@ -92,8 +92,8 @@ def loadFiberAnalyze(FA, options, animal_id, exp_date, exp_type):
 
 def group_regression_plot(all_data, 
                           options, 
-                          exp_type='homecagesocial', 
-                          time_window=[-1,1],
+                          exp_type, 
+                          time_window,
                           metric="peak",
                           ):
     """
@@ -102,11 +102,6 @@ def group_regression_plot(all_data,
 
     TODO: write better description of function. Clean up code. Have figure save to output_path. 
     """
-
-    exp_type = options.exp_type
-    time_window = np.asarray(options.time_window.split(':'),dtype=np.int)
-    time_window = [-1,1] #HARDCODED FOR NOW BE SURE TO REMOVE THIS
-
 
     # Create figure
     fig = pl.figure()
@@ -134,6 +129,7 @@ def group_regression_plot(all_data,
         animal_id = exp['animal_id']
         dates = exp['date']
         exp_type = exp['exp_type']
+        print "animal_id", animal_id
 
 
         FA = FiberAnalyze(options)
@@ -146,6 +142,7 @@ def group_regression_plot(all_data,
 
         # get intensity and next_val values for this animal
         if success != -1:
+            print "metric", metric
             peak_intensity, onset_next_vals = FA.plot_next_event_vs_intensity(intensity_measure=metric, 
                                                                             next_event_measure="onset", 
                                                                             window=time_window, 
@@ -154,12 +151,10 @@ def group_regression_plot(all_data,
                                                                             baseline_window=[2,0])
             # fit a robust regression
             if len(onset_next_vals) > 0:
-                print "peak_intensity", peak_intensity
-                print "onset_next_vals", onset_next_vals
-
                 X = np.nan_to_num( np.vstack( ( np.log(peak_intensity), np.ones((len(onset_next_vals),))) ) )
                 print "X", X.T
-                if X.shape[1] > 2:
+                if X.shape[1] > 2: #Change this depending on whether you want at least two points plotted
+                
 
                     X = X[0:min(num_bouts,X.shape[1]),:]
                     y = np.log(onset_next_vals)
@@ -198,7 +193,10 @@ def group_regression_plot(all_data,
                     #ax.plot(np.log(peak_intensity), np.log(onset_next_vals),'o')
                     print "No values to plot for", animal_id, dates, exp_type
 
-    pl.xlabel("log peak intensity in first 2 seconds after interaction onset")
+    if time_window[0] == 0 and time_window[1] == 0:
+        pl.xlabel("log " + str(metric) + " intensity during interaction event")
+    else:
+        pl.xlabel("log " + str(metric) + " intensity in first " + str(time_window[1]) + " seconds after interaction onset")
 #    pl.xlabel("Log mean intensity in first 2 seconds after interaction onset")
     
     pl.ylabel("Log time in seconds until next interaction")
@@ -216,7 +214,7 @@ def group_regression_plot(all_data,
         pl.show()
 
     print "Slopes:",slopes
-    return slopes
+    return slopes, peak_intensity, onset_next_vals, lm_results
 
 
      #         FA = FiberAnalyze(options)
@@ -445,7 +443,7 @@ def group_bout_ci(all_data, options,
     """
     exp_type = options.exp_type
     time_window = np.asarray(options.time_window.split(':'),dtype=np.int)
-    time_window = [0,3]
+
     # Create figure
     fig = pl.figure()
     ax = fig.add_subplot(1,1,1)
@@ -1558,7 +1556,8 @@ if __name__ == "__main__":
 
     if options.group_regression_plot:
         group_regression_plot(all_data, options, 
-                              exp_type=options.exp_type, time_window=time_window,
+                              exp_type=options.exp_type,
+                              time_window=time_window,
                               metric=options.intensity_metric)
     elif options.group_bout_heatmaps:
         group_bout_heatmaps(all_data, options, 
