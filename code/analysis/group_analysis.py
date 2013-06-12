@@ -108,7 +108,7 @@ def group_regression_plot(all_data,
     ax = fig.add_subplot(1,1,1)
 
     i=0 # color counter
-    num_animals = 12.#6.
+    num_animals = 10.
     num_bouts = 10
     slopes = []
 

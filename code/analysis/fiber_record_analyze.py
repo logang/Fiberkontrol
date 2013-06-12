@@ -527,15 +527,35 @@ class FiberAnalyze( object ):
         end_event_times = None
         if window[0] == 0 and window[1] == 0: #if window == [0,0]:
             end_event_times = end_times
-        ts_arr = self.get_time_chunks_around_events(data=self.fluor_data, 
-                                              event_times = start_times, 
-                                              window=window, 
-                                              baseline_window=baseline_window, 
-                                              end_event_times=end_event_times)
-        intensity = self.score_of_chunks(ts_arr, 
-                                        metric=intensity_measure,
-                                        start_event_times=start_times, 
-                                        end_event_times=end_times)
+
+        # ts_arr = self.get_time_chunks_around_events(data=self.fluor_data, 
+        #                                       event_times = start_times, 
+        #                                       window=window, 
+        #                                       baseline_window=baseline_window, 
+        #                                       end_event_times=end_event_times)
+        # intensity = self.score_of_chunks(ts_arr, 
+        #                                 metric=intensity_measure,
+        #                                 start_event_times=start_times, 
+        #                                 end_event_times=end_times)
+
+        if intensity_measure == "peak":
+            intensity = np.zeros(len(start_times))
+            for i in xrange(len(start_times)):
+                peak = self.get_peak(start_times[i]-window[0], 
+                                     start_times[i]+window[1], 
+                                     self.exp_type) # end_times[i])
+                intensity[i] = peak
+        elif intensity_measure == "average":
+            intensity = self.get_areas_under_curve( start_times, 
+                                                    window, 
+                                                    baseline_window=window, 
+                                                    normalize=False)
+        elif intensity_measure == "window":
+            window[1] = 0
+            intensity = self.get_areas_under_curve( start_times, 
+                                                    window, 
+                                                    baseline_window=window, 
+                                                    normalize=False)
 
         # get next event values
         if next_event_measure == "onset":
@@ -1021,28 +1041,28 @@ class FiberAnalyze( object ):
         if self.save_and_exit:
             sys.exit(0)
 
-    # def get_areas_under_curve( self, start_times, window, baseline_window=None, normalize=False):
-    #     """
-    #     Returns a vector of the area under the fluorescence curve within the provided
-    #     window [before, after] (in seconds), that surrounds each start_time.
-    #     Normalize determines whether to divide the area by the maximum fluorescence
-    #     value of the window (this is more if you want to look at the "shape" of the curve)
-    #     """
-    #     print "window: ", window
-    #     time_chunks = self.get_time_chunks_around_events(self.fluor_data, start_times, window, baseline_window)
+    def get_areas_under_curve( self, start_times, window, baseline_window=None, normalize=False):
+        """
+        Returns a vector of the area under the fluorescence curve within the provided
+        window [before, after] (in seconds), that surrounds each start_time.
+        Normalize determines whether to divide the area by the maximum fluorescence
+        value of the window (this is more if you want to look at the "shape" of the curve)
+        """
+        print "window: ", window
+        time_chunks = self.get_time_chunks_around_events(self.fluor_data, start_times, window, baseline_window)
         
-    #     print "len(time_chunks)", len(time_chunks)
-    #     areas = []
-    #     for chunk in time_chunks:
-    #         if normalize:
-    #             if max(chunk) < 0.01: 
-    #                 areas.append(sum(chunk)/len(chunk)/0.01)
-    #             else:
-    #                 areas.append(sum(chunk)/len(chunk)/(max(abs(chunk))))
-    #         else: 
-    #             areas.append(sum(chunk)/len(chunk))
+        print "len(time_chunks)", len(time_chunks)
+        areas = []
+        for chunk in time_chunks:
+            if normalize:
+                if max(chunk) < 0.01: 
+                    areas.append(sum(chunk)/len(chunk)/0.01)
+                else:
+                    areas.append(sum(chunk)/len(chunk)/(max(abs(chunk))))
+            else: 
+                areas.append(sum(chunk)/len(chunk))
 
-    #     return areas
+        return areas
 
     def get_peak( self, start_time, end_time, exp_type=None ):
         """
