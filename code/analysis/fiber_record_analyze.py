@@ -509,7 +509,8 @@ class FiberAnalyze( object ):
 #                (I'm not sure what this one means)
 
         Set window = [0,0] to use the entire event length as the
-            (variable) window length.
+            window length (although this length will be different
+            for each interaction event).
 
         Returns: (intensity, next_vals), where:
             intensity = a vector of length (num_events - 1) 
@@ -528,34 +529,49 @@ class FiberAnalyze( object ):
         if window[0] == 0 and window[1] == 0: #if window == [0,0]:
             end_event_times = end_times
 
-        # ts_arr = self.get_time_chunks_around_events(data=self.fluor_data, 
-        #                                       event_times = start_times, 
-        #                                       window=window, 
-        #                                       baseline_window=baseline_window, 
-        #                                       end_event_times=end_event_times)
-        # intensity = self.score_of_chunks(ts_arr, 
-        #                                 metric=intensity_measure,
-        #                                 start_event_times=start_times, 
-        #                                 end_event_times=end_times)
+        print "window", window
 
-        if intensity_measure == "peak":
-            intensity = np.zeros(len(start_times))
-            for i in xrange(len(start_times)):
-                peak = self.get_peak(start_times[i]-window[0], 
-                                     start_times[i]+window[1], 
-                                     self.exp_type) # end_times[i])
-                intensity[i] = peak
-        elif intensity_measure == "average":
-            intensity = self.get_areas_under_curve( start_times, 
-                                                    window, 
-                                                    baseline_window=window, 
-                                                    normalize=False)
-        elif intensity_measure == "window":
-            window[1] = 0
-            intensity = self.get_areas_under_curve( start_times, 
-                                                    window, 
-                                                    baseline_window=window, 
-                                                    normalize=False)
+        print "end_event_times", end_event_times
+        print "baseline_window", baseline_window
+        ts_arr = self.get_time_chunks_around_events(data=self.fluor_data, 
+                                              event_times = start_times, 
+                                              window=window, 
+                                              baseline_window=baseline_window, 
+                                              end_event_times=end_event_times)
+        intensity = self.score_of_chunks(ts_arr, 
+                                        metric=intensity_measure,
+                                        start_event_times=start_times, 
+                                        end_event_times=end_times)
+
+        ##THIS COMMENTED BLOCK SHOWS THAT THE NUMBER OF INDICES
+        ## CORRESPONDING TO A GIVEN WINDOW IS NOT THE CONSTANT
+        ## ACROSS THE WHOLE TIME SERIES
+        # print "window[1]", self.convert_seconds_to_index(window[1])
+        # print "window[1] 1", self.convert_seconds_to_index(start_times[1] + window[1]) - self.convert_seconds_to_index(start_times[1])
+        # print "window[1] 2", self.convert_seconds_to_index(start_times[2] + window[1]) - self.convert_seconds_to_index(start_times[2])
+        # print "window[1] 3", self.convert_seconds_to_index(start_times[3] + window[1]) - self.convert_seconds_to_index(start_times[3])
+
+        ## THIS COMMENTED BLOCK YIELDS LOGANS PLOTS
+        ## TODO: FIGURE OUT WHETHER THE ABOVE METHOD ALSO WORKS
+        # if intensity_measure == "peak":
+        #     intensity = np.zeros(len(start_times))
+        #     for i in xrange(len(start_times)):
+        #         peak = self.get_peak(start_times[i]-window[0], 
+        #                              start_times[i]+window[1], 
+        #                              self.exp_type) # end_times[i])
+        #         intensity[i] = peak
+        # elif intensity_measure == "average":
+        #     intensity = self.get_areas_under_curve( start_times, 
+        #                                             window, 
+        #                                             baseline_window=window, 
+        #                                             normalize=False)
+        # elif intensity_measure == "window":
+        #     window[1] = 0
+        #     intensity = self.get_areas_under_curve( start_times, 
+        #                                             window, 
+        #                                             baseline_window=window, 
+        #                                             normalize=False)
+
 
         # get next event values
         if next_event_measure == "onset":
@@ -688,10 +704,7 @@ class FiberAnalyze( object ):
         window_indices = [self.convert_seconds_to_index( window[0]),
                           self.convert_seconds_to_index( window[1])]
 
-        # baseline_window_provided = (baseline_window is not None and 
-        #                             ((not isinstance(baseline_window, int) and len(baseline_window) == 2) 
-        #                               or (isinstance(baseline_window, int) and baseline_window != -1)))
-        baseline_window_provided = (baseline_window is not None  and baseline_window != 'smooth' and 
+        baseline_window_provided = (baseline_window is not None  and baseline_window != 'full' and 
                                     ((not isinstance(baseline_window, int) and len(baseline_window) == 2) 
                                       or (isinstance(baseline_window, int) and baseline_window != -1)))
 
@@ -711,7 +724,9 @@ class FiberAnalyze( object ):
            # try:
             e_idx = np.where(e<self.time_stamps)[0][0]
             if (e_idx + window_indices[1] < len(data)-1) and (e_idx - window_indices[0] > 0):
-                chunk = data[range(max(0, (e_idx-window_indices[0])),min(len(data)-1, (e_idx+window_indices[1])))]
+                chunk = data[range(max(0, (e_idx-window_indices[0])),
+                                   min(len(data)-1, (e_idx+window_indices[1])))]
+                print "indices", e_idx-window_indices[0], e_idx+window_indices[1]
                 if baseline_window_provided:
                     baseline_chunk = data[range(max(0, (e_idx-baseline_indices[0])), min(len(data)-1, (e_idx+baseline_indices[1])))]
                     baseline = np.min(baseline_chunk)
@@ -746,6 +761,7 @@ class FiberAnalyze( object ):
 
         TODO: Add a metric that is simply the time of the event
         """
+
         scores = []
         i=0
         print "metric", metric
@@ -1075,6 +1091,7 @@ class FiberAnalyze( object ):
         """
         start_time_index = self.convert_seconds_to_index(start_time)
         end_time_index = self.convert_seconds_to_index(end_time)
+        print "get_peak_indices", start_time_index, end_time_index
         if start_time_index < end_time_index:
             return np.max(self.fluor_data[start_time_index : end_time_index])
         else:

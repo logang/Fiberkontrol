@@ -108,20 +108,10 @@ def group_regression_plot(all_data,
     ax = fig.add_subplot(1,1,1)
 
     i=0 # color counter
-    num_animals = 10.
+    num_animals = 12.
     num_bouts = 10
     slopes = []
-
-    # for animal_id in all_data.keys():
-
-    #     # load data from hdf5 file by animal-date-exp_type
-    #     animal = all_data[animal_id]
-
-    #     for dates in animal.keys():
-    #         date = animal[dates]
-
-    #         FA = FiberAnalyze(options)
-    #         FA, success = loadFiberAnalyze(FA, options, animal_id, dates, exp_type)
+    next_event_measure = "onset"
 
     [iter_list, animal_id_list, date_list, exp_type_list] = group_iter_list(all_data, options)
 
@@ -143,17 +133,18 @@ def group_regression_plot(all_data,
         # get intensity and next_val values for this animal
         if success != -1:
             print "metric", metric
+            print "time_window", time_window
             peak_intensity, onset_next_vals = FA.plot_next_event_vs_intensity(intensity_measure=metric, 
-                                                                            next_event_measure="onset", 
+                                                                            next_event_measure=next_event_measure, 
                                                                             window=time_window, 
                                                                             out_path=None, 
                                                                             plotit=False,
-                                                                            baseline_window=[2,0])
+                                                                            baseline_window=-1)
             # fit a robust regression
             if len(onset_next_vals) > 0:
                 X = np.nan_to_num( np.vstack( ( np.log(peak_intensity), np.ones((len(onset_next_vals),))) ) )
                 print "X", X.T
-                if X.shape[1] > 2: #Change this depending on whether you want at least two points plotted
+                if X.shape[1] > 2:
                 
 
                     X = X[0:min(num_bouts,X.shape[1]),:]
@@ -197,17 +188,18 @@ def group_regression_plot(all_data,
         pl.xlabel("log " + str(metric) + " intensity during interaction event")
     else:
         pl.xlabel("log " + str(metric) + " intensity in first " + str(time_window[1]) + " seconds after interaction onset")
-#    pl.xlabel("Log mean intensity in first 2 seconds after interaction onset")
     
-    pl.ylabel("Log time in seconds until next interaction")
-#    pl.ylabel("log length of next interaction")
+    if next_event_measure == "onset":
+        pl.ylabel("Log time in seconds until next interaction")
+    elif next_event_measure == "length":
+       pl.ylabel("log length of next interaction")
     pl.title(options.mouse_type + " " + options.exp_type + " " + options.intensity_metric)
 
     if options.output_path is not None:
         outdir = options.output_path + '/' + options.exp_type
         if not os.path.isdir(outdir):
             os.makedirs(outdir)
-        outpath = outdir + '/' +str(animal_id)+'_'+str(dates)+'_'+str(metric)+ options.plot_format
+        outpath = outdir +'/'+str(dates)+'_'+str(metric) + '_window_'+str(time_window[0])+'_'+str(time_window[1])+ options.plot_format
         pl.savefig(outpath)
         print "outpath: ", outpath
     else:
@@ -215,58 +207,6 @@ def group_regression_plot(all_data,
 
     print "Slopes:",slopes
     return slopes, peak_intensity, onset_next_vals, lm_results
-
-
-     #         FA = FiberAnalyze(options)
-    #         [FA, success] = loadFiberAnalyze(FA, options, animal_id, dates, exp_type)
-
-    #         # get intensity and next_val values for this animal
-    #         if success != -1:
-    #             peak_intensity, onset_next_vals = FA.plot_next_event_vs_intensity(
-    #                                                                 intensity_measure=metric, 
-    #                                                                 next_event_measure="onset", 
-    #                                                                 window=time_window, 
-    #                                                                 out_path=None, 
-    #                                                                 plotit=False)
-
-    #             # fit a robust regression
-    #             if len(onset_next_vals) > 0:
-    #                 X = np.vstack( (np.log(peak_intensity), np.ones((len(onset_next_vals),))) )
-    # #                rlm_model = sm.RLM(np.log(onset_next_vals), X.T, M=sm.robust.norms.TukeyBiweight())
-    # #                lm_results = rlm_model.fit()
-    #                 lm_model = sm.OLS(np.log(onset_next_vals), X.T)
-    #                 lm_results = lm_model.fit()
-    #                 print "-------------------------------------"
-    #                 print animal_id, dates
-    #                 try:
-    #                     print "\t--> Slope:",lm_results.params[0]
-    # #                    print "\t--> Intercept:",lm_results.params[1]
-    # #                    print "\t--> Confidence Interval for Slope:", lm_results.conf_int()[0,:]
-    #                     print "\t--> P-value for Slope:", lm_results.pvalues[0]
-    # #                    print "\t--> Confidence Interval for Intercept:", lm_results.conf_int()[1,:]
-    # #                    print "\t--> P-value Interval for Intercept:", lm_results.pvalues[1]
-    #                     print "\t--> R-squared", lm_results.rsquared
-    #                 except:
-    #                     pass
-    #                 try:
-    #                     print "\t--> R-squared Adjusted:", lm_results.rsquared_adj
-    #                 except:
-    #                     print "\t--> Could not calculate adjusted R-squared."
-    #                 yhat = lm_results.fittedvalues
-
-    # #                fig = pl.figure()
-    # #                ax = fig.add_subplot(1,1,1)
-    # #                ax.loglog(peak_intensity,onset_next_vals,'o')
-
-    # #                ax.plot(np.log(peak_intensity), np.log(onset_next_vals),'o',color=cm.jet(float(i)/10.))
-    #                 ax.plot(peak_intensity, onset_next_vals,'o',color=cm.jet(float(i)/10.))
-    # #                ax.plot(np.log(peak_intensity), yhat, '-', color=cm.jet(float(i)/10.) )
-
-    # #                pl.show()
-    #                 i+=1 # increment color counter
-    #             else:
-    #                 #ax.plot(np.log(peak_intensity), np.log(onset_next_vals),'o')
-    #                 print "No values to plot for", animal_id, dates, exp_type
 
 
 #------------------------------------------------------------------------------
@@ -1540,6 +1480,11 @@ def set_and_read_options_parser():
                             " bouts, centered in time around the start of the bout, with the color"
                             " in the heatmap representing a fluorescence intensity."))
 
+
+    parser.add_option("", "--group-plot-time-series", dest="group_plot_time_series", action="store_true", default=False, 
+                      help=("For each trial, plot perievent heatmaps and time series of individual"
+                            " bouts, centered in time around the start of the bout, with the color"
+                            " in the heatmap representing a fluorescence intensity."))
     
     (options, args) = parser.parse_args()
     return (options, args)
