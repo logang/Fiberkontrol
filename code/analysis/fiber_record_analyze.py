@@ -737,6 +737,7 @@ class FiberAnalyze( object ):
                     baseline = np.min(baseline_chunk)
                 elif baseline_window=='full':
                     n = 10
+                    print "chunk"
                     smooth_chunk = np.convolve(chunk, np.ones(n)*1.0/n, mode='same')
                     #baseline = np.min(chunk)
                     baseline = np.min(smooth_chunk[n+1:-n-1])

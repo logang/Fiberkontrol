@@ -1429,6 +1429,7 @@ if __name__ == "__main__":
     if not os.path.isdir(outdir):
         os.makedirs(outdir)
     # [before,after] event in seconds 
+    print options.time_window
     time_window = np.array(options.time_window.split(':'), dtype='float32') 
 
 #    to_plot = 'compare_epochs'
