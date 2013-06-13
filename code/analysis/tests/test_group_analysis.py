@@ -219,13 +219,10 @@ class Test_group_regression_plot(Configure_tests):
 	pass
 
 
-class Test_group_plot_time_series():
-	pass
+class Test_get_novel_social_pairs():
+    pass
 
 class Test_compare_epochs():
-	pass
-
-class Test_get_novel_social_pairs():
 	pass
 
 class Test_plot_representative_time_series():
@@ -277,3 +274,6 @@ class Test_compileAnimalScoreDictIntoArray():
 
 class Test_group_bout_ci():
 	pass
+
+class Test_group_plot_time_series():
+    pass

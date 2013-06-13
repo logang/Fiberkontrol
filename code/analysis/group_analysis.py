@@ -11,6 +11,7 @@ import scipy as sp
 import scipy.stats as stats
 from state_space import denoise
 
+import fiber_record_analyze as fra 
 from fiber_record_analyze import FiberAnalyze
 
 def group_iter_list(all_data, options, 
@@ -199,7 +200,7 @@ def group_regression_plot(all_data,
         outdir = options.output_path + '/' + options.exp_type
         if not os.path.isdir(outdir):
             os.makedirs(outdir)
-        outpath = outdir +'/'+str(dates)+'_'+str(metric) + '_window_'+str(time_window[0])+'_'+str(time_window[1])+ options.plot_format
+        outpath = outdir +'/'+str(dates)+'_'+'_' + str(options.exp_type) + '_' + str(options.mouse_type) +'_' + str(metric) + '_window_'+str(time_window[0])+'_'+str(time_window[1])+ options.plot_format
         pl.savefig(outpath)
         print "outpath: ", outpath
     else:
@@ -660,10 +661,10 @@ def plot_compare_start_and_end(options,
     else:
         plt.title('Comparison of peak fluorescence after start and end of interaction')
     if compare_before_after_end:
-        pl.savefig(output_path + str(time_window[1]) + '_' + metric+ 
+        pl.savefig(output_path + '/' + options.mouse_type + '_'+ str(time_window[1]) + '_' + metric+ 
                     '_after_minus_before_end'+options.plot_format)
     else:
-        pl.savefig(output_path + str(time_window[1]) + '_' + metric+ 
+        pl.savefig(output_path + '/' + options.mouse_type + '_' + str(time_window[1]) + '_' + metric+ 
                     '_end_minus_start'+options.plot_format)
 
 
@@ -782,7 +783,7 @@ def compare_start_and_end_of_epoch(all_data, options,
                                output_path=options.output_path,
                                pvalue = pvalue,
                                 )
-    filename = options.output_path + 'window_' + \
+    filename = options.output_path + '/' + options.mouse_type + '_' + 'window_' + \
             str(time_window[1]).replace(".","-") + '_numbouts_' + \
             str(max_bout_number) + '_minspace_' + \
             str(options.event_spacing).replace(".", "-") + '_' + metric
@@ -836,7 +837,7 @@ def plotEpochComparison(pair_scores,
     p2, = plt.plot(exp_scores[exp2], 'o')
     plt.legend([p1, p2], [exp1, exp2])
     plt.xlabel('Mouse (one mouse per column)')
-    if time_window == [0, 0]:
+    if time_window[0] == 0 and time_window[1] == 0:
         plt.ylabel( metric + ' w/in entire epoch, avged across epochs)')
     else:
         plt.ylabel( metric + ' w/in ' + 
@@ -849,7 +850,11 @@ def plotEpochComparison(pair_scores,
     print exp1, ": ", exp_scores[exp1]
     print exp2, ": ", exp_scores[exp2]
 
-    filename = options.output_path + 'window_' + \
+    outdir = options.output_path
+    if not os.path.isdir(outdir):
+        os.makedirs(outdir)
+
+    filename = options.output_path + '/'+options.mouse_type+'_window_' + \
                 str(time_window[1]) + '_numbouts_' + \
                 str(max_bout_number) + '_minspace_' + \
                 str(min_spacing).replace(".", "-") + '_' + metric
@@ -862,7 +867,6 @@ def plotEpochComparison(pair_scores,
     f.close()
 
     plt.savefig(filename+ options.plot_format)
-    plt.show()
 
 
 def compare_epochs(all_data, 
@@ -871,7 +875,7 @@ def compare_epochs(all_data,
                    exp2='homecagenovel', 
                    time_window=[0, 1], 
                    metric='peak', 
-                   test='ttest', 
+                   test='wilcoxon', 
                    make_plot=True, 
                    max_bout_number=0, 
                    plot_perievent=False,
@@ -884,7 +888,6 @@ def compare_epochs(all_data,
     'peak' (maximum fluorescence value during epoch),
     'average'  (average fluorescence during epoch),
     'spacing', (time from end of current epoch to beginning of the next)
-
 
 
     Plots the average score for each mouse under each 
@@ -950,7 +953,7 @@ def compare_epochs(all_data,
                 print "end_event_times: ", end_event_times
 
                 #--Get an array of time series chunks in a window around each event time
-                if time_window == [0, 0]:
+                if time_window[0] == 0 and time_window[1] == 0:
                     start_time_arr = np.asarray( 
                                         FA.get_time_chunks_around_events(
                                             FA.fluor_data, 
@@ -1198,7 +1201,7 @@ def plot_decay(options,
         plt.title('Average time interval between bouts')
         plt.ylabel('Average time from end of bout to beginning of next bout [s]')
 
-    plt.savefig(options.output_path + 'decay_window_' + 
+    plt.savefig(options.output_path + '/'+ options.mouse_type + '_'+ 'decay_window_' + 
                 str(time_window[1]) + '_minspace_' + str(min_spacing) + '_mousetype_' + 
                 options.mouse_type + '_' + metric+ options.plot_format)
 
@@ -1233,7 +1236,8 @@ def compare_decay(all_data,
                   test='ttest', 
                   make_plot=True, 
                   just_first=False, 
-                  max_bout_number=0):
+                  max_bout_number=0,
+                  show_plot=False):
     """
     Using 'metric' to score the fluorescent response in each bout,
     plot the decay in the response vs. bout number
@@ -1267,7 +1271,7 @@ def compare_decay(all_data,
                output_path=options.output_path, 
                max_bout_number=max_bout_number,
                min_spacing=options.event_spacing,
-               show_plot=True,
+               show_plot=show_plot,
                )
 
 
@@ -1314,7 +1318,6 @@ def event_length_histogram(all_data,
     pl.xlabel("Bout length [s]")
     pl.ylabel("Number of bouts")
     if options.output_path is not None:
-        import os
         outdir = os.path.join(options.output_path, options.exp_type)
         if not os.path.isdir(outdir):
             os.makedirs(outdir)
@@ -1328,65 +1331,11 @@ def event_length_histogram(all_data,
 #-------------------------------------------------------------------------------------------
 
 def set_and_read_options_parser():
+   # Parse command line options
+    parser = fra.add_command_line_options() #add all command line options from fiber_record_analyze
 
-   # FiberAnalyze.add_command_line_options()
-
-        # Parse command line options
-    from optparse import OptionParser
-
-    parser = OptionParser()
-    parser.add_option("-o", "--output-path", dest="output_path", default=None,
-                      help="Specify the ouput path.")
-
-    parser.add_option("-t", "--trigger-path", dest="trigger_path", default=None,
-                      help=("Specify path to files with trigger times, minus the '_s.npz' "
-                            "and '_e.npz' suffixes."))
-
-    parser.add_option("-i", "--input-path", dest="input_path", default=None,
-                      help="Specify the input path.")
-
-    parser.add_option("", "--time-range", dest="time_range",default=None,
-                      help=("Specify a time window over which to analyze the time series "
-                            "in format start:end. -1 chooses the appropriate extremum"))
-
-    parser.add_option('', "--fluor_normalization", default = 'deltaF', dest="fluor_normalization",
-                      help=("Normalization of fluorescence trace. Can be a.u. between [0,1]: "
-                            "'stardardize' or deltaF/F: 'deltaF'."))
-
-    parser.add_option('-s', "--smoothness", default = 0, dest="smoothness",
-                      help="Should the time series be smoothed, and how much.")
-
-    parser.add_option("", "--save-txt", action="store_true", default=False, dest="save_txt",
-                      help="Save data matrix out to a text file.")
-
-    parser.add_option("", "--save-to-h5", default=None, dest="save_to_h5",
-                      help="Save data matrix to a dataset in an hdf5 file.")
-
-    parser.add_option("", "--save-and-exit", action="store_true", default=False, 
-                      dest="save_and_exit", help="Exit immediately after saving data out.")
-
-    parser.add_option("", "--filter-freqs", default=None, dest="filter_freqs",
-                      help=("Use a notch filter to remove high frequency noise. Format "
-                            "lowfreq:highfreq."))
-
-    parser.add_option("", "--save-debleach", action="store_true", default=False, 
-                      dest="save_debleach", help=("Debleach fluorescence time series by "
-                                                  "fitting with an exponential curve."))
-
-    parser.add_option('', "--exp-type", default = 'homecagesocial', dest="exp_type",
-                      help=("Which type of experiment. Current options are 'homecagesocial' "
-                            "and 'homecagenovel'"))
-
-    parser.add_option("", "--time-window", dest="time_window",default='3:3',
+    parser.add_option("", "--time-window", dest="time_window",default='0:0',
                       help="Specify a time window for peri-event plots in format before:after.")
-
-    parser.add_option("", "--event-spacing", dest="event_spacing", default=0,
-                       help=("Specify minimum time (in seconds) between the end of one event "
-                             "and the beginning of the next"))
-
-    parser.add_option("", "--mouse-type", dest="mouse_type", default="GC5",
-                       help="Specify the type of virus injected in the mouse (GC5, GC3, EYFP)")
-
 
     parser.add_option("", "--exp-date", dest="exp_date", default=None,
                        help="Limit group analysis to trials of a specific date ")
@@ -1406,30 +1355,68 @@ def set_and_read_options_parser():
                              "a bout. Possible values are: "
                              "'peak', 'average', 'spacing', 'epoch_length', 'event_time', 'event_index'" ))
 
-    parser.add_option("", "--group-regression-plot", dest="group_regression_plot", action="store_true", default=False, 
+    parser.add_option("", "--group-regression-plot", dest="group_regression_plot", 
+                      action="store_true", default=False, 
                       help=("Plot of linear regression to data from each individual"
                             "trial, with x-axis corresponding to the time until next bout, and y-axis "
                             " corresponding to the measure of spike intensity specified by the"
                             "--intensity-metric tag."))
 
-    parser.add_option("", "--group-bout-heatmaps", dest="group_bout_heatmaps", action="store_true", default=False, 
+    parser.add_option("", "--group-bout-heatmaps", dest="group_bout_heatmaps", 
+                      action="store_true", default=False, 
                       help=("For each trial, plot perievent heatmaps and time series of individual"
                             " bouts, centered in time around the start of the bout, with the color"
                             " in the heatmap representing a fluorescence intensity."))
 
-    parser.add_option("", "--group-bout-ci", dest="group_bout_ci", action="store_true", default=False, 
-                        help=("For each experiment_type, plot the mean of all time series"
+    parser.add_option("", "--group-bout-ci", dest="group_bout_ci", 
+                      action="store_true", default=False, 
+                      help=("For each experiment_type, plot the mean of all time series"
                         " chunks, centered in time around the start of the bout. The mean "
                         " is determined point by point, as the mean of all time chunks."))
 
-    parser.add_option("", "--group-plot-time-series", dest="group_plot_time_series", action="store_true", default=False, 
+    parser.add_option("", "--group-plot-time-series", dest="group_plot_time_series", 
+                      action="store_true", default=False, 
                       help=("Save out time series for each trial, overlaid with "
                             " red lines indicating event epochs."))
 
-    parser.add_option("", "--plot-representative-time-series", dest="plot_representative_time_series", action="store_true", default=False, 
-                  help=("For each trial, plot perievent heatmaps and time series of individual"
+    parser.add_option("", "--plot-representative-time-series", dest="plot_representative_time_series", 
+                      action="store_true", default=False, 
+                      help=("For each trial, plot perievent heatmaps and time series of individual"
                         " bouts, centered in time around the start of the bout, with the color"
                         " in the heatmap representing a fluorescence intensity."))
+
+    parser.add_option("", "--compare-start-and-end-of-epoch", dest="compare_start_and_end_of_epoch", 
+                      action="store_true", default=False, 
+                      help=(" Calculates the difference between the fluorescence in a window at "
+                            "the beginning and the end of each epoch. Compares these differences "
+                            " between novel object and social behaviors."))
+
+    parser.add_option("", "--compare-epochs", dest="compare_epochs", 
+                      action="store_true", default=False, 
+                      help=("Compares the fluorescence during epochs for each mouse undergoing "
+                            "two behavioral experiments (i.e. homecagenovel and homecagesocial)."
+                            "use --max-bout-number to specify how many bouts per trial to use "
+                            " (this allows one to compensate for the difference in decays between"
+                            " homecagenovel and homecagesocial, for example)."))
+
+    parser.add_option("", "--max-bout-number", dest="max_bout_number", default=0,
+                        help=(" The number of bouts to use per trial when comparing"
+                             "two behavioral experiments. This allows one to compensate "
+                            " for the difference in the number of bouts per trial during"
+                            " homecagenovel and homecagesocial experiment types."))
+
+    parser.add_option("", "--compare-decay", dest="compare_decay", 
+                      action="store_true", default=False, 
+                      help=("Compares the decay in fluorescence "
+                            " with increasing bout number within "
+                            " a trial for two exp_types (i.e. homecagesocial"
+                            " and homecagenovel)."))
+
+    parser.add_option("", "--event-length-histogram", dest="event_length_histogram", 
+                      action="store_true", default=False, 
+                      help=("Plot a histogram of the event length of all bouts "
+                            "across all trial of a given exp_type."))
+
     
     (options, args) = parser.parse_args()
     return (options, args)
@@ -1438,6 +1425,9 @@ def set_and_read_options_parser():
 if __name__ == "__main__":
     (options, args) = set_and_read_options_parser()
     all_data = h5py.File(options.input_path,'r')
+    outdir = options.output_path
+    if not os.path.isdir(outdir):
+        os.makedirs(outdir)
     # [before,after] event in seconds 
     time_window = np.array(options.time_window.split(':'), dtype='float32') 
 
@@ -1449,34 +1439,46 @@ if __name__ == "__main__":
                               exp_type=options.exp_type,
                               time_window=time_window,
                               metric=options.intensity_metric)
+
     elif options.group_bout_heatmaps:
         group_bout_heatmaps(all_data, options, 
                             exp_type=options.exp_type, time_window=time_window,
                             max_num_epochs=15, ymax_setting = 'small')
+
     elif options.group_bout_ci:
         group_bout_ci(all_data, options, exp_type=options.exp_type,
                       time_window=time_window)
+
     elif options.group_plot_time_series:
         group_plot_time_series(all_data, options)
+
     elif options.plot_representative_time_series:
         plot_representative_time_series(options, options.representative_time_series_specs_file)
-    elif to_plot == 'compare_start_and_end_of_epoch':
-        compare_start_and_end_of_epoch(all_data, options, 
-                                       exp1='homecagesocial', exp2='homecagenovel', 
-                                       time_window=[0, .5], metric='peak', test='wilcoxon',
-                                       plot_perievent=False)
-    elif to_plot == 'compare_epochs':
+
+    elif options.compare_epochs:
         compare_epochs(all_data, options, 
                        exp1='homecagenovel', exp2='homecagesocial', 
-                       time_window=[0, 0], metric='peak', test='wilcoxon', 
-                       make_plot=True, max_bout_number=5, plot_perievent=False)
-    elif to_plot == 'compare_decay':
+                       time_window=time_window, metric=options.intensity_metric,
+                       test='wilcoxon', make_plot=True, max_bout_number=int(options.max_bout_number), 
+                       plot_perievent=False)
+
+    elif options.compare_start_and_end_of_epoch:
+        compare_start_and_end_of_epoch(all_data, options, 
+                                       exp1='homecagesocial', exp2='homecagenovel', 
+                                       time_window=[0, .5], metric=options.intensity_metric, test='wilcoxon',
+                                       plot_perievent=False, max_bout_number=int(options.max_bout_number),
+                                       show_plot=False)
+
+    elif options.compare_decay:
         compare_decay(all_data, options, 
                       exp1='homecagenovel', exp2='homecagesocial', 
-                      time_window=[0, 0], metric='peak', test='wilcoxon', 
-                      make_plot=True, max_bout_number=13)
-    elif to_plot == 'event_length_histogram':
+                      time_window=time_window, metric=options.intensity_metric, test='wilcoxon', 
+                      make_plot=True, max_bout_number=int(options.max_bout_number), show_plot=False)
+
+    elif options.event_length_histogram:
         event_length_histogram(all_data, options, 
                                make_plot=True)
+
+
 
 # EOF

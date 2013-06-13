@@ -363,8 +363,9 @@ class FiberAnalyze( object ):
             trigger_high_locations = [time_vals[i] for i in range(len(trigger_data)) 
                                         if trigger_data[i] > trigger_low]
         elif self.exp_type == 'sucrose':
+            print "trigger_data", trigger_data
             trigger_high_locations = [time_vals[i] for i in range(len(trigger_data)) 
-                                        if trigger_data[i] < trigger_low]
+                                        if trigger_data[i] > trigger_low]
         
         ## Be careful whether event is recorded 
         ## by trigger high or trigger low (i.e. > or < trigger_low).
