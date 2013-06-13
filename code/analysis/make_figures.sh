@@ -91,7 +91,7 @@ python group_analysis.py --input-path=$data_path --output-path=$output_path/$plo
 
 
 if $(false); then
-
+echo you can use the section inside the if statement to comment out commands
 echo done
 fi
 
