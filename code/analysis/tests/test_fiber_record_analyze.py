@@ -64,13 +64,13 @@ class Configure_tests():
         Removes the test_output directory, 
         which should be done after every test.
         """
-        for f in os.listdir(self.test_output_directory):
-            file_path = os.path.join(self.test_output_directory, f)
-            try:
-                os.unlink(file_path)
-            except Exception, e:
-                print e
-        os.rmdir(self.test_output_directory)
+        # for f in os.listdir(self.test_output_directory):
+        #     file_path = os.path.join(self.test_output_directory, f)
+        #     try:
+        #         os.unlink(file_path)
+        #     except Exception, e:
+        #         print e
+        # os.removedirs(self.test_output_directory)
 
 
 class Test_load(Configure_tests):
