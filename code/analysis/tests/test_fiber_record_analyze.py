@@ -9,6 +9,7 @@ import fiber_record_analyze as fra
 import json
 import numpy as np
 import os
+import shutil
 from load_configuration import load_configuration
 
 
@@ -64,6 +65,7 @@ class Configure_tests():
         Removes the test_output directory, 
         which should be done after every test.
         """
+        shutil.rmtree(self.test_output_directory)
         # for f in os.listdir(self.test_output_directory):
         #     file_path = os.path.join(self.test_output_directory, f)
         #     try:

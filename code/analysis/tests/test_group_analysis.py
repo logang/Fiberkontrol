@@ -7,6 +7,7 @@ import json
 import numpy as np
 import os
 import h5py
+import shutil
 
 import preprocessing as prp
 import fiber_record_analyze as fra 
@@ -68,6 +69,7 @@ class Configure_tests():
         Removes the test_output directory, 
         which should be done after every test.
         """
+        shutil.rmtree(self.test_output_directory)
         # for f in os.listdir(self.test_output_directory):
         #     file_path = os.path.join(self.test_output_directory, f)
         #     try:
@@ -97,8 +99,8 @@ class Test_group_regression_plot(Configure_tests):
         self.all_data = h5py.File(self.options.input_path,'r')
 
     def tearDown(self):
-        #Configure_tests.remove_output_directory(self)
-        pass
+        Configure_tests.remove_output_directory(self)
+        
 
     def test_peak_regression(self):
 
