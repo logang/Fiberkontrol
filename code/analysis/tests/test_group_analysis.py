@@ -70,22 +70,13 @@ class Configure_tests():
         which should be done after every test.
         """
         shutil.rmtree(self.test_output_directory)
-        # for f in os.listdir(self.test_output_directory):
-        #     file_path = os.path.join(self.test_output_directory, f)
-        #     try:
-        #         os.unlink(file_path)
-        #     except Exception, e:
-        #         print e
-        # os.removedirs(self.test_output_directory)
-
-
 
 
 ##MAKE PLOT TESTING FOR ARTIFACT IN group_regression:
 ##i.e. set the score as the event_index, or event_time
 
 class Test_group_iter_list():
-	pass
+    pass
 
 class Test_group_regression_plot(Configure_tests):
     def setup(self):
@@ -218,64 +209,146 @@ class Test_group_regression_plot(Configure_tests):
         assert(lm_results.rsquared > 0.80)
 
 
-	pass
+
+class Test_get_novel_social_pairs(Configure_tests):
+    def setup(self):
+        Configure_tests.__init__(self)
+
+        self.options.fluor_normalization = 'deltaF'
+        self.options.exp_type = 'homecagesocial'
+        self.options.event_spacing = 0
+        self.options.mouse_type = 'GC5'
+
+        self.all_data = h5py.File(self.options.input_path,'r')
+
+    def tearDown(self):
+        Configure_tests.remove_output_directory(self)
+        
+
+    def test_get_novel_social_pairs(self):
+        all_data = h5py.File(self.options.input_path,'r')
+
+        self.options.intensity_metric='peak'
+        self.options.time_window = '0:0'
+        exp1 = 'homecagesocial'
+        exp2 = 'homecagenovel'
+        pairs = ga.get_novel_social_pairs(all_data, self.options, exp1, exp2)
+        print "pairs", pairs
+
+        assert(pairs['0005']['homecagesocial'] == 20130524)
+        assert(pairs['0005']['homecagenovel'] == 20130524)
+        assert(pairs['0001']['homecagesocial'] == 20130524)
+        assert(pairs['0001']['homecagenovel'] == 20130524)
+        assert(pairs['0002']['homecagesocial'] == 20130524)
+        assert(pairs['0002']['homecagenovel'] == 20130524)
 
 
-class Test_get_novel_social_pairs():
-    pass
+        self.options.exp_date = '20130523'
+        self.options.mouse_type = 'GC5_NAcprojection'
+        pairs = ga.get_novel_social_pairs(all_data, self.options, exp1, exp2)
+        assert(pairs['0003']['homecagesocial'] == 20130523)
+        assert(pairs['0003']['homecagenovel'] == 20130523)
+        assert(pairs['0004']['homecagesocial'] == 20130523)
+        assert(pairs['0004']['homecagenovel'] == 20130523)
 
-class Test_compare_epochs():
-	pass
 
-class Test_plot_representative_time_series():
-	pass
+
+class Test_compare_epochs(Configure_tests):
+    def setup(self):
+        Configure_tests.__init__(self)
+
+        self.options.fluor_normalization = 'deltaF'
+        self.options.exp_type = 'homecagesocial'
+        self.options.event_spacing = 0
+        self.options.mouse_type = 'GC5'
+
+        self.all_data = h5py.File(self.options.input_path,'r')
+
+    def tearDown(self):
+        Configure_tests.remove_output_directory(self)
+        
+
+    def test_get_novel_social_pairs(self):
+        all_data = h5py.File(self.options.input_path,'r')
+
+        self.options.intensity_metric='peak'
+        self.options.time_window = '0:0'
+        time_window = np.array(self.options.time_window.split(':'), dtype='float32') 
+        self.options.max_bout_number = 0
+        exp1 = 'homecagesocial'
+        exp2 = 'homecagenovel'
+        [pair_scores, pair_avg_scores] = ga.compare_epochs(all_data, self.options, exp1, exp2,
+                                                           time_window=time_window, 
+                                                           metric=self.options.intensity_metric,
+                                                           max_bout_number=self.options.max_bout_number, 
+                                                           test='wilcoxon',
+                                                           make_plot=True, 
+                                                           plot_perievent=False,
+                                                           show_plot=False)
+
+        assert(np.abs(pair_scores['0005']['homecagesocial'][0] - 1.0) < 0.000001)
+        assert(np.abs(pair_scores['0005']['homecagesocial'][1] - 0.5) < 0.000001)
+        assert(np.abs(pair_scores['0005']['homecagesocial'][2] - 1.0/3.0) < 0.000001)
+        assert(np.abs(pair_scores['0005']['homecagesocial'][3] - 1.0/4.0) < 0.000001)
+
+        assert(np.abs(pair_scores['0005']['homecagenovel'][0] - 1.0) < 0.000001)
+        assert(np.abs(pair_scores['0005']['homecagenovel'][1] - 0.5) < 0.000001)
+        assert(np.abs(pair_scores['0005']['homecagenovel'][2] - 1.0/3.0) < 0.000001)
+
+        assert(np.abs(pair_avg_scores['0005']['homecagesocial'] - 0.52083) < 0.0001)
+        assert(np.abs(pair_avg_scores['0005']['homecagenovel'] - 0.61111) < 0.0001)
+
+
+
 
 class Test_statisticalTestOfComparison():
-	pass
+    pass
 
 class Test_get_bout_averages():
-	pass
+    pass
 
 class Test_plot_decay():
-	pass
+    pass
 
 
+class Test_plot_representative_time_series():
+    pass
 
 
 class Test_group_bout_heatmaps():
-	"""
-	Read through group_bout_heatmaps,
-	it should be fine if the underlying 
-	functions have been tested 
-	"""
-	pass
+    """
+    Read through group_bout_heatmaps,
+    it should be fine if the underlying 
+    functions have been tested 
+    """
+    pass
 
 class Test_compare_start_and_end_of_epoch():
-	"""
-	Are we using this in the paper?
-	"""
-	pass
+    """
+    Are we using this in the paper?
+    """
+    pass
 
 class Test_plot_compare_start_and_end():
-	"""
-	Are we using this in the paper?
-	"""
-	pass
+    """
+    Are we using this in the paper?
+    """
+    pass
 
 
 class Test_fit_exponential():
-	pass
+    pass
 
 
 class Test_loadFiberAnalyze():
-	pass
+    pass
 
 
 class Test_compileAnimalScoreDictIntoArray():
-	pass
+    pass
 
 class Test_group_bout_ci():
-	pass
+    pass
 
 class Test_group_plot_time_series():
     pass

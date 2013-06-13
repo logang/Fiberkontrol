@@ -66,13 +66,6 @@ class Configure_tests():
         which should be done after every test.
         """
         shutil.rmtree(self.test_output_directory)
-        # for f in os.listdir(self.test_output_directory):
-        #     file_path = os.path.join(self.test_output_directory, f)
-        #     try:
-        #         os.unlink(file_path)
-        #     except Exception, e:
-        #         print e
-        # os.removedirs(self.test_output_directory)
 
 
 class Test_load(Configure_tests):

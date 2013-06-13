@@ -95,7 +95,7 @@ def group_regression_plot(all_data,
                           options, 
                           exp_type, 
                           time_window,
-                          metric="peak",
+                          metric,
                           ):
     """
     Plot fits of regression lines on data from home cage or novel social 
@@ -216,11 +216,11 @@ def group_bout_heatmaps(all_data,
                         options, 
                         exp_type, 
                         time_window, 
+                        max_num_epochs,
+                        ymax_setting,
                         df_max=0.35, 
-                        event_edge="rising", 
-                        baseline_window='full',
-                        max_num_epochs=0,
-                        ymax_setting='large'):
+                        event_edge="rising",
+                        baseline_window='full', ):
     """
     Save out 'heatmaps' showing time on the x axis, 
     bouts on the y axis, and representing signal
@@ -568,26 +568,29 @@ def plot_representative_time_series(options, representative_time_series_specs_fi
 
 #----------------------------------------------------------------------------------------
 
-def get_novel_social_pairs(all_data, exp1, exp2, mouse_type = 'GC5'):
+def get_novel_social_pairs(all_data, options, exp1, exp2):
     """
     all_data = an hdf5 file containing all of the time series data
     exp1 and exp2 = the two experiment types to be compared 
     (i.e. homecagesocial and homecagenovel)
 
     Returns: a dict where the keys are animal_ids
-    and each entry is a dict containing for each exp_type (the keys), 
-    the entry is the date of the best trial of that behavior
+    and each entry is a dict: 
+    {keys = exp_type, entry = date of the most recent trial of that exp_type} 
     """
     pairs = dict()
 
+    mouse_type = options.mouse_type
+
+    # load data from hdf5 file by animal-date-exp_type.
     for animal_id in all_data.keys():
-        # load data from hdf5 file by animal-date-exp_type
         animal = all_data[animal_id]
+
         if animal.attrs['mouse_type'] == mouse_type: #don't use EYFP or GC3
             pairs[animal_id] = dict()
+
+            # make a list for each experiment type of all dates on which that exp was run.
             for date in animal.keys(): 
-                ##make a list for each experiment type of 
-                ##all dates on which that exp was run
                 for exp_type in animal[date].keys(): 
                     if exp_type == str(exp1) or exp_type == str(exp2):
                         if exp_type in pairs[animal_id].keys():
@@ -691,7 +694,7 @@ def compare_start_and_end_of_epoch(all_data, options,
     Metric can be 'average' (mean value of curve) or 'peak' (peak fluorescence value).
     """
 
-    pairs = get_novel_social_pairs(all_data, exp1, exp2, mouse_type=options.mouse_type) 
+    pairs = get_novel_social_pairs(all_data, options, exp1, exp2) 
                 ##can use any function here that returns pairs of data
 
     pair_scores = dict() #key: animal_id, entry: a dict storing an array of scores for each trial type (i.e. homecagenovel and homecagesocial)
@@ -783,6 +786,9 @@ def compare_start_and_end_of_epoch(all_data, options,
                                output_path=options.output_path,
                                pvalue = pvalue,
                                 )
+
+    #Write out actual values to a text file to be used in making bar plot and
+    #calculating significance of difference
     filename = options.output_path + '/' + options.mouse_type + '_' + 'window_' + \
             str(time_window[1]).replace(".","-") + '_numbouts_' + \
             str(max_bout_number) + '_minspace_' + \
@@ -797,7 +803,6 @@ def compare_start_and_end_of_epoch(all_data, options,
 
     if show_plot:
         plt.show()
-
 
 
 
@@ -818,7 +823,8 @@ def statisticalTestOfComparison(exp_scores, exp1, exp2, test):
             return [zstatistic, pvalue]
 
 
-def plotEpochComparison(pair_scores, 
+def plotEpochComparison(options,
+                        pair_scores, 
                         pair_avg_scores, 
                         exp_scores, 
                         exp1, 
@@ -854,6 +860,8 @@ def plotEpochComparison(pair_scores,
     if not os.path.isdir(outdir):
         os.makedirs(outdir)
 
+    #Write out actual values to a text file to be used in making bar plot and
+    #calculating significance of difference
     filename = options.output_path + '/'+options.mouse_type+'_window_' + \
                 str(time_window[1]) + '_numbouts_' + \
                 str(max_bout_number) + '_minspace_' + \
@@ -871,13 +879,13 @@ def plotEpochComparison(pair_scores,
 
 def compare_epochs(all_data, 
                    options, 
-                   exp1='homecagesocial', 
-                   exp2='homecagenovel', 
-                   time_window=[0, 1], 
-                   metric='peak', 
-                   test='wilcoxon', 
+                   exp1, 
+                   exp2, 
+                   time_window, 
+                   metric, 
+                   max_bout_number, 
+                   test, 
                    make_plot=True, 
-                   max_bout_number=0, 
                    plot_perievent=False,
                    show_plot=True,
                    ):
@@ -889,14 +897,22 @@ def compare_epochs(all_data,
     'average'  (average fluorescence during epoch),
     'spacing', (time from end of current epoch to beginning of the next)
 
+    test represents the statistical test used for comparsion:
+     can be 'wilcoxon' or 'ttest'
+
+    max_bout_number is the number of bouts to include in calculating
+    the score for a trial. Set to 0 to include all bouts of a trial. 
+
+    Time window is an array of two values [time before onset, time after onset]
+    In order to use the full length of each epoch as opposed to a fixed window,
+    set time_window = [0, 0].
 
     Plots the average score for each mouse under each 
     behavioral condition. Using a statistical test, determines 
     whether there is a significant difference in the average 
     score between behavioral conditions across all mice.
 
-    In order to use the full length of each epoch as opposed to a fixed window,
-    set time_window = [0, 0] 
+
 
     Returns: 1) a dict (keys: animal_id, 
                         entries: dict (keys: exp_type, 
@@ -907,9 +923,9 @@ def compare_epochs(all_data,
     """
 
     pairs = get_novel_social_pairs(all_data, 
+                                   options,
                                    exp1, 
-                                   exp2, 
-                                   mouse_type=options.mouse_type) #can use any function here that returns pairs of data
+                                   exp2) #can use any function here that returns pairs of data
 
     pair_scores = dict() #key: animal_id, 
                             #entry: a dict storing an array of scores for 
@@ -918,22 +934,12 @@ def compare_epochs(all_data,
                                 #entry: a dict storing the average score within a trial 
                                 #       for each trial type (i.e. homecagenovel and homecagesocial)
 
-
-    #[iter_list, animal_id_list, date_list, exp_type_list] = group_iter_list(all_data, options)
-
     for animal_id in pairs.keys():
-        pair_scores[animal_id] = dict()
+        pair_scores[animal_id] = dict() #initialize entry for each animal_id
         pair_avg_scores[animal_id] = dict()
+
         for exp_type in pairs[animal_id].keys():
             date = pairs[animal_id][exp_type]
-        # for animal_id in animal_id_list:
-        #     pair_scores[animal_id] = dict()
-        #     pair_avg_scores[animal_id] = dict()
-
-        # for animal in iter_list:
-        #     animal_id = animal[animal_id]
-        #     exp_type = animal[exp_type]
-        #     date = animal[date]
 
             FA = FiberAnalyze(options)
             [FA, success] = loadFiberAnalyze(FA,
@@ -941,6 +947,7 @@ def compare_epochs(all_data,
                                              animal_id, 
                                              date, 
                                              exp_type)
+
             if (success != -1):
                 start_event_times = FA.get_event_times(edge="rising", 
                                                        #nseconds=float(options.event_spacing),
@@ -1007,7 +1014,8 @@ def compare_epochs(all_data,
                                                   test)
 
     print 'time_window ', time_window
-    plotEpochComparison(pair_scores, 
+    plotEpochComparison(options,
+                        pair_scores, 
                         pair_avg_scores, 
                         exp_scores, 
                         exp1, 
@@ -1229,25 +1237,35 @@ def plot_decay(options,
 
 def compare_decay(all_data, 
                   options, 
-                  exp1='homecagesocial', 
-                  exp2='homecagenovel', 
-                  time_window=[0, 1], 
-                  metric='peak', 
-                  test='ttest', 
+                  exp1, 
+                  exp2, 
+                  time_window, 
+                  metric, 
+                  test, 
+                  max_bout_number,
                   make_plot=True, 
                   just_first=False, 
-                  max_bout_number=0,
                   show_plot=False):
     """
     Using 'metric' to score the fluorescent response in each bout,
-    plot the decay in the response vs. bout number
+    plot the decay in the response vs. bout number, and fits
+    with an exponential curve.
 
     Metric can be:
     'peak' (maximum fluorescence value during epoch),
     'average'  (average fluorescence during epoch),
     'spacing', (time from end of current epoch to beginning of the next)
 
-    TODO: Fit with an exponential?
+    test represents the statistical test used for comparsion:
+    can be 'wilcoxon' or 'ttest'
+
+    max_bout_number is the number of bouts to include in calculating
+    the score for a trial. Set to 0 to include all bouts of a trial. 
+
+    Time window is an array of two values [time before onset, time after onset]
+    In order to use the full length of each epoch as opposed to a fixed window,
+    set time_window = [0, 0].
+
     """
 
     [pair_scores, pair_avg_scores] =  compare_epochs(all_data, options, 
@@ -1277,8 +1295,9 @@ def compare_decay(all_data,
 
 def event_length_histogram(all_data, 
                            options, 
+                           max_bout_number,
                            make_plot=True,
-                           max_bout_number=0):
+                           ):
 
     """
     Plots a histogram of the length (in seconds) of each event
@@ -1428,12 +1447,10 @@ if __name__ == "__main__":
     outdir = options.output_path
     if not os.path.isdir(outdir):
         os.makedirs(outdir)
-    # [before,after] event in seconds 
-    print options.time_window
+
+    # [before,after] event in seconds.
     time_window = np.array(options.time_window.split(':'), dtype='float32') 
 
-#    to_plot = 'compare_epochs'
-    to_plot=None
 
     if options.group_regression_plot:
         group_regression_plot(all_data, options, 
@@ -1444,7 +1461,7 @@ if __name__ == "__main__":
     elif options.group_bout_heatmaps:
         group_bout_heatmaps(all_data, options, 
                             exp_type=options.exp_type, time_window=time_window,
-                            max_num_epochs=15, ymax_setting = 'small')
+                            max_num_epochs=int(options.max_bout_number), ymax_setting = 'small')
 
     elif options.group_bout_ci:
         group_bout_ci(all_data, options, exp_type=options.exp_type,
@@ -1473,11 +1490,12 @@ if __name__ == "__main__":
     elif options.compare_decay:
         compare_decay(all_data, options, 
                       exp1='homecagenovel', exp2='homecagesocial', 
-                      time_window=time_window, metric=options.intensity_metric, test='wilcoxon', 
-                      make_plot=True, max_bout_number=int(options.max_bout_number), show_plot=False)
+                      time_window=time_window, metric=options.intensity_metric, 
+                      max_bout_number=int(options.max_bout_number), test='wilcoxon', 
+                      make_plot=True, show_plot=False)
 
     elif options.event_length_histogram:
-        event_length_histogram(all_data, options, 
+        event_length_histogram(all_data, options, max_bout_number=int(options.max_bout_number),
                                make_plot=True)
 
 

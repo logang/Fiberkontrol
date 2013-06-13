@@ -1,18 +1,18 @@
 #!/bin/bash
 
 data_path='/Users/isaackauvar/Documents/2012-2013/ZDlab/FiberKontrol/Results/Cell/all_data_raw_w20130108.h5'
-output_path='/Users/isaackauvar/Documents/2012-2013/ZDlab/FiberKontrol/Results/Cell/Plots/Testing/20130612Presubmission_test'
+output_path='/Users/isaackauvar/Documents/2012-2013/ZDlab/FiberKontrol/Results/Cell/Plots/Testing/20130613Presubmission_test'
 
 
 plot_type=group-bout-heatmaps
 time_window='3:3'
 plot_format='.png'
-python group_analysis.py --input-path=$data_path --output-path=$output_path/$plot_type/GC5 --$plot_type --mouse-type='GC5' --exp-type='homecagesocial' --time-window=$time_window --plot-format=$plot_format
-python group_analysis.py --input-path=$data_path --output-path=$output_path/$plot_type/GC5 --$plot_type --mouse-type='GC5' --exp-type='homecagenovel' --time-window=$time_window --plot-format=$plot_format
-python group_analysis.py --input-path=$data_path --output-path=$output_path/$plot_type/GC5_NAcprojection --$plot_type --mouse-type='GC5_NAcprojection' --exp-type='homecagesocial' --time-window=$time_window --plot-format=$plot_format
-python group_analysis.py --input-path=$data_path --output-path=$output_path/$plot_type/GC5_NAcprojection --$plot_type --mouse-type='GC5_NAcprojection' --exp-type='homecagenovel' --time-window=$time_window --plot-format=$plot_format
+max_bout_number=15
+python group_analysis.py --input-path=$data_path --output-path=$output_path/$plot_type/GC5 --$plot_type --mouse-type='GC5' --exp-type='homecagesocial' --time-window=$time_window --plot-format=$plot_format --max-bout-number=$max_bout_number
+python group_analysis.py --input-path=$data_path --output-path=$output_path/$plot_type/GC5 --$plot_type --mouse-type='GC5' --exp-type='homecagenovel' --time-window=$time_window --plot-format=$plot_format --max-bout-number=$max_bout_number
+python group_analysis.py --input-path=$data_path --output-path=$output_path/$plot_type/GC5_NAcprojection --$plot_type --mouse-type='GC5_NAcprojection' --exp-type='homecagesocial' --time-window=$time_window --plot-format=$plot_format --max-bout-number=$max_bout_number
+python group_analysis.py --input-path=$data_path --output-path=$output_path/$plot_type/GC5_NAcprojection --$plot_type --mouse-type='GC5_NAcprojection' --exp-type='homecagenovel' --time-window=$time_window --plot-format=$plot_format --max-bout-number=$max_bout_number
 
-if $(false); then
 
 plot_type=group-regression-plot
 metric=event_index
@@ -49,10 +49,11 @@ python group_analysis.py --input-path=$data_path --output-path=$output_path/$plo
 
 
 plot_type=event-length-histogram
-python group_analysis.py --input-path=$data_path --output-path=$output_path/$plot_type/GC5 --$plot_type --mouse-type='GC5' --exp-type='homecagesocial'
-python group_analysis.py --input-path=$data_path --output-path=$output_path/$plot_type/GC5 --$plot_type --mouse-type='GC5' --exp-type='homecagenovel' 
-python group_analysis.py --input-path=$data_path --output-path=$output_path/$plot_type/GC5_NAcprojection --$plot_type --mouse-type='GC5_NAcprojection' --exp-type='homecagesocial' 
-python group_analysis.py --input-path=$data_path --output-path=$output_path/$plot_type/GC5_NAcprojection --$plot_type --mouse-type='GC5_NAcprojection' --exp-type='homecagenovel' 
+max_bout_number=0
+python group_analysis.py --input-path=$data_path --output-path=$output_path/$plot_type/GC5 --$plot_type --mouse-type='GC5' --exp-type='homecagesocial' --max-bout-number=$max_bout_number
+python group_analysis.py --input-path=$data_path --output-path=$output_path/$plot_type/GC5 --$plot_type --mouse-type='GC5' --exp-type='homecagenovel' --max-bout-number=$max_bout_number
+python group_analysis.py --input-path=$data_path --output-path=$output_path/$plot_type/GC5_NAcprojection --$plot_type --mouse-type='GC5_NAcprojection' --exp-type='homecagesocial' --max-bout-number=$max_bout_number
+python group_analysis.py --input-path=$data_path --output-path=$output_path/$plot_type/GC5_NAcprojection --$plot_type --mouse-type='GC5_NAcprojection' --exp-type='homecagenovel' --max-bout-number=$max_bout_number
 
 plot_type=compare-decay
 max_bout_number=13
@@ -89,6 +90,7 @@ python group_analysis.py --input-path=$data_path --output-path=$output_path/$plo
 python group_analysis.py --input-path=$data_path --output-path=$output_path/$plot_type/GC5_NAcprojection --$plot_type --mouse-type='GC5_NAcprojection' --exp-type='homecagenovel' 
 
 
+if $(false); then
 
 echo done
 fi
