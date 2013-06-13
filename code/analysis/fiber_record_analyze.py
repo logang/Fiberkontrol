@@ -280,6 +280,8 @@ class FiberAnalyze( object ):
         ymin = -1
         ymax = 3.0
 
+        print "max_val", max_val
+
         if exp_type == 'sucrose':
             if ymax_setting == 'small':
                 ymax = 1.0
@@ -353,7 +355,7 @@ class FiberAnalyze( object ):
             fluor_data = fluor_data[window_indices[0]:window_indices[1]]
             trigger_data = trigger_data[window_indices[0]:window_indices[1]]
 
-        [ymax, ymin] = self.get_plot_ylim(self.exp_type, self.fluor_normalization, np.max(fluor_data))
+        [ymax, ymin] = self.get_plot_ylim(self.exp_type, self.fluor_normalization, max_val=np.max(fluor_data))
 
 
         trigger_low = min(trigger_data) + 0.2
@@ -551,8 +553,10 @@ class FiberAnalyze( object ):
         # print "window[1] 2", self.convert_seconds_to_index(start_times[2] + window[1]) - self.convert_seconds_to_index(start_times[2])
         # print "window[1] 3", self.convert_seconds_to_index(start_times[3] + window[1]) - self.convert_seconds_to_index(start_times[3])
 
-        ## THIS COMMENTED BLOCK YIELDS LOGANS PLOTS
+        ## THIS COMMENTED BLOCK YIELDS LOGAN'S ORIGINAL PLOTS
         ## TODO: FIGURE OUT WHETHER THE ABOVE METHOD ALSO WORKS
+        ## The above method does work, the window length is just 
+        ## determined once at the beginning of the time series
         # if intensity_measure == "peak":
         #     intensity = np.zeros(len(start_times))
         #     for i in xrange(len(start_times)):

@@ -185,9 +185,9 @@ def group_regression_plot(all_data,
                     print "No values to plot for", animal_id, dates, exp_type
 
     if time_window[0] == 0 and time_window[1] == 0:
-        pl.xlabel("log " + str(metric) + " intensity during interaction event")
+        pl.xlabel("log " + str(metric) + " during interaction event")
     else:
-        pl.xlabel("log " + str(metric) + " intensity in first " + str(time_window[1]) + " seconds after interaction onset")
+        pl.xlabel("log " + str(metric) + " in first " + str(time_window[1]) + " seconds after interaction onset")
     
     if next_event_measure == "onset":
         pl.ylabel("Log time in seconds until next interaction")
@@ -513,30 +513,6 @@ def group_plot_time_series(all_data, options):
                                   str(int(FA.time_range.split(':')[0])) +  "_" + 
                                   str(int(FA.time_range.split(':')[1])) +"_" ) 
 
-
-
-    # for animal_id in all_data.keys():
-    #     animal = all_data[animal_id]
-    #     for date in animal.keys():
-    #         if options.exp_date is None or options.exp_date == date:
-    #             for exp_type in animal[date].keys():
-    #                 if options.exp_type is None or exp_type == options.exp_type:
-    #                     FA = FiberAnalyze(options)
-    #                     FA.fluor_normalization = 'deltaF'
-    #                     FA.time_range = '0:-1'
-    #                     [FA, success] = loadFiberAnalyze(FA, options, animal_id, date, exp_type)
-
-    #                     if (success != -1):
-    #                         dir = options.output_path + '/' + FA.exp_type
-    #                         print dir
-    #                         if os.path.isdir(dir) is False:
-    #                             os.makedirs(dir)
-    #                         FA.plot_basic_tseries(out_path = dir + '/' + FA.subject_id + "_" + 
-    #                                               FA.exp_date + "_" + FA.exp_type + "_" + 
-    #                                               str(int(FA.time_range.split(':')[0])) +  "_" + 
-    #                                               str(int(FA.time_range.split(':')[1])) +"_" ) 
-
-
 #----------------------------------------------------------------------------------------
 
 def plot_representative_time_series(options, representative_time_series_specs_file):
@@ -630,45 +606,6 @@ def get_novel_social_pairs(all_data, exp1, exp2, mouse_type = 'GC5'):
     print "Pairs after max filter: ", pairs
 
     return pairs
-
-# def score_of_chunks(ts_arr, metric='area', start_event_times=None, end_event_times=None):
-#     """
-#       MOVED THIS INTO FIBERANALYZE
-#     Given an array of time series chunks, return an array
-#     holding a score for each of these chunks
-
-#     metric can be
-#     'area' (average value of curve),
-#     'peak' (peak fluorescence value), 
-#     'spacing', (time from end of current epoch to beginning of the next)
-#     'epoch_length' (time from beginning of epoch to end of epoch)
-#     """
-#     scores = []
-#     i=0
-#     for ts in ts_arr:
-#         if metric == 'area':
-#             scores.append(np.sum(ts)/len(ts))
-#         elif metric == 'peak':
-#             scores.append(np.max(ts))
-#         elif metric == 'spacing':
-#             if start_event_times is None or end_event_times is None:
-#                 raise ValueError( "start_event_times and end_event_times were not passed to score_of_chunks() in group_analysis.")
-#             else:
-#                 if i == len(start_event_times) - 1:
-#                     scores.append(0)
-#                 else:
-#                     scores.append(start_event_times[i+1] - end_event_times[i])
-#         elif metric == 'epoch_length':
-#             if start_event_times is None or end_event_times is None:
-#                 raise ValueError( "start_event_times and end_event_times were not passed to score_of_chunks() in group_analysis.")
-#             else:
-#                 if i == len(start_event_times) - 1:
-#                     scores.append(0)
-#                 else:
-#                     scores.append(end_event_times[i] - start_event_times[i])
-
-#         i = i + 1
-#     return scores
 
 
 def compileAnimalScoreDictIntoArray(pair_avg_scores):
@@ -1480,11 +1417,19 @@ def set_and_read_options_parser():
                             " bouts, centered in time around the start of the bout, with the color"
                             " in the heatmap representing a fluorescence intensity."))
 
+    parser.add_option("", "--group-bout-ci", dest="group_bout_ci", action="store_true", default=False, 
+                        help=("For each experiment_type, plot the mean of all time series"
+                        " chunks, centered in time around the start of the bout. The mean "
+                        " is determined point by point, as the mean of all time chunks."))
 
     parser.add_option("", "--group-plot-time-series", dest="group_plot_time_series", action="store_true", default=False, 
-                      help=("For each trial, plot perievent heatmaps and time series of individual"
-                            " bouts, centered in time around the start of the bout, with the color"
-                            " in the heatmap representing a fluorescence intensity."))
+                      help=("Save out time series for each trial, overlaid with "
+                            " red lines indicating event epochs."))
+
+    parser.add_option("", "--plot-representative-time-series", dest="plot_representative_time_series", action="store_true", default=False, 
+                  help=("For each trial, plot perievent heatmaps and time series of individual"
+                        " bouts, centered in time around the start of the bout, with the color"
+                        " in the heatmap representing a fluorescence intensity."))
     
     (options, args) = parser.parse_args()
     return (options, args)
@@ -1508,12 +1453,12 @@ if __name__ == "__main__":
         group_bout_heatmaps(all_data, options, 
                             exp_type=options.exp_type, time_window=time_window,
                             max_num_epochs=15, ymax_setting = 'small')
-    elif to_plot == 'group_bout_ci':
+    elif options.group_bout_ci:
         group_bout_ci(all_data, options, exp_type=options.exp_type,
                       time_window=time_window)
-    elif to_plot == 'group_plot_time_series':
+    elif options.group_plot_time_series:
         group_plot_time_series(all_data, options)
-    elif to_plot == 'plot_representative_time_series':
+    elif options.plot_representative_time_series:
         plot_representative_time_series(options, options.representative_time_series_specs_file)
     elif to_plot == 'compare_start_and_end_of_epoch':
         compare_start_and_end_of_epoch(all_data, options, 
