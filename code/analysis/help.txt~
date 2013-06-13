@@ -1,8 +1,9 @@
 --------Preprocessing files---------
-**********************************************************************************
-**Steps for converting raw data (in .npz format as output by fiberkontrol_LED.py)*
-**into flattened data in an hdf5 file, ready for analysis.			 *
-**********************************************************************************
+* Note, that we can make this simpler if we store flattened
+* data in place of the original data. Just use the flattened
+* filenames in analysis_filenames.txt in place of step 4, skip step 6
+* and change the load_flat variable in fiber_record_analyze.py 
+* to be false 
 
 1) Make sure that data files have the format:
 20121105-GC5-homecagesocial-8497-600patch-2012_11_5_19-6_run_number_0.npz
@@ -50,13 +51,3 @@ python preprocessing.py 'path_to_npz' --add-flattened-files -f analysis_filename
 ------------Analyzing files------------
 **See the script make_figures.sh for examples**
 
------------Testing script-------------
-Change the hardcoded paths in tests/test_configuration.json
-
-in the command line type:
-nosetests -v
-
-If you need to generate more test data, see the examples in generate_test_data.sh
-However, be sure not to rerun the script for the already existing data, since 
-mice 0001 through 0004 have a stochastic component and the tests may not pass
-if the data is regenerated.

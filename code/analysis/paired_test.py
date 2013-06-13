@@ -6,6 +6,9 @@ import scipy as sp
 import sys
 
 """
+This was the first iteration of code for comparing two behavioral conditions (exp_types).
+This code is deprecated and serves only for reference currently.
+
 This class is for comparing the effect two different trial conditions (i.e. novel object interaction vs. social interaction)
 across a cohort of mice.
 The score used to measure the effect of each condition is determined by which files are passed in to the class.

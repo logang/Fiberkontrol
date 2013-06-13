@@ -1,3 +1,13 @@
+-create prediction plot where bout number is on the xaxis instead of dF/F
+
+-create test data in order to test prediction plot
+
+-use group_iter_list in:
+     group_regression_plot
+     group_bout_ci
+     get_novel_social_pairs
+
+
 -functions to test:
 --In group_analysis
 	   -loading data
