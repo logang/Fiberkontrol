@@ -1,6 +1,11 @@
 import numpy as np
 from scipy import stats
 
+"""
+This is simple code to produce a bar chart given a list of numbers.
+Not currently in use, but a good reference.
+"""
+
 N = 11
 s = [.45, .34, .60, .39, .80, 1.0, .43, .17, .45, .30, .40, .37]
 n = [.30, .60, 1.0, .29, .35, .75, .20, .32, .59, .66, .79, .37]

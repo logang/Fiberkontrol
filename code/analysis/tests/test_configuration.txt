@@ -1,0 +1,4 @@
+{
+"path_to_raw_data" : "/Users/isaackauvar/Dropbox/Fiberkontrol/Fiberkontrol_Data/Lisa_Data/",
+"analysis_filenames_file" : "tests/test_analysis_filenames.txt"
+}

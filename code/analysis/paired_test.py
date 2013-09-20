@@ -6,6 +6,9 @@ import scipy as sp
 import sys
 
 """
+This was the first iteration of code for comparing two behavioral conditions (exp_types).
+This code is deprecated and serves only for reference currently.
+
 This class is for comparing the effect two different trial conditions (i.e. novel object interaction vs. social interaction)
 across a cohort of mice.
 The score used to measure the effect of each condition is determined by which files are passed in to the class.
@@ -842,50 +845,48 @@ class PairAnalyze( object ):
 				print "normalized area zstatistic: ", zstatistic, " normalized area pvalue: ", pvalue
 
 
-def test_PairAnalyze(options):
-	"""
-	Test the PairAnalyze class.
-	"""
+# def test_PairAnalyze(options):
+# 	"""
+# 	Test the PairAnalyze class.
+# 	"""
 
-	PA = PairAnalyze( options )
-	PA.Load()
-#	PA.CompareAllPeaks()
+# 	PA = PairAnalyze( options )
+# 	PA.Load()
+# #	PA.CompareAllPeaks()
 
-#	PA.CompareEvent(0)
-#	PA.CompareEvent(0, "wilcoxon" )
-#	print "Novel interaction time:"
-	#PA.EventLength_vs_Score(PA.n_scores, PA.n_start_times, PA.n_end_times, PA.n_length_times, just_first=False, title="Novel", out_path=PA.output_path)
-#	print "Social interaction time:"
-	#PA.EventLength_vs_Score(PA.s_scores, PA.s_start_times, PA.s_end_times, PA.s_length_times, just_first=False, title="Social", out_path=PA.output_path)
+# #	PA.CompareEvent(0)
+# #	PA.CompareEvent(0, "wilcoxon" )
+# #	print "Novel interaction time:"
+# 	#PA.EventLength_vs_Score(PA.n_scores, PA.n_start_times, PA.n_end_times, PA.n_length_times, just_first=False, title="Novel", out_path=PA.output_path)
+# #	print "Social interaction time:"
+# 	#PA.EventLength_vs_Score(PA.s_scores, PA.s_start_times, PA.s_end_times, PA.s_length_times, just_first=False, title="Social", out_path=PA.output_path)
 
-	#	PA.CombinedAverage(PA.n_scores, PA.n_start_times, PA.s_scores, PA.s_start_times, titlen='novel', titles='social', score_type='area under curve', out_path=PA.output_path + 'area_')
-	#PA.CombinedAverage(PA.n_scores, PA.n_start_times, PA.s_scores, PA.s_start_times, titlen='novel', titles='social', score_type='peak height', out_path=PA.output_path + 'peak_')
-##	PA.CombinedAverage(PA.n_scores, PA.n_start_times, None, None, titlen='novel', titles='social', score_type='peak height', out_path=PA.output_path + 'peak_')
+# 	#	PA.CombinedAverage(PA.n_scores, PA.n_start_times, PA.s_scores, PA.s_start_times, titlen='novel', titles='social', score_type='area under curve', out_path=PA.output_path + 'area_')
+# 	#PA.CombinedAverage(PA.n_scores, PA.n_start_times, PA.s_scores, PA.s_start_times, titlen='novel', titles='social', score_type='peak height', out_path=PA.output_path + 'peak_')
+# ##	PA.CombinedAverage(PA.n_scores, PA.n_start_times, None, None, titlen='novel', titles='social', score_type='peak height', out_path=PA.output_path + 'peak_')
 
-	###Use this for Before_After decay plots
-	###PA.CombinedAverage(PA.n_scores, None, PA.s_scores, None, titlen='Before', titles='After', score_type=PA.score_type, out_path=PA.output_path + PA.label)
+# 	###Use this for Before_After decay plots
+# 	###PA.CombinedAverage(PA.n_scores, None, PA.s_scores, None, titlen='Before', titles='After', score_type=PA.score_type, out_path=PA.output_path + PA.label)
 
-	####USE THIS FOR SOCIAL VS NOVEL DECAY PLOTS	
-	####PA.CombinedAverage(PA.s_scores, None, None, None, titlen='Social', titles='', score_type=PA.score_type, out_path=PA.output_path + "_social_")
-	####PA.CombinedAverage(PA.n_scores, None, None, None, titlen='Novel', titles='', score_type=PA.score_type, out_path=PA.output_path + "_novel_")	
-	####PA.CombinedAverage(PA.n_scores, None, PA.s_scores, None, titlen='Novel', titles='Social', score_type=PA.score_type, out_path=PA.output_path + PA.label)
-
-
+# 	####USE THIS FOR SOCIAL VS NOVEL DECAY PLOTS	
+# 	####PA.CombinedAverage(PA.s_scores, None, None, None, titlen='Social', titles='', score_type=PA.score_type, out_path=PA.output_path + "_social_")
+# 	####PA.CombinedAverage(PA.n_scores, None, None, None, titlen='Novel', titles='', score_type=PA.score_type, out_path=PA.output_path + "_novel_")	
+# 	####PA.CombinedAverage(PA.n_scores, None, PA.s_scores, None, titlen='Novel', titles='Social', score_type=PA.score_type, out_path=PA.output_path + PA.label)
 
 
-	n_k_array, n_r2_array, n_xp_array, n_pxp_array = PA.GetIndividualDecayRates(PA.n_scores)
-	s_k_array, s_r2_array, s_xp_array, s_pxp_array = PA.GetIndividualDecayRates(PA.s_scores)
-	PA.CompareIndividualDecayRates(n_xp_array, n_pxp_array, PA.n_scores, n_k_array, n_r2_array, PA.n_names, s_xp_array, s_pxp_array, PA.s_scores, s_k_array, s_r2_array, PA.s_names, out_path=PA.output_path,)
-	print PA.n_names
-	print PA.s_names
+# 	n_k_array, n_r2_array, n_xp_array, n_pxp_array = PA.GetIndividualDecayRates(PA.n_scores)
+# 	s_k_array, s_r2_array, s_xp_array, s_pxp_array = PA.GetIndividualDecayRates(PA.s_scores)
+# 	PA.CompareIndividualDecayRates(n_xp_array, n_pxp_array, PA.n_scores, n_k_array, n_r2_array, PA.n_names, s_xp_array, s_pxp_array, PA.s_scores, s_k_array, s_r2_array, PA.s_names, out_path=PA.output_path,)
+# 	print PA.n_names
+# 	print PA.s_names
 
-	plt.show()
+# 	plt.show()
 
 
-#	PA.AverageScores(PA.n_scores, PA.n_start_times, title='Novel', score_type='area', out_path=PA.output_path)
-#	PA.AverageScores(PA.s_scores, PA.s_start_times, title='Social', score_type='area', out_path=PA.output_path)
-	#PA.ScoreHistogram(PA.n_scores, title='Novel', score_type='Peak', out_path=PA.output_path)
-	#PA.ScoreHistogram(PA.s_scores, title='Social', score_type='Peak', out_path=PA.output_path)
+# #	PA.AverageScores(PA.n_scores, PA.n_start_times, title='Novel', score_type='area', out_path=PA.output_path)
+# #	PA.AverageScores(PA.s_scores, PA.s_start_times, title='Social', score_type='area', out_path=PA.output_path)
+# 	#PA.ScoreHistogram(PA.n_scores, title='Novel', score_type='Peak', out_path=PA.output_path)
+# 	#PA.ScoreHistogram(PA.s_scores, title='Social', score_type='Peak', out_path=PA.output_path)
 
 
 
@@ -913,4 +914,4 @@ if __name__ == "__main__":
 
 		(options, args) = parser.parse_args()
 
-		test_PairAnalyze(options)
+		#test_PairAnalyze(options)
