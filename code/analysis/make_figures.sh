@@ -1,12 +1,12 @@
 #!/bin/bash
 
-data_path='/Users/isaackauvar/Documents/2012-2013/ZDlab/FiberKontrol/Results/Cell/all_data_raw_w20130108.h5'
-output_path='/Users/isaackauvar/Documents/2012-2013/ZDlab/FiberKontrol/Results/Cell/Plots/Testing/20130613Presubmission_test'
+data_path='/Users/isaackauvar/Documents/2012-2013/ZDlab/FiberKontrol/Results/Cell/all_data_raw_w20130920.h5'
+output_path='/Users/isaackauvar/Documents/2012-2013/ZDlab/FiberKontrol/Results/Cell/Plots/Finalz_including_20130920'
 
 
 plot_type=group-bout-heatmaps
 time_window='3:3'
-plot_format='.png'
+plot_format='.pdf'
 max_bout_number=15
 python group_analysis.py --input-path=$data_path --output-path=$output_path/$plot_type/GC5 --$plot_type --mouse-type='GC5' --exp-type='homecagesocial' --time-window=$time_window --plot-format=$plot_format --max-bout-number=$max_bout_number
 python group_analysis.py --input-path=$data_path --output-path=$output_path/$plot_type/GC5 --$plot_type --mouse-type='GC5' --exp-type='homecagenovel' --time-window=$time_window --plot-format=$plot_format --max-bout-number=$max_bout_number
@@ -59,22 +59,25 @@ plot_type=compare-decay
 max_bout_number=13
 intensity_metric='peak'
 time_window='0:0'
-python group_analysis.py --input-path=$data_path --output-path=$output_path/$plot_type/GC5 --$plot_type --mouse-type='GC5' --max-bout-number=$max_bout_number --intensity-metric=$intensity_metric --time-window=$time_window
-python group_analysis.py --input-path=$data_path --output-path=$output_path/$plot_type/GC5_NAcprojection --$plot_type --mouse-type='GC5_NAcprojection' --max-bout-number=$max_bout_number --intensity-metric=$intensity_metric --time-window=$time_window
+plot_format='.pdf'
+python group_analysis.py --input-path=$data_path --output-path=$output_path/$plot_type/GC5 --$plot_type --mouse-type='GC5' --max-bout-number=$max_bout_number --intensity-metric=$intensity_metric --time-window=$time_window --plot-format=$plot_format
+python group_analysis.py --input-path=$data_path --output-path=$output_path/$plot_type/GC5_NAcprojection --$plot_type --mouse-type='GC5_NAcprojection' --max-bout-number=$max_bout_number --intensity-metric=$intensity_metric --time-window=$time_window --plot-format=$plot_format
 
 plot_type=compare-start-and-end-of-epoch
 max_bout_number=0
 intensity_metric='peak'
 time_window='0:.5'
-python group_analysis.py --input-path=$data_path --output-path=$output_path/$plot_type/GC5 --$plot_type --mouse-type='GC5' --max-bout-number=$max_bout_number --intensity-metric=$intensity_metric --time-window=$time_window
-python group_analysis.py --input-path=$data_path --output-path=$output_path/$plot_type/GC5_NAcprojection --$plot_type --mouse-type='GC5_NAcprojection' --max-bout-number=$max_bout_number --intensity-metric=$intensity_metric --time-window=$time_window
+plot_format='.pdf'
+python group_analysis.py --input-path=$data_path --output-path=$output_path/$plot_type/GC5 --$plot_type --mouse-type='GC5' --max-bout-number=$max_bout_number --intensity-metric=$intensity_metric --time-window=$time_window --plot-format=$plot_format
+python group_analysis.py --input-path=$data_path --output-path=$output_path/$plot_type/GC5_NAcprojection --$plot_type --mouse-type='GC5_NAcprojection' --max-bout-number=$max_bout_number --intensity-metric=$intensity_metric --time-window=$time_window --plot-format=$plot_format
 
 plot_type=compare-epochs
 max_bout_number=10
 intensity_metric='peak'
 time_window='0:0'
-python group_analysis.py --input-path=$data_path --output-path=$output_path/$plot_type/GC5 --$plot_type --mouse-type='GC5' --max-bout-number=$max_bout_number --intensity-metric=$intensity_metric --time-window=$time_window
-python group_analysis.py --input-path=$data_path --output-path=$output_path/$plot_type/GC5_NAcprojection --$plot_type --mouse-type='GC5_NAcprojection' --max-bout-number=$max_bout_number --intensity-metric=$intensity_metric --time-window=$time_window
+plot_format='.pdf'
+python group_analysis.py --input-path=$data_path --output-path=$output_path/$plot_type/GC5 --$plot_type --mouse-type='GC5' --max-bout-number=$max_bout_number --intensity-metric=$intensity_metric --time-window=$time_window --plot-format=$plot_format
+python group_analysis.py --input-path=$data_path --output-path=$output_path/$plot_type/GC5_NAcprojection --$plot_type --mouse-type='GC5_NAcprojection' --max-bout-number=$max_bout_number --intensity-metric=$intensity_metric --time-window=$time_window --plot-format=$plot_format
 
 plot_type=plot-representative-time-series
 representative_time_series_specs_file='representative_time_series_specs.txt'

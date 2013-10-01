@@ -837,17 +837,20 @@ def plotEpochComparison(options,
                         animal_list,
                         ):
 
+    #    colors = ['g', 'b']
+    colors = ['#96C681', '#3d7a23'] #dark green and light green
+
     plt.close('all')
     plt.figure()
-    p1, = plt.plot(exp_scores[exp1], 'o')
-    p2, = plt.plot(exp_scores[exp2], 'o')
+    p1, = plt.plot(exp_scores[exp1], 'o', markerfacecolor=colors[0])
+    p2, = plt.plot(exp_scores[exp2], 'o', markerfacecolor=colors[1])
     plt.legend([p1, p2], [exp1, exp2])
     plt.xlabel('Mouse (one mouse per column)')
     if time_window[0] == 0 and time_window[1] == 0:
-        plt.ylabel( metric + ' w/in entire epoch, avged across epochs)')
+        plt.ylabel( metric + ' w/in entire epoch, avged across epochs')
     else:
         plt.ylabel( metric + ' w/in ' + 
-                    str(time_window[1]) + 's window, avged across epochs)')
+                    str(time_window[1]) + 's window, avged across epochs')
     plt.title('Comparison of ' + metric + 
               ' between ' + exp1 + ' and ' + 
               exp2 + '. p < ' + str(pvalue)) 
@@ -1163,7 +1166,8 @@ def plot_decay(options,
     if max_bout_number == 0:
         max_bout_number = len(bout_avg_dict[bout_avg_dict.keys()[0]])
 
-    colors = ['g', 'b']
+#    colors = ['g', 'b']
+    colors = ['#96C681', '#3d7a23'] #dark green and light green
 
     fig = plt.figure()  
     ax = fig.add_subplot(111)
