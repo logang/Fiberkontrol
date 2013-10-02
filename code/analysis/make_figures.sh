@@ -4,6 +4,17 @@ data_path='/Users/isaackauvar/Documents/2012-2013/ZDlab/FiberKontrol/Results/Cel
 output_path='/Users/isaackauvar/Documents/2012-2013/ZDlab/FiberKontrol/Results/Cell/Plots/Finalz_including_20130920'
 
 
+plot_type=print-spike-times
+time_window='3:3'
+max_bout_number=15
+python group_analysis.py --input-path=$data_path --output-path=$output_path/$plot_type/GC5 --$plot_type --mouse-type='GC5' --exp-type='homecagesocial' --time-window=$time_window --max-bout-number=$max_bout_number
+python group_analysis.py --input-path=$data_path --output-path=$output_path/$plot_type/GC5 --$plot_type --mouse-type='GC5' --exp-type='homecagenovel' --time-window=$time_window  --max-bout-number=$max_bout_number
+python group_analysis.py --input-path=$data_path --output-path=$output_path/$plot_type/GC5_NAcprojection --$plot_type --mouse-type='GC5_NAcprojection' --exp-type='homecagesocial' --time-window=$time_window --max-bout-number=$max_bout_number
+python group_analysis.py --input-path=$data_path --output-path=$output_path/$plot_type/GC5_NAcprojection --$plot_type --mouse-type='GC5_NAcprojection' --exp-type='homecagenovel' --time-window=$time_window --max-bout-number=$max_bout_number
+
+
+if $(false); then
+
 plot_type=group-bout-heatmaps
 time_window='3:3'
 plot_format='.pdf'
@@ -93,7 +104,7 @@ python group_analysis.py --input-path=$data_path --output-path=$output_path/$plo
 python group_analysis.py --input-path=$data_path --output-path=$output_path/$plot_type/GC5_NAcprojection --$plot_type --mouse-type='GC5_NAcprojection' --exp-type='homecagenovel' 
 
 
-if $(false); then
+
 echo you can use the section inside the if statement to comment out commands
 echo done
 fi

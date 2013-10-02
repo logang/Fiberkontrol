@@ -212,6 +212,102 @@ def group_regression_plot(all_data,
 
 #------------------------------------------------------------------------------
 
+def print_spike_times(all_data,
+                      options,
+                      exp_type,
+                      max_num_epochs,
+                      time_window,
+                      event_edge="rising",
+                      baseline_window='full',):
+    """
+    Save a text file that lists, for each mouse trial,
+    the time (since the beginning of the trial, in seconds),
+    of the peak fluorescence in the time window (i.e. [3,3])
+    surrounding the beginning of each interaction event
+    """
+
+    [iter_list, animal_id_list, date_list, exp_type_list] = group_iter_list(all_data, options)
+
+    all_peak_times_dict = dict()
+    all_peak_vals_dict = dict()
+    all_local_times_dict = dict()
+
+
+    for exp in iter_list:
+        animal_id = exp['animal_id']
+        date = exp['date']
+        exp_type = exp['exp_type']
+
+        dict_key = str(animal_id) + '_' + str(date) + '_' + str(exp_type)
+        print "dict_key", dict_key
+        all_peak_times_dict[dict_key] = np.array([])
+        all_peak_vals_dict[dict_key] = np.array([])
+        all_local_times_dict[dict_key] = np.array([])
+
+
+        FA = FiberAnalyze(options)
+        [FA, success] = loadFiberAnalyze(FA,
+                                         options, 
+                                         animal_id, 
+                                         date, 
+                                         exp_type)
+
+        if(success!=-1):
+            event_times = FA.get_event_times(edge=event_edge, 
+                                             #nseconds=float(options.event_spacing), 
+                                             exp_type=exp_type)
+            if len(event_times) > 0:
+                if max_num_epochs > 0:
+                    event_times = event_times[0:max_num_epochs]
+
+                print "baseline_window", baseline_window
+                time_arr = np.asarray( FA.get_time_chunks_around_events(
+                                            FA.fluor_data, 
+                                            event_times, 
+                                            time_window, 
+                                            baseline_window=baseline_window) )
+
+                for i in range(len(time_arr)):
+                    chunk = time_arr[i]
+                    event_time = event_times[i]
+
+                    max_index = np.argmax(chunk)
+                    max_val = np.amax(chunk)
+                    max_time = FA.time_stamps[FA.convert_seconds_to_index(event_time - time_window[0]) 
+                                                + max_index]
+                    all_peak_times_dict[dict_key] = np.append(all_peak_times_dict[dict_key], 
+                                                              max_time)
+                    all_local_times_dict[dict_key] = np.append(all_local_times_dict[dict_key], 
+                                                              max_time - event_time)
+                    all_peak_vals_dict[dict_key] = np.append(all_peak_vals_dict[dict_key], 
+                                                              max_val)
+
+    if options.output_path is not None:
+        import os
+        import csv
+        outdir = os.path.join(options.output_path, options.exp_type)
+        if not os.path.isdir(outdir):
+            os.makedirs(outdir)
+
+        path = outdir+'/'+'list_of_event_times_'+options.mouse_type+'_'+ options.exp_type+'.txt'
+        f = open(path,'w')
+        f.write('time,\t fluor_value, \ttime_relative_to_event_time\n\n')
+
+        for key in all_peak_times_dict.keys():
+            f.write('\n' + str(key) + ',\n')
+            for i in range(len(all_peak_times_dict[key])):
+                time = all_peak_times_dict[key][i]
+                val = all_peak_vals_dict[key][i]
+                local = all_local_times_dict[key][i]
+                f.write("%.2f" % time + ',\t' + "%.2f" % val + ',\t\t' + "%.2f" % local+'\n')
+
+        f.close()
+        print path
+
+
+
+
+
 def group_bout_heatmaps(all_data, 
                         options, 
                         exp_type, 
@@ -1440,6 +1536,11 @@ def set_and_read_options_parser():
                       help=("Plot a histogram of the event length of all bouts "
                             "across all trial of a given exp_type."))
 
+    parser.add_option("", "--print-spike-times", dest="print_spike_times", 
+                      action="store_true", default=False, 
+                      help=("Print a list of all peaks in fluorescence "
+                            "during event times across all trials of all mice."))
+
     
     (options, args) = parser.parse_args()
     return (options, args)
@@ -1502,6 +1603,10 @@ if __name__ == "__main__":
         event_length_histogram(all_data, options, max_bout_number=int(options.max_bout_number),
                                make_plot=True)
 
+    elif options.print_spike_times:
+        print_spike_times(all_data, options, exp_type=options.exp_type,
+                            max_num_epochs=int(options.max_bout_number), 
+                            time_window=time_window, event_edge="rising")
 
 
 # EOF
