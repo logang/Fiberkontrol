@@ -10,6 +10,7 @@ import sys
 import scipy as sp
 import scipy.stats as stats
 from state_space import denoise
+import pickle
 
 import fiber_record_analyze as fra 
 from fiber_record_analyze import FiberAnalyze
@@ -293,6 +294,15 @@ def print_spike_times(all_data,
         f = open(path,'w')
         f.write('time,\t fluor_value, \ttime_relative_to_event_time\n\n')
 
+        ## Save file as a pickle for easy loading back into python
+        pickle_path = options.output_path+'/'+'list_of_event_times_'+options.mouse_type+'_'+ options.exp_type+'.pkl'
+        output = open(pickle_path, 'wb')
+        pickle.dump(all_peak_times_dict, output)
+        pickle.dump(all_peak_vals_dict, output)
+        pickle.dump(all_local_times_dict, output)
+        output.close()
+
+        ## Save file in a human readable format for easy manual checking
         for key in all_peak_times_dict.keys():
             f.write('\n' + str(key) + ',\n')
             for i in range(len(all_peak_times_dict[key])):
