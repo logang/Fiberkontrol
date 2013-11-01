@@ -224,7 +224,13 @@ def print_spike_times(all_data,
     Save a text file that lists, for each mouse trial,
     the time (since the beginning of the trial, in seconds),
     of the peak fluorescence in the time window (i.e. [3,3])
-    surrounding the beginning of each interaction event
+    surrounding the beginning of each interaction event. 
+
+    Return dicts (keys: animalid_date_exptype) where each 
+    key corresponds to a trial, and contains an array with 
+    the peak times, the peak fluorescence values, the 
+    time of the peak with respect to the behavior interaction
+    start time, and the behavior interaction end time. 
     """
 
     [iter_list, animal_id_list, date_list, exp_type_list] = group_iter_list(all_data, options)
@@ -232,6 +238,8 @@ def print_spike_times(all_data,
     all_peak_times_dict = dict()
     all_peak_vals_dict = dict()
     all_local_times_dict = dict()
+    all_interaction_start_times_dict = dict()
+    all_interaction_end_times_dict = dict()
 
 
     for exp in iter_list:
@@ -244,6 +252,8 @@ def print_spike_times(all_data,
         all_peak_times_dict[dict_key] = np.array([])
         all_peak_vals_dict[dict_key] = np.array([])
         all_local_times_dict[dict_key] = np.array([])
+        all_interaction_start_times_dict[dict_key] = np.array([])
+        all_interaction_end_times_dict[dict_key] = np.array([])
 
 
         FA = FiberAnalyze(options)
@@ -254,9 +264,12 @@ def print_spike_times(all_data,
                                          exp_type)
 
         if(success!=-1):
-            event_times = FA.get_event_times(edge=event_edge, 
-                                             #nseconds=float(options.event_spacing), 
+            event_times = FA.get_event_times(edge="rising", 
                                              exp_type=exp_type)
+
+            end_event_times = FA.get_event_times(edge="falling", 
+                                     exp_type=exp_type)
+
             if len(event_times) > 0:
                 if max_num_epochs > 0:
                     event_times = event_times[0:max_num_epochs]
@@ -271,6 +284,7 @@ def print_spike_times(all_data,
                 for i in range(len(time_arr)):
                     chunk = time_arr[i]
                     event_time = event_times[i]
+                    end_event_time = end_event_times[i]
 
                     max_index = np.argmax(chunk)
                     max_val = np.amax(chunk)
@@ -282,6 +296,12 @@ def print_spike_times(all_data,
                                                               max_time - event_time)
                     all_peak_vals_dict[dict_key] = np.append(all_peak_vals_dict[dict_key], 
                                                               max_val)
+                    all_interaction_start_times_dict[dict_key] = np.append(
+                                                    all_interaction_start_times_dict[dict_key],
+                                                    event_time)
+                    all_interaction_end_times_dict[dict_key] = np.append(
+                                                    all_interaction_end_times_dict[dict_key],
+                                                    end_event_time)
 
     if options.output_path is not None:
         import os
@@ -290,26 +310,30 @@ def print_spike_times(all_data,
         if not os.path.isdir(outdir):
             os.makedirs(outdir)
 
-        path = outdir+'/'+'list_of_event_times_'+options.mouse_type+'_'+ options.exp_type+'.txt'
-        f = open(path,'w')
-        f.write('time,\t fluor_value, \ttime_relative_to_event_time\n\n')
-
         ## Save file as a pickle for easy loading back into python
         pickle_path = options.output_path+'/'+'list_of_event_times_'+options.mouse_type+'_'+ options.exp_type+'.pkl'
         output = open(pickle_path, 'wb')
         pickle.dump(all_peak_times_dict, output)
         pickle.dump(all_peak_vals_dict, output)
         pickle.dump(all_local_times_dict, output)
+        pickle.dump(all_interaction_start_times_dict, output)
+        pickle.dump(all_interaction_end_times_dict, output)
         output.close()
 
         ## Save file in a human readable format for easy manual checking
+        path = outdir+'/'+'list_of_event_times_'+options.mouse_type+'_'+ options.exp_type+'.txt'
+        f = open(path,'w')
+        f.write('time,\t fluor_value, \t\ttime_relative_to_event_time\tinteraction_start\tinteraction_end\n\n')
         for key in all_peak_times_dict.keys():
             f.write('\n' + str(key) + ',\n')
             for i in range(len(all_peak_times_dict[key])):
                 time = all_peak_times_dict[key][i]
                 val = all_peak_vals_dict[key][i]
                 local = all_local_times_dict[key][i]
-                f.write("%.2f" % time + ',\t' + "%.2f" % val + ',\t\t' + "%.2f" % local+'\n')
+                start_time = all_interaction_start_times_dict[key][i]
+                end_time = all_interaction_end_times_dict[key][i]
+                f.write("%.2f" % time + ',\t' + "%.2f" % val + ',\t\t' + "%.2f" % local
+                        +',\t' + "%.2f" % start_time+',\t' + "%.2f" % end_time+'\n')
 
         f.close()
         print path
@@ -1589,11 +1613,19 @@ if __name__ == "__main__":
         plot_representative_time_series(options, options.representative_time_series_specs_file)
 
     elif options.compare_epochs:
-        compare_epochs(all_data, options, 
-                       exp1='homecagenovel', exp2='homecagesocial', 
-                       time_window=time_window, metric=options.intensity_metric,
-                       test='wilcoxon', make_plot=True, max_bout_number=int(options.max_bout_number), 
-                       plot_perievent=False)
+        if options.exp_type == 'sucrose':
+            compare_epochs(all_data, options, 
+                           exp1='sucrose', exp2='sucrose', 
+                           time_window=time_window, metric=options.intensity_metric,
+                           test='wilcoxon', make_plot=True, max_bout_number=int(options.max_bout_number), 
+                           plot_perievent=False)
+
+        else:
+            compare_epochs(all_data, options, 
+                           exp1='homecagenovel', exp2='homecagesocial', 
+                           time_window=time_window, metric=options.intensity_metric,
+                           test='wilcoxon', make_plot=True, max_bout_number=int(options.max_bout_number), 
+                           plot_perievent=False)
 
     elif options.compare_start_and_end_of_epoch:
         compare_start_and_end_of_epoch(all_data, options, 
@@ -1615,6 +1647,11 @@ if __name__ == "__main__":
 
     elif options.print_spike_times:
         print_spike_times(all_data, options, exp_type=options.exp_type,
+                            max_num_epochs=int(options.max_bout_number), 
+                            time_window=time_window, event_edge="rising")
+
+    elif options.make_time_series_animations:
+        make_time_series_animations(all_data, options, exp_type=options.exp_type,
                             max_num_epochs=int(options.max_bout_number), 
                             time_window=time_window, event_edge="rising")
 
