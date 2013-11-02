@@ -269,17 +269,24 @@ def print_spike_times(all_data,
 
             end_event_times = FA.get_event_times(edge="falling", 
                                      exp_type=exp_type)
+            
 
             if len(event_times) > 0:
                 if max_num_epochs > 0:
                     event_times = event_times[0:max_num_epochs]
 
                 print "baseline_window", baseline_window
+
+                end_times = None
+                if time_window[0] == 0 and time_window[1] == 0:
+                    end_times = end_event_times
+
                 time_arr = np.asarray( FA.get_time_chunks_around_events(
                                             FA.fluor_data, 
                                             event_times, 
                                             time_window, 
-                                            baseline_window=baseline_window) )
+                                            baseline_window=baseline_window,
+                                            end_event_times = end_times) )
 
                 for i in range(len(time_arr)):
                     chunk = time_arr[i]
@@ -1083,14 +1090,10 @@ def compare_epochs(all_data,
 
             if (success != -1):
                 start_event_times = FA.get_event_times(edge="rising", 
-                                                       #nseconds=float(options.event_spacing),
                                                        exp_type=exp_type)
-                end_event_times = FA.get_event_times(edge="falling", 
-                                                     #nseconds=float(options.event_spacing),
-                                                     exp_type=exp_type)
 
-                print "start_event_times: ", start_event_times
-                print "end_event_times: ", end_event_times
+                end_event_times = FA.get_event_times(edge="falling", 
+                                                     exp_type=exp_type)
 
                 #--Get an array of time series chunks in a window around each event time
                 if time_window[0] == 0 and time_window[1] == 0:
@@ -1646,6 +1649,7 @@ if __name__ == "__main__":
                                make_plot=True)
 
     elif options.print_spike_times:
+        print "time_window", time_window
         print_spike_times(all_data, options, exp_type=options.exp_type,
                             max_num_epochs=int(options.max_bout_number), 
                             time_window=time_window, event_edge="rising")
