@@ -120,6 +120,7 @@ def splice_clips(list_file, output_file):
     cmd += ['-f', 'concat']
     cmd += ['-i', list_file]
     cmd += ['-c', 'copy']
+    cmd += ['-y']
     cmd += [output_file + '_clips.mp4']
     #cmd += ['> /dev/null 2>&1 < /dev/null'] 
 
@@ -209,7 +210,12 @@ def  check_video_format(movie_file, desired_format='.mp4', original_format='.avi
 
 
 
-def cut_into_clips(movie_info, peak_thresh, clip_window, output_file, draw_box=True):
+def cut_into_clips(movie_info, 
+                   peak_thresh, 
+                   clip_window, 
+                   clip_window_origin, 
+                   output_file, 
+                   draw_box=True):
     """
     Given movie_info (which contains a 'movie_file', a 
     list of times at which to cut clips ('peak_times'),
@@ -229,12 +235,15 @@ def cut_into_clips(movie_info, peak_thresh, clip_window, output_file, draw_box=T
     Set clip_window = [0, 0] to use clips of the entire
     behavior interactions (as opposed to a subclip around
     fluorescence peaks).
-    """
-    if clip_window[0] == 0 and clip_window[1] == 0:
-        clip_all_interactions = True
-    else:
-        clip_all_interactions = False
 
+    Set clip_window_origin = 'peak', 'interaction_start'
+    to choose the origin of the clip window (either at
+    the time of the peak fluorescence in an interaction, 
+    or the start of the interaction). That is, the
+    clip_window [a, b] is a window of 'a' seconds before
+    clip_window_origin and 'b' seconds  after
+    clip_window_origin.
+    """
     movie_file = movie_info['movie_file'] + '_tt'
     peak_times = movie_info['peak_times']
     peak_vals = movie_info['peak_vals']
@@ -242,9 +251,14 @@ def cut_into_clips(movie_info, peak_thresh, clip_window, output_file, draw_box=T
     interaction_start_times = movie_info['interaction_start']
     interaction_end_times = movie_info['interaction_end']
 
-    if clip_all_interactions:
-        start_clip_times = interaction_start_times
+    if clip_window[0] == 0 and clip_window[1] == 0:
+        clip_all_interactions = True
     else:
+        clip_all_interactions = False
+
+    if clip_window_origin == 'interaction_start':
+        start_clip_times = interaction_start_times
+    elif clip_window_origin == 'peak':
         start_clip_times = peak_times
 
     clip_list_arr = []
@@ -274,7 +288,12 @@ def cut_into_clips(movie_info, peak_thresh, clip_window, output_file, draw_box=T
                 cmd += ['-t', duration]
                 if draw_box:
                     cmd += ['-vf']
-                    cmd += ['drawbox=0:0:'+str(int(v*1000))+':'+str(int(v*1000))+':red']
+                    cmd += ['drawbox=0:0:100:100:red'+':t=1']
+                    cmd += ['-vf']
+#                    cmd += ['drawbox=0:0:'+str(int(v*1000))+':'+str(int(v*1000))+':red'+]
+#                    cmd += ['drawbox=0:0:100:100:red@'+str(min(1.0, int(v*1000)/100.0))+':t=100']
+                    cmd += ['drawbox=0:0:100:100:red:t='+str(min(100, int(v*1000)/5.0))]
+                cmd += ['-y']
                 cmd += [new_file]
                 #cmd += ['> /dev/null 2>&1 < /dev/null'] #not 100% sure what this does
                                                         # it is supposed to not send
@@ -305,13 +324,19 @@ def interleave_lists(before, after):
     return output
 
 
-def cut_and_splice_clips(movie_info, clip_window, peak_thresh=0.00, divider_clip=None):
+def cut_and_splice_clips(movie_info, 
+                         clip_window, 
+                         clip_window_origin,
+                         peak_thresh=0.00, 
+                         divider_clip=None):
     """
     Given a dict containing the 'movie_file', 'peak_times', 
     'peak_vals', 'start_time', and 'name', splice a movie clip 
     of clip_window[0] seconds before the peak_time and
     clip_window[1] seconds after the peak_time for all times
     in peak_times where peak_val > peak_thresh.
+    If clip_window[1] == 0, then the clip will extend
+    until the end of the behavior interaction period.
     """
 
     movie_file = movie_info['movie_file']
@@ -323,23 +348,24 @@ def cut_and_splice_clips(movie_info, clip_window, peak_thresh=0.00, divider_clip
     if clip_window[0] != 0 and clip_window[1] != 0:
         before_window = [clip_window[0], 0]
         before_clip_list_arr = cut_into_clips(movie_info, peak_thresh, before_window, 
-                                              output_file, draw_box=False)
+                                            clip_window_origin, output_file, draw_box=False)
         after_window = [0, clip_window[1]]
         after_clip_list_arr = cut_into_clips(movie_info, peak_thresh, after_window, 
-                                             output_file, draw_box=True)
+                                             clip_window_origin, output_file, draw_box=True)
         clip_list_arr = interleave_lists(before_clip_list_arr, after_clip_list_arr)
         print 'clip_list_arr', clip_list_arr
-    #if clip_window[0] != 0 and clip_window[1] == 0:
-        # before_window = [clip_window[0], 0]
-        # before_clip_list_arr = cut_into_clips(movie_info, peak_thresh, before_window, 
-        #                                       output_file, draw_box=False)
-        # after_window = [0, 0]
-        # after_clip_list_arr = cut_into_clips(movie_info, peak_thresh, after_window, 
-        #                                      output_file, draw_box=True)
-        # clip_list_arr = interleave_lists(before_clip_list_arr, after_clip_list_arr)
+
+    if clip_window[0] != 0 and clip_window[1] == 0:
+        before_window = [clip_window[0], 0]
+        before_clip_list_arr = cut_into_clips(movie_info, peak_thresh, before_window, 
+                                              clip_window_origin, output_file, draw_box=False)
+        after_window = [0, 0]
+        after_clip_list_arr = cut_into_clips(movie_info, peak_thresh, after_window, 
+                                             clip_window_origin, output_file, draw_box=True)
+        clip_list_arr = interleave_lists(before_clip_list_arr, after_clip_list_arr)
 
     else:
-        clip_list_arr = cut_into_clips(movie_info, peak_thresh, clip_window, output_file)
+        clip_list_arr = cut_into_clips(movie_info, peak_thresh, clip_window, 'peak', output_file)
 
     if divider_clip is not None:
         clip_list_arr_full = interleave_lists(clip_list_arr, 
@@ -373,6 +399,12 @@ if __name__ == '__main__':
                       help="Specify a time window in which to display video clip"
                             " around given time points, in format before:after.")
 
+    parser.add_option("", "--clip-window-origin", dest="clip_window_origin", default='peak',
+                  help="If the clip_window is [a,b], clip_window_origin defines"
+                       "the center of the clip_window. Options are 'peak', the time of "
+                       "the peak fluorescence value in an interaction period, or "
+                       "'interaction_start', the start time of the interaction period.")
+
     parser.add_option("", "--peak-thresh", dest="peak_thresh",default=0.05,
                       help="Specify the threshold (in dF/F) that the signal"
                            "must cross to be considered a peak.")
@@ -382,6 +414,8 @@ if __name__ == '__main__':
                            "to place between each clip in the final compilation.")
 
 
+
+
     (options, args) = parser.parse_args()
 
     print "options.clip_window", options.clip_window
@@ -389,6 +423,7 @@ if __name__ == '__main__':
     output_folder = options.output_folder
     peak_thresh = float(options.peak_thresh)
     divider_clip = options.divider_clip
+    clip_window_origin = options.clip_window_origin
 
     # Check for required input path
     if len(args) < 1:
@@ -405,6 +440,7 @@ if __name__ == '__main__':
     for key in movie_info_dict:
         print key
         cut_and_splice_clips(movie_info_dict[key], clip_window=clip_window, 
+                             clip_window_origin = clip_window_origin,
                              peak_thresh=peak_thresh, divider_clip=divider_clip)
         
         #movie_file = movie_info_dict[key]['movie_file']
@@ -454,6 +490,8 @@ ffmpeg -i /Users/isaackauvar/Documents/2012-2013/ZDlab/Test_video_extract/30fps_
 #checking framerate
 ffmpeg -i 407_social_30.mp4 2>&1 | sed -n "s/.*, \(.*\) fp.*/\1/p"
 
+#Making divider clip
+ffmpeg -r 30 -i black.png -c:v libx264 -r 30 -pix_fmt yuv420p black.mp4
 """
 
 
