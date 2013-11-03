@@ -54,7 +54,6 @@ def load_start_times(start_times_file):
     for line in f:
         info = line.split(',')
         all_start_times_dict[info[0]] = float(info[1])
-        print all_start_times_dict[info[0]]
     f.close()
     return all_start_times_dict
 
@@ -102,8 +101,8 @@ def load_clip_times(clip_list_file, path_to_data, start_times_file, output_folde
         movie_info_dict[key] = movie_info
     return movie_info_dict
 
-def get_time_string(t, prefix):
-    start = t - prefix
+def get_time_string(t):
+    start = t
     hr = int(np.floor(start/3600.0))
     min = int(np.floor((start - hr*3600)/60.0))
     sec = int(start - hr*3600 - min*60)
@@ -253,16 +252,16 @@ def cut_into_clips(movie_info, peak_thresh, clip_window, output_file, draw_box=T
     ## saving to individual files, figure out pipes
     ## after you get this working). 
     for i in range(len(start_clip_times)):
-        t = start_clip_times[i] + start_time
+        t = start_clip_times[i] + start_time - clip_window[0]
         v = peak_vals[i]
-        start = get_time_string(t, clip_window[0])
+        start = get_time_string(t)
         if clip_all_interactions:
             duration = str(interaction_end_times[i] - start_clip_times[i])
         else:
-            duration = str(clip_window[1])
+            duration = str(clip_window[0] + clip_window[1])
+        print 'start', start, 'duration', duration
 
-        print 'start', start, t - clip_window[0], 'duration', duration
-        new_file = output_file+'_'+str(int(t))+'_clip.mp4'
+        new_file = output_file+'_'+str(int(t*10))+'_clip.mp4'
         if v<peak_thresh:
             print "PEAK LESS THAN THRESHOLD: ", v, "thresh: ", peak_thresh
         if v>=peak_thresh or clip_all_interactions:
@@ -273,8 +272,8 @@ def cut_into_clips(movie_info, peak_thresh, clip_window, output_file, draw_box=T
                 cmd += ['-i', movie_file+'.mp4']
                 cmd += ['-ss', start]
                 cmd += ['-t', duration]
-                cmd += ['-vf']
                 if draw_box:
+                    cmd += ['-vf']
                     cmd += ['drawbox=0:0:'+str(int(v*1000))+':'+str(int(v*1000))+':red']
                 cmd += [new_file]
                 #cmd += ['> /dev/null 2>&1 < /dev/null'] #not 100% sure what this does
@@ -282,13 +281,31 @@ def cut_into_clips(movie_info, peak_thresh, clip_window, output_file, draw_box=T
                                                         # output to the PIPE buffer
 
                 cmd_string = ''.join(["%s " % el for el in cmd])
-                # print '-->Running: ', cmd_string
+                print '-->Running: ', cmd_string
                 p = subprocess.Popen(cmd, shell=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                 p.wait()
 
     return clip_list_arr
 
-def cut_and_splice_clips(movie_info, clip_window, peak_thresh=0.00):
+def interleave_lists(before, after):
+    """
+    Interleave two arrays of equal size, 
+    'before' and 'after', yielding an output 
+    array of twice the size, with entries
+    alternating from the the before and 
+    after array.
+    """
+    if len(before) != len(after):
+        print "Error: arrays must of same length in interleave_lists"
+        return None
+    else:
+        output = before + after
+        output[::2] = before
+        output[1::2] = after
+    return output
+
+
+def cut_and_splice_clips(movie_info, clip_window, peak_thresh=0.00, divider_clip=None):
     """
     Given a dict containing the 'movie_file', 'peak_times', 
     'peak_vals', 'start_time', and 'name', splice a movie clip 
@@ -299,10 +316,38 @@ def cut_and_splice_clips(movie_info, clip_window, peak_thresh=0.00):
 
     movie_file = movie_info['movie_file']
     output_file = movie_info['output_file']
-
     check_video_format(movie_file, desired_format='.mp4')
-    clip_list_arr = cut_into_clips(movie_info, peak_thresh, clip_window, output_file)
-    list_file = write_list_file(output_file, clip_list_arr)
+
+
+
+    if clip_window[0] != 0 and clip_window[1] != 0:
+        before_window = [clip_window[0], 0]
+        before_clip_list_arr = cut_into_clips(movie_info, peak_thresh, before_window, 
+                                              output_file, draw_box=False)
+        after_window = [0, clip_window[1]]
+        after_clip_list_arr = cut_into_clips(movie_info, peak_thresh, after_window, 
+                                             output_file, draw_box=True)
+        clip_list_arr = interleave_lists(before_clip_list_arr, after_clip_list_arr)
+        print 'clip_list_arr', clip_list_arr
+    #if clip_window[0] != 0 and clip_window[1] == 0:
+        # before_window = [clip_window[0], 0]
+        # before_clip_list_arr = cut_into_clips(movie_info, peak_thresh, before_window, 
+        #                                       output_file, draw_box=False)
+        # after_window = [0, 0]
+        # after_clip_list_arr = cut_into_clips(movie_info, peak_thresh, after_window, 
+        #                                      output_file, draw_box=True)
+        # clip_list_arr = interleave_lists(before_clip_list_arr, after_clip_list_arr)
+
+    else:
+        clip_list_arr = cut_into_clips(movie_info, peak_thresh, clip_window, output_file)
+
+    if divider_clip is not None:
+        clip_list_arr_full = interleave_lists(clip_list_arr, 
+                                        [divider_clip]*len(clip_list_arr))
+    else:
+        clip_list_arr_full = clip_list_arr
+
+    list_file = write_list_file(output_file, clip_list_arr_full)
     splice_clips(list_file, output_file)
     delete_clips(clip_list_arr)
 
@@ -332,6 +377,10 @@ if __name__ == '__main__':
                       help="Specify the threshold (in dF/F) that the signal"
                            "must cross to be considered a peak.")
 
+    parser.add_option("", "--divider-clip", dest="divider_clip",default=None,
+                      help="Provide the path to a divider clip (such as a black frame .mp4)" 
+                           "to place between each clip in the final compilation.")
+
 
     (options, args) = parser.parse_args()
 
@@ -339,6 +388,7 @@ if __name__ == '__main__':
     clip_window = np.array(options.clip_window.split(':'), dtype='float32') 
     output_folder = options.output_folder
     peak_thresh = float(options.peak_thresh)
+    divider_clip = options.divider_clip
 
     # Check for required input path
     if len(args) < 1:
@@ -355,7 +405,7 @@ if __name__ == '__main__':
     for key in movie_info_dict:
         print key
         cut_and_splice_clips(movie_info_dict[key], clip_window=clip_window, 
-                             peak_thresh=peak_thresh)
+                             peak_thresh=peak_thresh, divider_clip=divider_clip)
         
         #movie_file = movie_info_dict[key]['movie_file']
         #check_video_timestamps(movie_file)
