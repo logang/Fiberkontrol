@@ -5,6 +5,7 @@ import sys
 import pickle
 import os.path
 import os
+import shlex
 
 def get_mouse_info(key):
     """
@@ -74,14 +75,14 @@ def load_clip_times(clip_list_file, path_to_data, start_times_file, output_folde
                 }
         }
     """
+    print "clip_list_file", clip_list_file
     pkl_file = open(clip_list_file, 'rb')
     all_peak_times_dict = pickle.load(pkl_file)
     all_peak_vals_dict = pickle.load(pkl_file)
     all_local_times_dict = pickle.load(pkl_file)
-    all_interaction_start_times_dict = pickle.load(pkl_file)
-    all_interaction_end_times_dict = pickle.load(pkl_file)
+    # all_interaction_start_times_dict = pickle.load(pkl_file)
+    # all_interaction_end_times_dict = pickle.load(pkl_file)
     all_start_times_dict = load_start_times(start_times_file)
-    print 'all_start_times_dict', all_start_times_dict
 
     movie_info_dict = dict()
     for key in all_peak_times_dict.keys():
@@ -93,12 +94,10 @@ def load_clip_times(clip_list_file, path_to_data, start_times_file, output_folde
         movie_info['local_times'] = all_local_times_dict[key]
         movie_info['name'] = key
         movie_info['start_time'] = all_start_times_dict[key] #TO DO - update this to higher precision
-        movie_info['interaction_start'] = all_interaction_start_times_dict[key]
-        movie_info['interaction_end'] = all_interaction_end_times_dict[key]
+        # movie_info['interaction_start'] = all_interaction_start_times_dict[key]
+        # movie_info['interaction_end'] = all_interaction_end_times_dict[key]
 
         movie_info_dict[key] = movie_info
-
-    print movie_info_dict
     return movie_info_dict
 
 def get_time_string(t, prefix):
@@ -157,6 +156,36 @@ def write_list_file(output_file, clip_list_arr):
 
     return list_file
 
+def check_video_timestamps(movie_file, desired_format='.mp4', desired_framerate=30):
+    """
+    Check whether frame rate is 30fps (the original video files should
+    be 10fps). If not, convert framerate, and add timecode stamps
+    to the videos.
+    """
+
+    if not os.path.isfile(movie_file+'_tt'+desired_format):
+        #Convert file to 30 fps
+        cmd = ['ffmpeg', '-i', movie_file+desired_format]
+        cmd += ['-r', str(desired_framerate)]
+        cmd += ['-y', movie_file+'_t'+desired_format]
+        cmd_string = ''.join(["%s " % el for el in cmd])  
+        print '-->Running: ', cmd_string
+        p = subprocess.Popen(cmd, shell=False)
+        p.wait()
+
+        #Add time code to file
+        cmd = 'ffmpeg -i '+movie_file+'_t'+desired_format+' -vf drawtext=\"fontfile=/opt/X11/share/fonts/TTF/VeraMoBd.ttf: timecode=\'00\:00\:00\:00\':rate=30: fontcolor=white@0.8: x=7: y=460\" -an -y '+movie_file+'_tt'+desired_format
+        args = shlex.split(cmd)
+        print args
+        p = subprocess.Popen(args, shell=False)
+        p.wait()
+
+        os.remove(movie_file+'_t'+desired_format)
+
+
+
+
+
 def  check_video_format(movie_file, desired_format='.mp4', original_format='.avi'):
     """
     The original (data) video should be in .avi format. But 
@@ -166,15 +195,21 @@ def  check_video_format(movie_file, desired_format='.mp4', original_format='.avi
     to the desired_format.
     """
 
-    if not os.path.isfile(movie_file+'.avi'):
+    if not os.path.isfile(movie_file+original_format):
         print 'Error. avi file does not exist:'+movie_file+'.avi'
-    if not os.path.isfile(movie_file+'.mp4'):
+    if not os.path.isfile(movie_file+desired_format):
         cmd = ['ffmpeg']
-        cmd += ['-i', movie_file+'.avi']
+        cmd += ['-i', movie_file+original_format]
         cmd += [movie_file+desired_format]
         cmd_string = ''.join(["%s " % el for el in cmd])
         print '-->Running: ', cmd_string
-        subprocess.Popen(cmd, shell=False)
+        p = subprocess.Popen(cmd, shell=False)
+        p.wait()
+
+    check_video_timestamps(movie_file, desired_format='.mp4', desired_framerate=30)
+
+
+
 
 def cut_into_clips(movie_info, peak_thresh, clip_window, output_file):
     """
@@ -210,8 +245,6 @@ def cut_into_clips(movie_info, peak_thresh, clip_window, output_file):
         print 'start', start, t - clip_window[0]
         new_file = output_file+'_'+str(int(t))+'_clip.mp4'
         if v>peak_thresh:
-            print 'i', i
-            print 'clip_list_arr', clip_list_arr
             if len(clip_list_arr) == 0 or clip_list_arr[-1] != new_file:
                 clip_list_arr.append(new_file)
 
@@ -233,7 +266,7 @@ def cut_into_clips(movie_info, peak_thresh, clip_window, output_file):
 
     return clip_list_arr
 
-def cut_and_splice_clips(movie_info, clip_window=[0,2], peak_thresh=0.05):
+def cut_and_splice_clips(movie_info, clip_window, peak_thresh=0.05):
     """
     Given a dict containing the 'movie_file', 'peak_times', 
     'peak_vals', 'start_time', and 'name', splice a movie clip 
@@ -255,7 +288,7 @@ def cut_and_splice_clips(movie_info, clip_window=[0,2], peak_thresh=0.05):
 if __name__ == '__main__':
     ## The path_to_data is the folder containing folders corresponding to each trial date.
     path_to_data='/Users/isaackauvar/Dropbox/Fiberkontrol/Fiberkontrol_Data/Lisa_Data/'
-    start_times_file='/Users/isaackauvar/Dropbox/Fiberkontrol/Fiberkontrol_Data/Lisa_Data/video_start_times.txt'
+    start_times_file='/Users/isaackauvar/Dropbox/Fiberkontrol/Fiberkontrol_Data/Lisa_Data/video_start_times_precise.txt'
 
     ## The path_to_clip_lists is the folder containing multiple .pkl which each contain
     ## three dicts: all_peak_times_dict, all_peak_vals_dict, all_local_times_dict
@@ -268,8 +301,19 @@ if __name__ == '__main__':
                       default='test', 
                       help=("Specify the name (not full path) of the output folder "
                             "to contain the output movies."))
+
+    parser.add_option("", "--behavior-time-window", dest="behavior_time_window",default='0:0',
+                      help="Specify a time window in which to choose peaks, in format before:after.")
+
+    parser.add_option("", "--clip-window", dest="clip_window",default='0:1',
+                      help="Specify a time window in which to display video clip"
+                            " around given time points, in format before:after.")
+
+
     (options, args) = parser.parse_args()
 
+    behavior_time_window = np.array(options.behavior_time_window.split(':'), dtype='float32') 
+    clip_window = np.array(options.clip_window.split(':'), dtype='float32') 
     output_folder = options.output_folder
 
     # Check for required input path
@@ -285,8 +329,11 @@ if __name__ == '__main__':
 
     for key in movie_info_dict:
         print key
-        cut_and_splice_clips(movie_info_dict[key], [0, 1])
+       # cut_and_splice_clips(movie_info_dict[key], clip_window=clip_window)
         
+        movie_file = movie_info_dict[key]['movie_file']
+        #check_video_timestamps(movie_file)
+        #check_video_format(movie_file)
 
 
 
@@ -323,8 +370,14 @@ ffmpeg -i 407_clip.mp4 -i 407_box.mp4  -filter_complex "[0:v] setpts=PTS-STARTPT
 
 
 #convert framerate - this is super sketchy to me, but it won't print the timestamp for the 10fps that the video is at.
+ffmpeg -i 407_social.mp4 -r 30 -y 407_social_30.mp4
 
+#Adding timecode
 ffmpeg -i /Users/isaackauvar/Documents/2012-2013/ZDlab/Test_video_extract/30fps_407_clip.mp4  -vf drawtext="fontfile=/opt/X11/share/fonts/TTF/VeraMoBd.ttf: timecode='00\:00\:00\:00':rate=30: fontcolor=white@0.8: x=7: y=460" -an -y with_text3.mp4
+
+#checking framerate
+ffmpeg -i 407_social_30.mp4 2>&1 | sed -n "s/.*, \(.*\) fp.*/\1/p"
+
 """
 
 
