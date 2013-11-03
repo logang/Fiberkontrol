@@ -241,7 +241,6 @@ def print_spike_times(all_data,
     all_interaction_start_times_dict = dict()
     all_interaction_end_times_dict = dict()
 
-
     for exp in iter_list:
         animal_id = exp['animal_id']
         date = exp['date']
@@ -269,7 +268,7 @@ def print_spike_times(all_data,
 
             end_event_times = FA.get_event_times(edge="falling", 
                                      exp_type=exp_type)
-            
+
 
             if len(event_times) > 0:
                 if max_num_epochs > 0:
@@ -344,6 +343,7 @@ def print_spike_times(all_data,
 
         f.close()
         print path
+
 
 
 
@@ -1429,6 +1429,47 @@ def compare_decay(all_data,
                show_plot=show_plot,
                )
 
+def fluorescence_histogram(all_data, 
+                           options, 
+                           max_bout_number,
+                           make_plot=True,
+                           ):
+    """
+    Plots a histogram of the sqrt of the fluorescence 
+    values across the entire trial, for each trial.
+    """
+
+    [iter_list, animal_id_list, date_list, exp_type_list] = group_iter_list(all_data, options)
+
+    for exp in iter_list:
+        animal_id = exp['animal_id']
+        date = exp['date']
+        exp_type = exp['exp_type']
+
+        FA = FiberAnalyze(options)
+        FA.fluor_normalization = 'deltaF'
+        FA.time_range = '0:-1'
+        [FA, success] = loadFiberAnalyze(FA, options, animal_id, date, exp_type)
+
+        transformed_data = np.sqrt(FA.fluor_data)
+
+        name = str(animal_id)+'_'+str(date)+'_'+str(exp_type)
+        x = np.arange(0.,1.5, 0.01)
+        pl.figure()
+        pl.hist(transformed_data, x)
+        pl.title("Distribution of sqrt(fluorescence): " + name)
+        pl.xlabel("Fluorescence [dF/F]")
+        pl.ylabel("Number of counts")
+        if options.output_path is not None:
+            outdir = os.path.join(options.output_path, options.exp_type)
+            if not os.path.isdir(outdir):
+                os.makedirs(outdir)
+            pl.savefig(outdir+'/'+name+'_fluor_hist' + options.plot_format)
+            print outdir+'/'+name+'_fluor_hist' + options.plot_format
+        else:
+            pl.show()
+
+
 
 def event_length_histogram(all_data, 
                            options, 
@@ -1573,6 +1614,11 @@ def set_and_read_options_parser():
                       help=("Plot a histogram of the event length of all bouts "
                             "across all trial of a given exp_type."))
 
+    parser.add_option("", "--fluorescence-histogram", dest="fluorescence_histogram", 
+                      action="store_true", default=False, 
+                      help=("Plot a histogram for each trial of the value"
+                            "of the fluorescence, transformed by a sqrt."))
+
     parser.add_option("", "--print-spike-times", dest="print_spike_times", 
                       action="store_true", default=False, 
                       help=("Print a list of all peaks in fluorescence "
@@ -1646,6 +1692,10 @@ if __name__ == "__main__":
 
     elif options.event_length_histogram:
         event_length_histogram(all_data, options, max_bout_number=int(options.max_bout_number),
+                               make_plot=True)
+
+    elif options.fluorescence_histogram:
+        fluorescence_histogram(all_data, options, max_bout_number=int(options.max_bout_number),
                                make_plot=True)
 
     elif options.print_spike_times:
