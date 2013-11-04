@@ -268,7 +268,8 @@ def cut_into_clips(movie_info,
     for i in range(len(start_clip_times)):
         t = start_clip_times[i] + start_time - clip_window[0]
         v = peak_vals[i]
-        start = get_time_string(t)
+        #start = get_time_string(t)
+        start = str(t)
         if clip_all_interactions:
             duration = str(interaction_end_times[i] - start_clip_times[i])
         else:
@@ -370,6 +371,7 @@ def cut_and_splice_clips(movie_info,
     if divider_clip is not None:
         clip_list_arr_full = interleave_lists(clip_list_arr, 
                                         [divider_clip]*len(clip_list_arr))
+        print 'clip_list_arr_full', clip_list_arr_full
     else:
         clip_list_arr_full = clip_list_arr
 

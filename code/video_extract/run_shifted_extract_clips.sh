@@ -9,7 +9,20 @@ python extract_clips.py $directory/GC5_NAcprojection/list_of_event_times_GC5_NAc
 python extract_clips.py $directory/GC5/list_of_event_times_GC5_homecagesocial.pkl -o $output --clip-window=$clip_window --peak-thresh=$peak_thresh --clip-window-origin=$clip_window_origin
 python extract_clips.py $directory/GC5/list_of_event_times_GC5_homecagenovel.pkl -o $output --clip-window=$clip_window --peak-thresh=$peak_thresh --clip-window-origin=$clip_window_origin
 
+
 if $(false); then
+
+output='clipwindow_0_1_for_lisa_final'
+clip_window='0:1'
+peak_thresh='0.00'
+clip_window_origin='peak'
+divider_clip='/Users/isaackauvar/Documents/2012-2013/ZDlab/FiberKontrol/Fiberkontrol/code/video_extract/black.mp4'
+python extract_clips.py $directory/GC5_NAcprojection/list_of_event_times_GC5_NAcprojection_homecagesocial.pkl -o $output --clip-window=$clip_window --peak-thresh=$peak_thresh --clip-window-origin=$clip_window_origin --divider-clip=$divider_clip
+python extract_clips.py $directory/GC5_NAcprojection/list_of_event_times_GC5_NAcprojection_homecagenovel.pkl -o $output --clip-window=$clip_window --peak-thresh=$peak_thresh --clip-window-origin=$clip_window_origin --divider-clip=$divider_clip
+python extract_clips.py $directory/GC5/list_of_event_times_GC5_homecagesocial.pkl -o $output --clip-window=$clip_window --peak-thresh=$peak_thresh --clip-window-origin=$clip_window_origin --divider-clip=$divider_clip
+python extract_clips.py $directory/GC5/list_of_event_times_GC5_homecagenovel.pkl -o $output --clip-window=$clip_window --peak-thresh=$peak_thresh --clip-window-origin=$clip_window_origin --divider-clip=$divider_clip
+
+
 
 output='clipwindow_1_1'
 clip_window='1:1'
