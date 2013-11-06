@@ -1306,7 +1306,8 @@ def plot_decay(options,
     ax = fig.add_subplot(111)
     x = np.array(range(max_bout_number))
     y0 = bout_avg_dict[bout_avg_dict.keys()[0]][0:max_bout_number]
-    y1 = bout_avg_dict[bout_avg_dict.keys()[1]][0:max_bout_number]
+    if len(bout_avg_dict.keys()) > 1:
+        y1 = bout_avg_dict[bout_avg_dict.keys()[1]][0:max_bout_number]
 
 
     yvalues = y0
@@ -1314,6 +1315,7 @@ def plot_decay(options,
         xp, pxp, xo, yo, c, k, r2, yxp = fit_exponential(x, np.array(yvalues)+1.0)
         ax.plot(xp, pxp-1, color=colors[0])
         legend0 = bout_avg_dict.keys()[0] + ": decay rate = " + "{0:.2f}".format(k) + ", r^2 = " + "{0:.2f}".format(r2)
+        print legend0
     except:
         legend0 = bout_avg_dict.keys()[0]
         print "Exponential Curve fit did not work"
@@ -1433,6 +1435,7 @@ def fluorescence_histogram(all_data,
                            options, 
                            max_bout_number,
                            make_plot=True,
+
                            ):
     """
     Plots a histogram of the sqrt of the fluorescence 
@@ -1684,11 +1687,19 @@ if __name__ == "__main__":
                                        show_plot=False)
 
     elif options.compare_decay:
-        compare_decay(all_data, options, 
-                      exp1='homecagenovel', exp2='homecagesocial', 
-                      time_window=time_window, metric=options.intensity_metric, 
-                      max_bout_number=int(options.max_bout_number), test='wilcoxon', 
-                      make_plot=True, show_plot=False)
+        if options.exp_type == 'sucrose':
+            compare_decay(all_data, options, 
+                          exp1='sucrose', exp2='sucrose', 
+                          time_window=time_window, metric=options.intensity_metric, 
+                          max_bout_number=int(options.max_bout_number), test='wilcoxon', 
+                          make_plot=True, show_plot=False)
+
+        else:
+            compare_decay(all_data, options, 
+                          exp1='homecagenovel', exp2='homecagesocial', 
+                          time_window=time_window, metric=options.intensity_metric, 
+                          max_bout_number=int(options.max_bout_number), test='wilcoxon', 
+                          make_plot=True, show_plot=False)
 
     elif options.event_length_histogram:
         event_length_histogram(all_data, options, max_bout_number=int(options.max_bout_number),
