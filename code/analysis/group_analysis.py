@@ -14,6 +14,8 @@ import pickle
 
 import fiber_record_analyze as fra 
 from fiber_record_analyze import FiberAnalyze
+import matplotlib.animation as animation
+
 
 def group_iter_list(all_data, options, 
                     exp_type=None, 
@@ -395,7 +397,6 @@ def group_bout_heatmaps(all_data,
 
         if(success!=-1):
             event_times = FA.get_event_times(edge=event_edge, 
-                                             #nseconds=float(options.event_spacing), 
                                              exp_type=exp_type)
             print "len(event_times)", len(event_times)
             if len(event_times) > 0:
@@ -1281,6 +1282,7 @@ def plot_decay(options,
                max_bout_number=0, 
                min_spacing=0,
                show_plot=False,
+               num_curves = 2,
                ):
 
     """
@@ -1293,6 +1295,10 @@ def plot_decay(options,
        n < max_bout_number, again comparing experiment types.
     3) The score of every bout of every mouse (as opposed to the average
         of mice within an experiment type)
+
+    'num_curves' allows you to use this code to plot just one behavior
+    (i.e. sucrose), by setting exp1 = sucrose, exp2 = sucrose in compare_decay().
+    For comparing two behaviors, num_curves should be set to 2.
     """
 
 
@@ -1306,7 +1312,7 @@ def plot_decay(options,
     ax = fig.add_subplot(111)
     x = np.array(range(max_bout_number))
     y0 = bout_avg_dict[bout_avg_dict.keys()[0]][0:max_bout_number]
-    if len(bout_avg_dict.keys()) > 1:
+    if num_curves > 1:
         y1 = bout_avg_dict[bout_avg_dict.keys()[1]][0:max_bout_number]
 
 
@@ -1315,6 +1321,8 @@ def plot_decay(options,
         xp, pxp, xo, yo, c, k, r2, yxp = fit_exponential(x, np.array(yvalues)+1.0)
         ax.plot(xp, pxp-1, color=colors[0])
         legend0 = bout_avg_dict.keys()[0] + ": decay rate = " + "{0:.2f}".format(k) + ", r^2 = " + "{0:.2f}".format(r2)
+        ymin, ymax = ax.get_ylim()
+        ax.set_ylim((0, ymax))
         print legend0
     except:
         legend0 = bout_avg_dict.keys()[0]
@@ -1324,23 +1332,27 @@ def plot_decay(options,
                         yerr=1.96*np.array(bout_std_err[bout_avg_dict.keys()[0]][0:max_bout_number]), 
                         fmt='o', color=colors[0])
 
-    yvalues = y1
-    try:
-        xp, pxp, xo, yo, c, k, r2, yxp = fit_exponential(x, np.array(yvalues)+1.0)
-        ax.plot(xp, pxp-1, color=colors[1])
-        legend1 = bout_avg_dict.keys()[1] + ": decay rate = " + "{0:.2f}".format(k) + ", r^2 = " + "{0:.2f}".format(r2)
-    except:
-        legend1 = bout_avg_dict.keys()[1]
-        print "Exponential Curve fit did not work"
+    if num_curves > 1:
+        yvalues = y1
+        try:
+            xp, pxp, xo, yo, c, k, r2, yxp = fit_exponential(x, np.array(yvalues)+1.0)
+            ax.plot(xp, pxp-1, color=colors[1])
+            legend1 = bout_avg_dict.keys()[1] + ": decay rate = " + "{0:.2f}".format(k) + ", r^2 = " + "{0:.2f}".format(r2)
+        except:
+            legend1 = bout_avg_dict.keys()[1]
+            print "Exponential Curve fit did not work"
 
-    plot1 = ax.errorbar(x, y1, 
-                        yerr=1.96*np.array(bout_std_err[bout_avg_dict.keys()[1]][0:max_bout_number]), 
-                        fmt='o', color=colors[1])
+        plot1 = ax.errorbar(x, y1, 
+                            yerr=1.96*np.array(bout_std_err[bout_avg_dict.keys()[1]][0:max_bout_number]), 
+                            fmt='o', color=colors[1])
 
 
 
+    if num_curves > 1:
+        plt.legend([plot0, plot1], [legend0, legend1])
+    else:
+        plt.legend([plot0], [legend0])
 
-    plt.legend([plot0, plot1], [legend0, legend1])
     plt.xlabel('Bout number')
     plt.title('Average decay over time')
     plt.ylabel('Average ' + metric + ' per bout [dF/F]')
@@ -1355,9 +1367,12 @@ def plot_decay(options,
     plt.figure()
     plot0, = plt.plot(bout_count_dict[bout_count_dict.keys()[0]][0:max_bout_number],  
                         color=colors[0])
-    plot1, = plt.plot(bout_count_dict[bout_count_dict.keys()[1]][0:max_bout_number],  
-                        color=colors[1])
-    plt.legend([plot0, plot1], bout_count_dict.keys())
+    if num_curves > 1:
+        plot1, = plt.plot(bout_count_dict[bout_count_dict.keys()[1]][0:max_bout_number],  
+                            color=colors[1])
+        plt.legend([plot0, plot1], bout_count_dict.keys())
+    else:
+        plt.legend([plot0], bout_count_dict.keys())
     plt.title('Counts of bout number')
 
     plt.figure()
@@ -1418,6 +1433,11 @@ def compare_decay(all_data,
 
     [bout_dict, bout_avg_dict, bout_count_dict, bout_std_err] = get_bout_averages(pair_scores)
 
+    if exp1 == exp2:
+        num_curves = 1
+    else:
+        num_curves = 2
+
     plot_decay(options=options,
                bout_dict=bout_dict, 
                bout_avg_dict=bout_avg_dict, 
@@ -1429,6 +1449,7 @@ def compare_decay(all_data,
                max_bout_number=max_bout_number,
                min_spacing=options.event_spacing,
                show_plot=show_plot,
+               num_curves = num_curves,
                )
 
 def fluorescence_histogram(all_data, 
@@ -1526,6 +1547,129 @@ def event_length_histogram(all_data,
     else:
         pl.show()
 
+def time_series_animation(  all_data, 
+                            options, 
+                            set_exp_type, 
+                            set_animal_id, 
+                            set_exp_date, 
+                            fps=30,
+                            video_format = '.mp4',
+                            plot_type='box',
+                            ):
+    """
+    Outputs a 'video_format' [.mp4, .avi etc..] video with framerate 
+    'fps' animating the fluorescence time series in real time. 
+    You can specify which trials to visualize by setting
+    'set_exp_type', 'set_mouse_number', and 'set_date'.
+    You can choose how the time series is represented by setting 
+    'plot_type' ['box' changes the fill factor of a box (completely
+    full is high fluorescence, just the the outline is low fluorescence),
+    'line' shows a chunk of the time series moving across the screen].
+    The videos are output to options.output_path with 
+    filename: date_animalid_exptype_plottype .
+    """
+
+    [iter_list, animal_id_list, date_list, exp_type_list] = group_iter_list(all_data, options)
+
+    for exp in iter_list:
+        animal_id = exp['animal_id']
+        date = exp['date']
+        exp_type = exp['exp_type']
+        print "set_animal_id", set_animal_id
+        print "animal_id", animal_id
+
+
+        if ((set_animal_id is None or animal_id == set_animal_id)
+            and (set_exp_type is None or exp_type == set_exp_type)
+            and (set_exp_date is None or date == set_exp_date) ):
+
+
+            FA = FiberAnalyze(options)
+            [FA, success] = loadFiberAnalyze(FA,
+                                             options, 
+                                             animal_id, 
+                                             date, 
+                                             exp_type)
+
+            if success != -1:
+                print "success:", animal_id, date, exp_type
+                #make array of frames that match fps
+                frame_times = np.arange(0, np.max(FA.time_stamps), 1.0/fps, dtype=float)
+                frame_indices = np.searchsorted(FA.time_stamps, frame_times)
+                frames = FA.fluor_data[frame_indices]
+                frames = FA.smooth(frames, 2, window_type='gaussian')
+
+
+                print "frame_times", np.max(np.abs(frame_times - FA.time_stamps[frame_indices]))
+                print "frame_indices", frame_indices
+                print "frames", frames
+
+
+                maxf = np.max(frames)
+                minf = np.min(frames)
+                dpi = 100
+
+#                 fig = plt.figure()
+# #                ax = plt.axes([0, 0, 1, 1], frameon=False, axisbg='w')
+#                 ax = fig.add_subplot(111)
+#                 ax.set_aspect('equal')
+#                 ax.get_xaxis().set_visible(False)
+#                 ax.get_yaxis().set_visible(False)
+#                 ax.patch.set_edgecolor('r')
+
+#                 # im = ax.imshow(np.zeros((300, 300)),cmap='gray',interpolation='nearest')
+#                 # im.set_clim([0,1])
+#                 # fig.set_size_inches([5,5])
+#                 #im = ax.plot(1, 'ko', markersize=10)
+#                 rectangle = plt.Rectangle((0, 0), 1, 1, fc='r', ec='r')
+#                 plt.gca().add_patch(rectangle)
+#                 fig.set_size_inches([4,4])
+
+                # ax.axis([-1, 10, -1, 10])
+                # fig.set_size_inches([5,5])
+
+                fig = plt.figure()
+                fig.set_facecolor('w')
+                ax = plt.axes(frameon=False)
+                ax.set_aspect('equal')
+                ax.get_xaxis().set_visible(False)
+                ax.get_yaxis().set_visible(False)
+                bg = plt.Rectangle((0, 0), 1, 1, fc='w', ec='w')
+                plt.gca().add_patch(bg)
+                h = .5
+                rectangle = plt.Rectangle((h - h/2.0, h - h/2.0), h, h, fc='r', ec='r')
+                plt.gca().add_patch(rectangle)
+                fig.set_size_inches([4,4])
+
+                plt.tight_layout(pad=0.0, h_pad=0.1, w_pad=0.1)
+#                plt.tight_layout(rect=(0, 0, 2, 2))
+
+                def update_img(n):
+                    h = (frames[n]-minf)/(maxf - minf)
+                    rectangle.set_height(h)
+                    rectangle.set_width(1.0)
+                    rectangle.set_x(0.0)
+                    rectangle.set_y(0.0)
+                    # rectangle.set_width(h)
+                    # rectangle.set_x(0.5 - h/2.0)
+                    # rectangle.set_y(0.5 - h/2.0)
+                    #rectangle.set_alpha(0.1)
+                    return rectangle
+
+                import time
+                starttime = time.time()
+                nframes = len(frames) - 1#- 14000
+                print "LEN(FRAMES)", nframes
+                ani = animation.FuncAnimation(fig,update_img, frames=nframes, interval=30)
+                writer = animation.writers['ffmpeg'](fps=30)
+
+                outpath = options.output_path+str(date)+'_'+str(animal_id)+'_'+str(exp_type)+'.mp4'
+                ani.save(outpath,writer=writer,dpi=dpi)
+                print "Total time: ", time.time() - starttime
+                print "saved", outpath
+                return ani
+
+
 
 
 #-------------------------------------------------------------------------------------------
@@ -1540,6 +1684,9 @@ def set_and_read_options_parser():
     parser.add_option("", "--exp-date", dest="exp_date", default=None,
                        help="Limit group analysis to trials of a specific date ")
 
+    parser.add_option("", "--animal-id", dest="animal_id", default=None,
+                   help="Limit group analysis to trials of a specific animal ")
+
     parser.add_option("", "--representative-time-series-specs-file", 
                       dest="representative_time_series_specs_file", 
                       default='representative_time_series_specs.txt',
@@ -1547,7 +1694,13 @@ def set_and_read_options_parser():
                             "animal# date start_in_secs end_in_secs exp_type smoothness"))
 
     parser.add_option("", "--plot-format", dest="plot_format", default='.png',
-                      help="Image format for saving plots: '.png', '.pdf', '.svg', '.tiff'")
+                      help="Image format for saving plots: '.png', '.pdf', '.svg', '.tiff'"
+                           "Or if making a video, set video format: '.mp4', '.avi'")
+
+    parser.add_option("", "--animation-plot-type", dest="animation_plot_type", default='box',
+                      help="Choose whether to animate time series with 'line' trace,"
+                           "or 'box' plot with thickness of border varying according to"
+                           "fluorescence value. ")
 
     #Various plot types
     parser.add_option("", "--intensity-metric", dest="intensity_metric", default='average',
@@ -1627,6 +1780,12 @@ def set_and_read_options_parser():
                       help=("Print a list of all peaks in fluorescence "
                             "during event times across all trials of all mice."))
 
+    parser.add_option("", "--time-series-animation", dest="time_series_animation", 
+                      action="store_true", default=False, 
+                      help=("Produce a video of video format: 'plot_format' "
+                            "animating the time series trace in real time."))
+
+
     
     (options, args) = parser.parse_args()
     return (options, args)
@@ -1682,7 +1841,7 @@ if __name__ == "__main__":
     elif options.compare_start_and_end_of_epoch:
         compare_start_and_end_of_epoch(all_data, options, 
                                        exp1='homecagesocial', exp2='homecagenovel', 
-                                       time_window=[0, .5], metric=options.intensity_metric, test='wilcoxon',
+                                       time_window=time_window, metric=options.intensity_metric, test='wilcoxon',
                                        plot_perievent=False, max_bout_number=int(options.max_bout_number),
                                        show_plot=False)
 
@@ -1715,10 +1874,14 @@ if __name__ == "__main__":
                             max_num_epochs=int(options.max_bout_number), 
                             time_window=time_window, event_edge="rising")
 
-    elif options.make_time_series_animations:
-        make_time_series_animations(all_data, options, exp_type=options.exp_type,
-                            max_num_epochs=int(options.max_bout_number), 
-                            time_window=time_window, event_edge="rising")
+    elif options.time_series_animation:
+        time_series_animation(all_data, options, set_exp_type=options.exp_type, 
+                                set_animal_id=options.animal_id, 
+                                set_exp_date=options.exp_date,
+                                fps=30,
+                                video_format=options.plot_format,
+                                plot_type='box',
+                                )        
 
 
 # EOF
