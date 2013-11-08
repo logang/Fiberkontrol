@@ -38,10 +38,10 @@ def get_movie_file(key, path_to_data):
     movie_file = path_to_data+date+'/'+mouse_number+'_'+exp_type
     return movie_file
 
-def get_output_file(key, path_to_data, output_folder):
+def get_output_file(key, path_to_data, output_dir):
     mouse_number, date, exp_type = get_mouse_info(key)
 
-    output_dir = path_to_data+date+'/'+output_folder
+#    output_dir = path_to_data+date+'/'+output_folder
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
     output_file = output_dir+'/'+mouse_number+'_'+exp_type
@@ -58,7 +58,7 @@ def load_start_times(start_times_file):
     return all_start_times_dict
 
 
-def load_clip_times(clip_list_file, path_to_data, start_times_file, output_folder):
+def load_clip_times(clip_list_file, path_to_data, start_times_file, output_dir):
     """
     Loads the three dictionaries all_peak_times_dict, all_peak_vals_dict, 
     and all_local_times_dict from the provided .pkl clip_list_file, which
@@ -89,7 +89,7 @@ def load_clip_times(clip_list_file, path_to_data, start_times_file, output_folde
     for key in all_peak_times_dict.keys():
         movie_info = dict()
         movie_info['movie_file'] = get_movie_file(key, path_to_data)
-        movie_info['output_file'] = get_output_file(key, path_to_data, output_folder)
+        movie_info['output_file'] = get_output_file(key, path_to_data, output_dir)
         movie_info['peak_times'] = all_peak_times_dict[key]
         movie_info['peak_vals'] = all_peak_vals_dict[key]
         movie_info['local_times'] = all_local_times_dict[key]
@@ -144,9 +144,10 @@ def delete_clips(clip_list_arr):
 def write_list_file(output_file, clip_list_arr):
     """
     Write all clip filenames to a text file for use
-    by ffmpeg concat (i.e. the function splice_clips).
+    by ffmpeg concat (i.e. by the function splice_clips()).
     """
     list_file = output_file+'_clip_list.txt'
+    print "list_file: ", list_file
     f = open(list_file, 'w')
     for clip in clip_list_arr:
         line = 'file '+clip
@@ -219,12 +220,13 @@ def cut_into_clips(movie_info,
     """
     Given movie_info (which contains a 'movie_file', a 
     list of times at which to cut clips ('peak_times'),
-    and values to judge the quality of the clip against
+    values to judge the quality of the clip against
     a threshold ('peak_vals', vs. 'peak_thresh'), and a 
     'start_time' which indicates the length in seconds
-    of buffer at the beginning of the video which
-    must be added to the listed times in 'peak_times',
-    cuts clips and saves them using the output_file
+    of buffer at the beginning of the video before 
+    the LED flashes to indicate the start of fluorescence
+    recording and which must be added to the listed times 
+    in 'peak_times', cuts clips and saves them using the output_file
     template (i.e. path/movie_name).
 
     Returns an array listing the file paths to each
@@ -325,6 +327,56 @@ def interleave_lists(before, after):
     return output
 
 
+    
+def generate_clips(movie_info, clip_window, clip_window_origin,
+                   peak_thresh, divider_clip):
+    '''
+    A wrapper function for cut_into_clips() which
+    handles edge cases in the format of clip_window.
+    In particular if clip_window=[0,0], then each clip
+    corresponds to an entire interaction epoch.
+    If clip_window=[T, 0], then each clip corresponds
+    to an entire interaction epoch preceded by
+    a clip of time T.
+
+    Outputs:
+    'clip_list_arr' is the list of clips to be spliced together.
+    'clips_to_delete' lists all clips except the divider_clip file.
+    '''
+
+    movie_file = movie_info['movie_file']
+    output_file = movie_info['output_file']
+
+    if clip_window[0] != 0 and clip_window[1] != 0:
+        before_window = [clip_window[0], 0]
+        before_clip_list_arr = cut_into_clips(movie_info, peak_thresh, before_window, 
+                                            clip_window_origin, output_file, draw_box=False)
+        after_window = [0, clip_window[1]]
+        after_clip_list_arr = cut_into_clips(movie_info, peak_thresh, after_window, 
+                                             clip_window_origin, output_file, draw_box=True)
+        clip_list_arr = interleave_lists(before_clip_list_arr, after_clip_list_arr)
+
+    elif clip_window[0] != 0 and clip_window[1] == 0:
+        before_window = [clip_window[0], 0]
+        before_clip_list_arr = cut_into_clips(movie_info, peak_thresh, before_window, 
+                                              clip_window_origin, output_file, draw_box=False)
+        after_window = [0, 0]
+        after_clip_list_arr = cut_into_clips(movie_info, peak_thresh, after_window, 
+                                             clip_window_origin, output_file, draw_box=True)
+        clip_list_arr = interleave_lists(before_clip_list_arr, after_clip_list_arr)
+    else:
+        clip_list_arr = cut_into_clips(movie_info, peak_thresh, clip_window, 'peak', output_file)
+
+    clips_to_delete = clip_list_arr
+
+    if divider_clip is not None:
+        clip_list_arr = interleave_lists(clip_list_arr, 
+                                        [divider_clip]*len(clip_list_arr))
+
+    return clip_list_arr, clips_to_delete
+
+
+
 def cut_and_splice_clips(movie_info, 
                          clip_window, 
                          clip_window_origin,
@@ -340,81 +392,61 @@ def cut_and_splice_clips(movie_info,
     until the end of the behavior interaction period.
     """
 
-    movie_file = movie_info['movie_file']
+    check_video_format(movie_info['movie_file'], desired_format='.mp4')
+    clip_list_arr, clips_to_delete = generate_clips(movie_info, clip_window, 
+                                     clip_window_origin, peak_thresh, divider_clip)
+
     output_file = movie_info['output_file']
-    check_video_format(movie_file, desired_format='.mp4')
-
-
-
-    if clip_window[0] != 0 and clip_window[1] != 0:
-        before_window = [clip_window[0], 0]
-        before_clip_list_arr = cut_into_clips(movie_info, peak_thresh, before_window, 
-                                            clip_window_origin, output_file, draw_box=False)
-        after_window = [0, clip_window[1]]
-        after_clip_list_arr = cut_into_clips(movie_info, peak_thresh, after_window, 
-                                             clip_window_origin, output_file, draw_box=True)
-        clip_list_arr = interleave_lists(before_clip_list_arr, after_clip_list_arr)
-        print 'clip_list_arr', clip_list_arr
-
-    if clip_window[0] != 0 and clip_window[1] == 0:
-        before_window = [clip_window[0], 0]
-        before_clip_list_arr = cut_into_clips(movie_info, peak_thresh, before_window, 
-                                              clip_window_origin, output_file, draw_box=False)
-        after_window = [0, 0]
-        after_clip_list_arr = cut_into_clips(movie_info, peak_thresh, after_window, 
-                                             clip_window_origin, output_file, draw_box=True)
-        clip_list_arr = interleave_lists(before_clip_list_arr, after_clip_list_arr)
-
-    else:
-        clip_list_arr = cut_into_clips(movie_info, peak_thresh, clip_window, 'peak', output_file)
-
-    if divider_clip is not None:
-        clip_list_arr_full = interleave_lists(clip_list_arr, 
-                                        [divider_clip]*len(clip_list_arr))
-        print 'clip_list_arr_full', clip_list_arr_full
-    else:
-        clip_list_arr_full = clip_list_arr
-
-    list_file = write_list_file(output_file, clip_list_arr_full)
+    list_file = write_list_file(output_file, clip_list_arr)
     splice_clips(list_file, output_file)
-    delete_clips(clip_list_arr)
+    delete_clips(clips_to_delete)
 
 
 if __name__ == '__main__':
     ## The path_to_data is the folder containing folders corresponding to each trial date.
+    ## These folders contain videos for each trial. 
     path_to_data='/Users/isaackauvar/Dropbox/Fiberkontrol/Fiberkontrol_Data/Lisa_Data/'
     start_times_file='/Users/isaackauvar/Dropbox/Fiberkontrol/Fiberkontrol_Data/Lisa_Data/video_start_times_precise.txt'
 
-    ## The path_to_clip_lists is the folder containing multiple .pkl which each contain
-    ## three dicts: all_peak_times_dict, all_peak_vals_dict, all_local_times_dict
-    ## where the key of each dict is a name of the format: 409_20130327_homecagesocial
-    ## and the number of entries for each key is variable.
-   # path_to_clip_lists = '/Users/isaackauvar/Documents/2012-2013/ZDlab/FiberKontrol/Results/Cell/Plots/Finalz_including_20130920/print-spike-times'
-
     parser = OptionParser()
-    parser.add_option("-o", "--output-folder", dest="output_folder", 
+    parser.add_option("-o", "--output-dir", dest="output_dir", 
                       default='test', 
-                      help=("Specify the name (not full path) of the output folder "
-                            "to contain the output movies."))
+                      help=("Specify the full path of the output folder "
+                            "to contain the output movies (no final backslash)."))
 
-    parser.add_option("", "--clip-window", dest="clip_window",default='0:1',
+    parser.add_option("", "--clip-window", dest="clip_window",
+                      default='0:1',
                       help="Specify a time window in which to display video clip"
                             " around given time points, in format before:after.")
 
-    parser.add_option("", "--clip-window-origin", dest="clip_window_origin", default='peak',
-                  help="If the clip_window is [a,b], clip_window_origin defines"
-                       "the center of the clip_window. Options are 'peak', the time of "
-                       "the peak fluorescence value in an interaction period, or "
-                       "'interaction_start', the start time of the interaction period.")
+    parser.add_option("", "--clip-window-origin", dest="clip_window_origin", 
+                      default='peak',
+                      help="If the clip_window is [a,b], clip_window_origin defines"
+                           "the center of the clip_window. Options are 'peak', the time of "
+                           "the peak fluorescence value in an interaction period, or "
+                           "'interaction_start', the start time of the interaction period.")
 
-    parser.add_option("", "--peak-thresh", dest="peak_thresh",default=0.05,
+    parser.add_option("", "--peak-thresh", dest="peak_thresh",
+                      default=0.05,
                       help="Specify the threshold (in dF/F) that the signal"
                            "must cross to be considered a peak.")
 
-    parser.add_option("", "--divider-clip", dest="divider_clip",default=None,
+    parser.add_option("", "--divider-clip", dest="divider_clip",
+                      default=None,
                       help="Provide the path to a divider clip (such as a black frame .mp4)" 
                            "to place between each clip in the final compilation.")
 
+    parser.add_option("", "--animal_id", dest="animal_id", 
+                      default=None,
+                      help="Limit group analysis to trials of a specific animal.")
+
+    parser.add_option("", "--exp-date", dest="exp_date", 
+                      default=None,
+                      help="Limit group analysis to trials of a specific date.")
+
+    parser.add_option("", "--exp-type", dest="exp_type", 
+                      default=None,
+                      help="Limit group analysis to trials of a specific type.")
 
 
 
@@ -422,7 +454,7 @@ if __name__ == '__main__':
 
     print "options.clip_window", options.clip_window
     clip_window = np.array(options.clip_window.split(':'), dtype='float32') 
-    output_folder = options.output_folder
+    output_dir = options.output_dir
     peak_thresh = float(options.peak_thresh)
     divider_clip = options.divider_clip
     clip_window_origin = options.clip_window_origin
@@ -436,11 +468,12 @@ if __name__ == '__main__':
         sys.exit(1)
 
     clip_list_file = args[0]
-    movie_info_dict = load_clip_times(clip_list_file, path_to_data, start_times_file, output_folder)
+    movie_info_dict = load_clip_times(clip_list_file, path_to_data, start_times_file, output_dir)
 
     print "KEYS: ", movie_info_dict.keys()
     for key in movie_info_dict:
         print key
+
         cut_and_splice_clips(movie_info_dict[key], clip_window=clip_window, 
                              clip_window_origin = clip_window_origin,
                              peak_thresh=peak_thresh, divider_clip=divider_clip)
@@ -480,7 +513,7 @@ ffmpeg -i 407_clip.mp4 -vf \
 ffmpeg -i 407_clip.mp4 -vf drawtext="fontfile=/usr/share/fonts/truetype/ttf-dejavu/DejaVuSerif.ttf: text='\%T': fontcolor=white@0.8: x=7: y=460" with_text3.mp4
 
 #for adding an overlay video
-ffmpeg -i 407_clip.mp4 -i 407_box.mp4  -filter_complex "[0:v] setpts=PTS-STARTPTS, scale=640x480 [background]; [1:v] setpts=PTS-STARTPTS, scale=200x100 [upperleft]; [background][upperleft] overlay=shortest=1" -c:v libx264 overlay_output.mp4
+ffmpeg -i 407_clip.mp4 -i 407_box.mp4  -filter_complex "[0:v] setpts=PTS-STARTPTS, scale=640x480 [background]; [1:v] setpts=PTS-STARTPTS, scale=200x200 [upperleft]; [background][upperleft] overlay=shortest=1" -c:v libx264 overlay_output.mp4
 
 
 #convert framerate - this is super sketchy to me, but it won't print the timestamp for the 10fps that the video is at.
@@ -492,8 +525,27 @@ ffmpeg -i /Users/isaackauvar/Documents/2012-2013/ZDlab/Test_video_extract/30fps_
 #checking framerate
 ffmpeg -i 407_social_30.mp4 2>&1 | sed -n "s/.*, \(.*\) fp.*/\1/p"
 
-#Making divider clip
-ffmpeg -r 30 -i black.png -c:v libx264 -r 30 -pix_fmt yuv420p black.mp4
+
+#Making divider clip (repeat one image)
+# see https://trac.ffmpeg.org/wiki/Create%20a%20video%20slideshow%20from%20images
+ffmpeg -loop 1 -i black.png -c:v libx264 -t 30 -pix_fmt yuv420p black1.mp4
+ffmpeg -loop 1 -i white.png -c:v libx264 -t 10.47 -pix_fmt yuv420p white.mp4
+
+#How to make time series overlay:
+#Run:
+plot_type=time-series-animation
+exp_type='homecagesocial'
+animal_id='421'
+exp_date='20121105'
+plot_format='.mp4'
+output_path='/Users/isaackauvar/Documents/2012-2013/ZDlab/FiberKontrol/Results/Cell/Videos'
+python group_analysis.py --input-path=$data_path --output-path=$output_path/$plot_type/GC5 --$plot_type --mouse-type='GC5' --plot-format=$plot_format --exp-type=$exp_type --animal-id=$animal_id --exp-date=$exp_date
+
+## for adding overlay to trimmed video (trim to start time 10.47)
+ffmpeg -ss 10.47 -i 421_social_tt.mp4 -i 20121105_421_homecagesocial.mp4  -filter_complex "[0:v] setpts=PTS-STARTPTS, scale=640x480 [background]; [1:v] setpts=PTS-STARTPTS, scale=100x200 [upperleft]; [background][upperleft] overlay=shortest=1" -c:v libx264 overlay_output.mp4
+
+
+
 """
 
 
