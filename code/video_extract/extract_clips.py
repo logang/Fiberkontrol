@@ -94,7 +94,7 @@ def load_clip_times(clip_list_file, path_to_data, start_times_file, output_dir):
         movie_info['peak_vals'] = all_peak_vals_dict[key]
         movie_info['local_times'] = all_local_times_dict[key]
         movie_info['name'] = key
-        movie_info['start_time'] = all_start_times_dict[key] #TO DO - update this to higher precision
+        movie_info['start_time'] = all_start_times_dict[key]
         movie_info['interaction_start'] = all_interaction_start_times_dict[key]
         movie_info['interaction_end'] = all_interaction_end_times_dict[key]
 
@@ -293,9 +293,8 @@ def cut_into_clips(movie_info,
                     cmd += ['-vf']
                     cmd += ['drawbox=0:0:100:100:red'+':t=1']
                     cmd += ['-vf']
-#                    cmd += ['drawbox=0:0:'+str(int(v*1000))+':'+str(int(v*1000))+':red'+]
-#                    cmd += ['drawbox=0:0:100:100:red@'+str(min(1.0, int(v*1000)/100.0))+':t=100']
-                    cmd += ['drawbox=0:0:100:100:red:t='+str(min(100, int(v*1000)/5.0))]
+                    #cmd += ['drawbox=0:0:100:100:red:t='+str(min(100, int(v*1000)/5.0))]
+                    cmd += ['drawbox=640:0:100:100:red:t='+str(min(100, int(v*1000)/5.0))]
                 cmd += ['-y']
                 cmd += [new_file]
                 #cmd += ['> /dev/null 2>&1 < /dev/null'] #not 100% sure what this does
@@ -308,6 +307,7 @@ def cut_into_clips(movie_info,
                 p.wait()
 
     return clip_list_arr
+
 
 def interleave_lists(before, after):
     """
@@ -325,7 +325,6 @@ def interleave_lists(before, after):
         output[::2] = before
         output[1::2] = after
     return output
-
 
     
 def generate_clips(movie_info, clip_window, clip_window_origin,
@@ -402,12 +401,75 @@ def cut_and_splice_clips(movie_info,
     delete_clips(clips_to_delete)
 
 
+def check_key(key, options):
+    """
+    Limit analysis if only specific animal_id,
+    exp_date, or exp_type is input as a command
+    line option.
+    """
+    animal_id, exp_date, exp_type = key.split('_')
+    if ((options.animal_id is None or animal_id == options.animal_id)
+            and (options.exp_date is None or exp_date == options.exp_date)
+            and (options.exp_type is None or exp_type == options.exp_type)):
+        return True
+    else:
+        return False
+
+def overlay_time_series(movie_info, output_dir):
+    """
+    Generate animation of time series using time_series_animation()
+    in group_analysis.py.
+    Then, overlay this animation on the full length behavior video,
+    clipped to start at the time of the first LED flash (start_time).
+
+    Saves animation to animation/ directory.
+    Saves overlay to overlay/ directory.
+    """
+    output_dir = '/'.join(output_dir.split('/')[:-1])
+    overlay_dir = output_dir + '/Overlay/'
+    animation_dir = output_dir + '/Time_Series_Animation/'
+
+    format = '.mp4'
+    animation_filename = animation_dir + key + format
+    if not os.path.isfile(animation_filename):
+        make_time_series_animation(movie_info, animation_dir)
+        animal_id, exp_date, exp_type = movie_info['name'].split('_')
+
+
+        cmd = ['python', 'group_analysis.py']
+        cmd += ['--input-path=']
+
+
+        movie_info['movie_file'] = get_movie_file(key, path_to_data)
+        movie_info['output_file'] = get_output_file(key, path_to_data, output_dir)
+        movie_info['peak_times'] = all_peak_times_dict[key]
+        movie_info['peak_vals'] = all_peak_vals_dict[key]
+        movie_info['local_times'] = all_local_times_dict[key]
+        movie_info['name'] = key
+        movie_info['start_time'] = all_start_times_dict[key]
+        movie_info['interaction_start'] = all_interaction_start_times_dict[key]
+        movie_info['interaction_end'] = all_interaction_end_times_dict[key]
+
+
+
+
+#     plot_type=time-series-animation
+# exp_type='homecagesocial'
+# animal_id='421'
+# exp_date='20121105'
+# plot_format='.mp4'
+# output_path='/Users/isaackauvar/Documents/2012-2013/ZDlab/FiberKontrol/Results/Cell/Videos'
+# python group_analysis.py --input-path=$data_path --output-path=$output_path --$plot_type --mouse-type='GC5' --plot-format=$plot_format --exp-type=$exp_type --animal-id=$animal_id --exp-date=$exp_date
+
+
+
+
+
+
+
 if __name__ == '__main__':
     ## The path_to_data is the folder containing folders corresponding to each trial date.
     ## These folders contain videos for each trial. 
-    path_to_data='/Users/isaackauvar/Dropbox/Fiberkontrol/Fiberkontrol_Data/Lisa_Data/'
-    start_times_file='/Users/isaackauvar/Dropbox/Fiberkontrol/Fiberkontrol_Data/Lisa_Data/video_start_times_precise.txt'
-
     parser = OptionParser()
     parser.add_option("-o", "--output-dir", dest="output_dir", 
                       default='test', 
@@ -436,7 +498,7 @@ if __name__ == '__main__':
                       help="Provide the path to a divider clip (such as a black frame .mp4)" 
                            "to place between each clip in the final compilation.")
 
-    parser.add_option("", "--animal_id", dest="animal_id", 
+    parser.add_option("", "--animal-id", dest="animal_id", 
                       default=None,
                       help="Limit group analysis to trials of a specific animal.")
 
@@ -447,9 +509,6 @@ if __name__ == '__main__':
     parser.add_option("", "--exp-type", dest="exp_type", 
                       default=None,
                       help="Limit group analysis to trials of a specific type.")
-
-
-
     (options, args) = parser.parse_args()
 
     print "options.clip_window", options.clip_window
@@ -460,27 +519,38 @@ if __name__ == '__main__':
     clip_window_origin = options.clip_window_origin
 
     # Check for required input path
-    if len(args) < 1:
-        print 'You must supply at a path to the .pkl file to be used'
-        print ' (i.e. generated by group_analysis.py) which should contain three dicts:'
+    if len(args) < 4:
+        print 'Usage: python extract_clips.py [video_data_path] [start_times_file] [time_series_data_path] [clip_list.pkl] -o [output]'
+        print 'Where clip_list.pkl is generated by group_analysis.py and should '
+        print ' contain three dicts:'
         print ' all_peak_times_dict, all_peak_vals_dict, all_local_times_dict,'
         print ' where the key of each dict is a name of the format: 409_20130327_homecagesocial .' 
         sys.exit(1)
 
-    clip_list_file = args[0]
-    movie_info_dict = load_clip_times(clip_list_file, path_to_data, start_times_file, output_dir)
+    # path_to_data='/Users/isaackauvar/Dropbox/Fiberkontrol/Fiberkontrol_Data/Lisa_Data/'
+    # start_times_file='/Users/isaackauvar/Dropbox/Fiberkontrol/Fiberkontrol_Data/Lisa_Data/video_start_times_precise.txt'
+
+    video_data_path = args[0]
+    start_times_file = args[1]
+    time_series_data_path = args[2]
+    clip_list_file = args[3]
+
+#    clip_list_file = args[0]
+    movie_info_dict = load_clip_times(clip_list_file, video_data_path, start_times_file, output_dir)
 
     print "KEYS: ", movie_info_dict.keys()
     for key in movie_info_dict:
-        print key
+        if check_key(key, options):
 
-        cut_and_splice_clips(movie_info_dict[key], clip_window=clip_window, 
-                             clip_window_origin = clip_window_origin,
-                             peak_thresh=peak_thresh, divider_clip=divider_clip)
-        
-        #movie_file = movie_info_dict[key]['movie_file']
-        #check_video_timestamps(movie_file)
-        #check_video_format(movie_file)
+           # overlay_time_series(movie_info_dict[key], output_dir)
+
+            cut_and_splice_clips(movie_info_dict[key], clip_window=clip_window, 
+                                 clip_window_origin = clip_window_origin,
+                                 peak_thresh=peak_thresh, divider_clip=divider_clip)
+            
+            #movie_file = movie_info_dict[key]['movie_file']
+            #check_video_timestamps(movie_file)
+            #check_video_format(movie_file)
 
 
 
