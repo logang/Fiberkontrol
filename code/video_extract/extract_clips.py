@@ -42,8 +42,7 @@ def get_output_file(key, path_to_data, output_dir):
     mouse_number, date, exp_type = get_mouse_info(key)
 
 #    output_dir = path_to_data+date+'/'+output_folder
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
+    check_dir(output_dir)
     output_file = output_dir+'/'+mouse_number+'_'+exp_type
     return output_file
 
@@ -82,7 +81,6 @@ def load_clip_times(clip_list_file, path_to_data, start_times_file, output_dir):
     all_local_times_dict = pickle.load(pkl_file)
     all_interaction_start_times_dict = pickle.load(pkl_file)
     all_interaction_end_times_dict = pickle.load(pkl_file)
-    print "Interaction times loaded."
     all_start_times_dict = load_start_times(start_times_file)
 
     movie_info_dict = dict()
@@ -166,7 +164,10 @@ def check_video_timestamps(movie_file, desired_format='.mp4', desired_framerate=
     to the videos.
     """
 
-    if not os.path.isfile(movie_file+'_tt'+desired_format):
+    check_video_format(movie_file, desired_format='.mp4', original_format='.avi')
+
+    new_movie_file = movie_file+'_tt'+desired_format
+    if not os.path.isfile(new_movie_file):
         #Convert file to 30 fps
         cmd = ['ffmpeg', '-i', movie_file+desired_format]
         cmd += ['-r', str(desired_framerate)]
@@ -185,6 +186,7 @@ def check_video_timestamps(movie_file, desired_format='.mp4', desired_framerate=
 
         os.remove(movie_file+'_t'+desired_format)
 
+    return new_movie_file
 
 
 def  check_video_format(movie_file, desired_format='.mp4', original_format='.avi'):
@@ -206,8 +208,6 @@ def  check_video_format(movie_file, desired_format='.mp4', original_format='.avi
         #print '-->Running: ', cmd_string
         p = subprocess.Popen(cmd, shell=False)
         p.wait()
-
-    check_video_timestamps(movie_file, desired_format='.mp4', desired_framerate=30)
 
 
 
@@ -391,7 +391,8 @@ def cut_and_splice_clips(movie_info,
     until the end of the behavior interaction period.
     """
 
-    check_video_format(movie_info['movie_file'], desired_format='.mp4')
+    check_video_timestamps(movie_info['movie_file'], desired_format='.mp4', desired_framerate=30)
+
     clip_list_arr, clips_to_delete = generate_clips(movie_info, clip_window, 
                                      clip_window_origin, peak_thresh, divider_clip)
 
@@ -415,7 +416,39 @@ def check_key(key, options):
     else:
         return False
 
-def overlay_time_series(movie_info, output_dir):
+def make_time_series_animation(movie_info, 
+                               animation_dir,
+                               time_series_data_path,
+                               mouse_type, 
+                               format):
+    """
+    Call time_series_data_path() in group_analysis.py
+    to create an animation video of the time series
+    corresponding to the trial specified in movie_info.
+    """
+    animal_id, exp_date, exp_type = movie_info['name'].split('_')
+
+    cmd = ['python', '../analysis/group_analysis.py']
+    cmd += ['--input-path='+str(time_series_data_path)]
+    cmd += ['--output-path='+str(animation_dir)]
+    cmd += ['--time-series-animation']
+
+    cmd += ['--mouse-type='+str(mouse_type)]
+    cmd += ['--plot-format='+str(format)]
+    cmd += ['--exp-type='+str(exp_type)]
+    cmd += ['--animal-id='+str(animal_id)]
+    cmd += ['--exp-date='+str(exp_date)]
+
+    cmd_string = ''.join(["%s " % el for el in cmd])
+    print '-->Running: ', cmd_string
+    p = subprocess.Popen(cmd, shell=False)# stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    p.wait()
+
+def check_dir(direc):
+    if not os.path.exists(direc):
+        os.makedirs(direc)
+
+def overlay_time_series(movie_info, time_series_data_path, output_dir, mouse_type):
     """
     Generate animation of time series using time_series_animation()
     in group_analysis.py.
@@ -425,30 +458,59 @@ def overlay_time_series(movie_info, output_dir):
     Saves animation to animation/ directory.
     Saves overlay to overlay/ directory.
     """
+    if mouse_type is None:
+        print 'Error: Must provide --mouse_type when using overlay_time_series.'
+        sys.exit(1)
+
+    #Place animation and overlay in two separate folders
     output_dir = '/'.join(output_dir.split('/')[:-1])
     overlay_dir = output_dir + '/Overlay/'
     animation_dir = output_dir + '/Time_Series_Animation/'
+    check_dir(overlay_dir)
+    check_dir(animation_dir)
 
+
+    #Generate animation of time series
     format = '.mp4'
     animation_filename = animation_dir + key + format
     if not os.path.isfile(animation_filename):
-        make_time_series_animation(movie_info, animation_dir)
-        animal_id, exp_date, exp_type = movie_info['name'].split('_')
+        make_time_series_animation(movie_info, animation_dir, 
+                                   time_series_data_path,
+                                   mouse_type, format)
+    else:
+        print "Animation file already exists: ", key
+
+    #Overlay animation in corner of behavior video
+    movie_file_tt = check_video_timestamps(movie_info['movie_file'], desired_format='.mp4', desired_framerate=30)
+    overlay_filename = overlay_dir + key + format
+    start_time = movie_info['start_time']
+    cmd = ['ffmpeg']
+    cmd += ['-ss', start_time]
+    cmd += ['-i', movie_file_tt]
+    cmd += ['filter_complex']
+
+    cmd = 'ffmpeg -ss '+str(start_time)+' -i '+movie_file_tt+' -i '+animation_filename+' -filter_complex \"[0:v] setpts=PTS-STARTPTS, scale=640x480 [background]; [1:v] setpts=PTS-STARTPTS, scale=100x200 [upperleft]; [background][upperleft] overlay=shortest=1\" -c:v libx264 '+overlay_filename
+    args = shlex.split(cmd)
+    print args
+    p = subprocess.Popen(args, shell=False)
+    p.wait()
 
 
-        cmd = ['python', 'group_analysis.py']
-        cmd += ['--input-path=']
+# ## for adding overlay to trimmed video (trim to start time 10.47)
+# ffmpeg -ss 10.47 -i 421_social_tt.mp4 -i 20121105_421_homecagesocial.mp4  -filter_complex "[0:v] setpts=PTS-STARTPTS, scale=640x480 [background]; [1:v] setpts=PTS-STARTPTS, scale=100x200 [upperleft]; [background][upperleft] overlay=shortest=1" -c:v libx264 overlay_output.mp4
 
 
-        movie_info['movie_file'] = get_movie_file(key, path_to_data)
-        movie_info['output_file'] = get_output_file(key, path_to_data, output_dir)
-        movie_info['peak_times'] = all_peak_times_dict[key]
-        movie_info['peak_vals'] = all_peak_vals_dict[key]
-        movie_info['local_times'] = all_local_times_dict[key]
-        movie_info['name'] = key
-        movie_info['start_time'] = all_start_times_dict[key]
-        movie_info['interaction_start'] = all_interaction_start_times_dict[key]
-        movie_info['interaction_end'] = all_interaction_end_times_dict[key]
+
+
+        # movie_info['movie_file'] = get_movie_file(key, path_to_data)
+        # movie_info['output_file'] = get_output_file(key, path_to_data, output_dir)
+        # movie_info['peak_times'] = all_peak_times_dict[key]
+        # movie_info['peak_vals'] = all_peak_vals_dict[key]
+        # movie_info['local_times'] = all_local_times_dict[key]
+        # movie_info['name'] = key
+        # movie_info['start_time'] = all_start_times_dict[key]
+        # movie_info['interaction_start'] = all_interaction_start_times_dict[key]
+        # movie_info['interaction_end'] = all_interaction_end_times_dict[key]
 
 
 
@@ -498,6 +560,10 @@ if __name__ == '__main__':
                       help="Provide the path to a divider clip (such as a black frame .mp4)" 
                            "to place between each clip in the final compilation.")
 
+    parser.add_option("", "--mouse-type", dest="mouse_type", 
+                      default=None,
+                      help="Specify the type of virus injected in the mouse (GC5, GC5_NAcprojection, GC3, EYFP)")
+
     parser.add_option("", "--animal-id", dest="animal_id", 
                       default=None,
                       help="Limit group analysis to trials of a specific animal.")
@@ -517,6 +583,7 @@ if __name__ == '__main__':
     peak_thresh = float(options.peak_thresh)
     divider_clip = options.divider_clip
     clip_window_origin = options.clip_window_origin
+    mouse_type = options.mouse_type
 
     # Check for required input path
     if len(args) < 4:
@@ -526,23 +593,18 @@ if __name__ == '__main__':
         print ' all_peak_times_dict, all_peak_vals_dict, all_local_times_dict,'
         print ' where the key of each dict is a name of the format: 409_20130327_homecagesocial .' 
         sys.exit(1)
-
-    # path_to_data='/Users/isaackauvar/Dropbox/Fiberkontrol/Fiberkontrol_Data/Lisa_Data/'
-    # start_times_file='/Users/isaackauvar/Dropbox/Fiberkontrol/Fiberkontrol_Data/Lisa_Data/video_start_times_precise.txt'
-
     video_data_path = args[0]
     start_times_file = args[1]
     time_series_data_path = args[2]
     clip_list_file = args[3]
 
-#    clip_list_file = args[0]
     movie_info_dict = load_clip_times(clip_list_file, video_data_path, start_times_file, output_dir)
 
-    print "KEYS: ", movie_info_dict.keys()
+    #print "KEYS: ", movie_info_dict.keys()
     for key in movie_info_dict:
         if check_key(key, options):
 
-           # overlay_time_series(movie_info_dict[key], output_dir)
+            overlay_time_series(movie_info_dict[key], time_series_data_path, output_dir, mouse_type)
 
             cut_and_splice_clips(movie_info_dict[key], clip_window=clip_window, 
                                  clip_window_origin = clip_window_origin,
