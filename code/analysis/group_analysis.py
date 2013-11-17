@@ -1,20 +1,23 @@
+import os
+import sys
 import h5py
 import numpy as np
 import pylab as pl
-import matplotlib as mpl
-import statsmodels.api as sm
-from matplotlib import cm
-import matplotlib.pyplot as plt
-import os
-import sys
 import scipy as sp
 import scipy.stats as stats
+import statsmodels.api as sm
+
+import matplotlib as mpl
+from matplotlib import cm
+import matplotlib.pyplot as plt
+import matplotlib.animation as animation
+
 from state_space import denoise
 import pickle
+import time
 
 import fiber_record_analyze as fra 
 from fiber_record_analyze import FiberAnalyze
-import matplotlib.animation as animation
 
 
 def group_iter_list(all_data, options, 
@@ -1609,25 +1612,6 @@ def time_series_animation(  all_data,
                 minf = np.min(frames)
                 dpi = 100
 
-#                 fig = plt.figure()
-# #                ax = plt.axes([0, 0, 1, 1], frameon=False, axisbg='w')
-#                 ax = fig.add_subplot(111)
-#                 ax.set_aspect('equal')
-#                 ax.get_xaxis().set_visible(False)
-#                 ax.get_yaxis().set_visible(False)
-#                 ax.patch.set_edgecolor('r')
-
-#                 # im = ax.imshow(np.zeros((300, 300)),cmap='gray',interpolation='nearest')
-#                 # im.set_clim([0,1])
-#                 # fig.set_size_inches([5,5])
-#                 #im = ax.plot(1, 'ko', markersize=10)
-#                 rectangle = plt.Rectangle((0, 0), 1, 1, fc='r', ec='r')
-#                 plt.gca().add_patch(rectangle)
-#                 fig.set_size_inches([4,4])
-
-                # ax.axis([-1, 10, -1, 10])
-                # fig.set_size_inches([5,5])
-
                 fig = plt.figure()
                 fig.set_facecolor('w')
                 ax = plt.axes(frameon=False)
@@ -1643,9 +1627,15 @@ def time_series_animation(  all_data,
 
                 plt.tight_layout(pad=0.0, h_pad=0.1, w_pad=0.1)
 #                plt.tight_layout(rect=(0, 0, 2, 2))
+                
+                if options.mouse_type == 'GC5_NAcprojection':
+                    normalize = 0.2
+                else:
+                    normalize = 1.0
 
                 def update_img(n):
-                    h = (frames[n]-minf)/(maxf - minf)
+                    #h = (frames[n]-minf)/(maxf - minf)
+                    h = min(1, (frames[n]-minf)/normalize)
                     rectangle.set_height(h)
                     rectangle.set_width(1.0)
                     rectangle.set_x(0.0)
@@ -1656,14 +1646,13 @@ def time_series_animation(  all_data,
                     #rectangle.set_alpha(0.1)
                     return rectangle
 
-                import time
                 starttime = time.time()
                 nframes = len(frames) - 1#- 14000
                 print "LEN(FRAMES)", nframes
                 ani = animation.FuncAnimation(fig,update_img, frames=nframes, interval=30)
                 writer = animation.writers['ffmpeg'](fps=30)
 
-                outpath = options.output_path+str(date)+'_'+str(animal_id)+'_'+str(exp_type)+'.mp4'
+                outpath = options.output_path+str(animal_id)+'_'+str(date)+'_'+str(exp_type)+'.mp4'
                 ani.save(outpath,writer=writer,dpi=dpi)
                 print "Total time: ", time.time() - starttime
                 print "saved", outpath
@@ -1682,7 +1671,7 @@ def set_and_read_options_parser():
                       help="Specify a time window for peri-event plots in format before:after.")
 
     parser.add_option("", "--exp-date", dest="exp_date", default=None,
-                       help="Limit group analysis to trials of a specific date ")
+                       help="Limit group analysis to trials of a specific date.")
 
     parser.add_option("", "--animal-id", dest="animal_id", default=None,
                    help="Limit group analysis to trials of a specific animal ")

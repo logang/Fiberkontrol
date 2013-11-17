@@ -1,11 +1,51 @@
 #!/bin/bash
 
-data_path='/Users/isaackauvar/Documents/2012-2013/ZDlab/FiberKontrol/Results/Cell/all_data_raw_w20130920.h5'
-output_path='/Users/isaackauvar/Documents/2012-2013/ZDlab/FiberKontrol/Results/Cell/Plots/Finalz_including_20130920'
+data_path='/Users/isaackauvar/Documents/2012-2013/ZDlab/FiberKontrol/Results/Cell/sucrose_200um_data_raw.h5'
+output_path='/Users/isaackauvar/Documents/2012-2013/ZDlab/FiberKontrol/Results/Cell/Plots/Finalz_including_20130920_sucrose200um'
 
+plot_type=group-plot-time-series
+python group_analysis.py --input-path=$data_path --output-path=$output_path/$plot_type/GC5 --$plot_type --mouse-type='EYFP' --exp-type='homecagesocial'
+
+plot_type=group-plot-time-series
+python group_analysis.py --input-path=$data_path --output-path=$output_path/$plot_type/GC5 --$plot_type --mouse-type='GC5' --exp-type='sucrose'
+
+if $(false); then
+
+plot_type=time-series-animation
+exp_type='homecagesocial'
+animal_id='421'
+exp_date='20121105'
+plot_format='.mp4'
+output_path='/Users/isaackauvar/Documents/2012-2013/ZDlab/FiberKontrol/Results/Cell/Videos'
+python group_analysis.py --input-path=$data_path --output-path=$output_path/$plot_type/GC5 --$plot_type --mouse-type='GC5' --plot-format=$plot_format --exp-type=$exp_type --animal-id=$animal_id --exp-date=$exp_date
+
+
+echo "Testing the effect of different window sizes in start-end. Smaller yields more believable result."	
+plot_type=compare-start-and-end-of-epoch
+max_bout_number=0
+intensity_metric='peak'
+time_window='0:.05'
+plot_format='.pdf'
+python group_analysis.py --input-path=$data_path --output-path=$output_path/$plot_type/GC5 --$plot_type --mouse-type='GC5' --max-bout-number=$max_bout_number --intensity-metric=$intensity_metric --time-window=$time_window --plot-format=$plot_format
+python group_analysis.py --input-path=$data_path --output-path=$output_path/$plot_type/GC5_NAcprojection --$plot_type --mouse-type='GC5_NAcprojection' --max-bout-number=$max_bout_number --intensity-metric=$intensity_metric --time-window=$time_window --plot-format=$plot_format
+
+plot_type=compare-decay
+max_bout_number=8
+intensity_metric='peak'
+time_window='0:0'
+plot_format='.pdf'
+exp_type='sucrose'
+python group_analysis.py --input-path=$data_path --output-path=$output_path/$plot_type/GC5 --$plot_type --exp-type=$exp_type --mouse-type='GC5' --max-bout-number=$max_bout_number --intensity-metric=$intensity_metric --time-window=$time_window --plot-format=$plot_format
+
+plot_type=fluorescence-histogram
+max_bout_number=0
+python group_analysis.py --input-path=$data_path --output-path=$output_path/$plot_type/GC5 --$plot_type --mouse-type='GC5' --exp-type='homecagesocial' --max-bout-number=$max_bout_number
+python group_analysis.py --input-path=$data_path --output-path=$output_path/$plot_type/GC5 --$plot_type --mouse-type='GC5' --exp-type='homecagenovel' --max-bout-number=$max_bout_number
+python group_analysis.py --input-path=$data_path --output-path=$output_path/$plot_type/GC5_NAcprojection --$plot_type --mouse-type='GC5_NAcprojection' --exp-type='homecagesocial' --max-bout-number=$max_bout_number
+python group_analysis.py --input-path=$data_path --output-path=$output_path/$plot_type/GC5_NAcprojection --$plot_type --mouse-type='GC5_NAcprojection' --exp-type='homecagenovel' --max-bout-number=$max_bout_number
 
 plot_type=print-spike-times
-time_window='3:3'
+time_window='0:0'
 max_bout_number=15
 python group_analysis.py --input-path=$data_path --output-path=$output_path/$plot_type/GC5 --$plot_type --mouse-type='GC5' --exp-type='homecagesocial' --time-window=$time_window --max-bout-number=$max_bout_number
 python group_analysis.py --input-path=$data_path --output-path=$output_path/$plot_type/GC5 --$plot_type --mouse-type='GC5' --exp-type='homecagenovel' --time-window=$time_window  --max-bout-number=$max_bout_number
@@ -13,7 +53,22 @@ python group_analysis.py --input-path=$data_path --output-path=$output_path/$plo
 python group_analysis.py --input-path=$data_path --output-path=$output_path/$plot_type/GC5_NAcprojection --$plot_type --mouse-type='GC5_NAcprojection' --exp-type='homecagenovel' --time-window=$time_window --max-bout-number=$max_bout_number
 
 
-if $(false); then
+
+echo "Below are the original commands for paper figures, above is playing around."
+
+plot_type=compare-epochs
+max_bout_number=10
+intensity_metric='peak'
+time_window='0:0'
+plot_format='.pdf'
+exp_type='sucrose'
+python group_analysis.py --input-path=$data_path --output-path=$output_path/$plot_type/$exp_type/GC5 --$plot_type --exp-type=$exp_type --mouse-type='GC5' --max-bout-number=$max_bout_number --intensity-metric=$intensity_metric --time-window=$time_window --plot-format=$plot_format
+intensity_metric='average'
+python group_analysis.py --input-path=$data_path --output-path=$output_path/$plot_type/$exp_type/GC5 --$plot_type --exp-type=$exp_type --mouse-type='GC5' --max-bout-number=$max_bout_number --intensity-metric=$intensity_metric --time-window=$time_window --plot-format=$plot_format
+
+
+plot_type=group-plot-time-series
+python group_analysis.py --input-path=$data_path --output-path=$output_path/$plot_type/GC5 --$plot_type --mouse-type='GC5' --exp-type='sucrose'
 
 plot_type=group-bout-heatmaps
 time_window='3:3'
@@ -102,7 +157,6 @@ python group_analysis.py --input-path=$data_path --output-path=$output_path/$plo
 python group_analysis.py --input-path=$data_path --output-path=$output_path/$plot_type/GC5 --$plot_type --mouse-type='GC5' --exp-type='homecagenovel' 
 python group_analysis.py --input-path=$data_path --output-path=$output_path/$plot_type/GC5_NAcprojection --$plot_type --mouse-type='GC5_NAcprojection' --exp-type='homecagesocial' 
 python group_analysis.py --input-path=$data_path --output-path=$output_path/$plot_type/GC5_NAcprojection --$plot_type --mouse-type='GC5_NAcprojection' --exp-type='homecagenovel' 
-
 
 
 echo you can use the section inside the if statement to comment out commands

@@ -87,11 +87,23 @@ class FiberAnalyze( object ):
                 if self.exp_type != 'sucrose':
                     self.time_tuples = np.asarray( h5_file[self.subject_id][self.exp_date][self.exp_type]['event_tuples'] )
                 else:
-                    self.time_typles = None
+                    self.time_tuples = None
 
                 self.time_stamps = self.data[:,0]
-                self.trigger_data = self.data[:,1]
-                
+                self.trigger_data = self.data[:,1] 
+
+                if self.exp_type != 'sucrose':
+                    ## ADD AVERAGE LISA REACTION TIME
+                    ## IN SELECTING START TIME OF 
+                    ## BEHAVIORAL SCORING (~400 ms)
+                    rxn_time = 0.37 # in seconds, hardcoded based on lisa's reaction time
+                    shift_index = self.convert_seconds_to_index(rxn_time)
+                    self.trigger_data = np.hstack((np.zeros(shift_index), 
+                                                    self.trigger_data[:-shift_index]))
+                    self.time_tuples = (np.array(self.time_tuples) + rxn_time).tolist()
+                    print "REACTION TIME: ", rxn_time
+
+
                 if (self.load_flat):
                     try:
                         self.fluor_data = np.asarray( h5_file[self.subject_id][self.exp_date][self.exp_type]['flat'] )[:, 0]
@@ -113,7 +125,7 @@ class FiberAnalyze( object ):
 
         if self.smoothness != 0:
             print "--> Smoothing data with parameter: ", self.smoothness
-            self.fluor_data = self.smooth(int(self.smoothness), window_type='gaussian')
+            self.fluor_data = self.smooth(self.fluor_data, int(self.smoothness), window_type='gaussian')
         else:
             print "--> No smoothing parameter specified."
 
@@ -624,7 +636,7 @@ class FiberAnalyze( object ):
            # pl.savefig(os.path.join(out_path,"event_vs_baseline_barplot"))
             pl.savefig(out_path + "event_vs_baseline_barplot.pdf")
 
-    def smooth(self, num_time_points, window_type='gaussian'):
+    def smooth(self, fluor_data, num_time_points, window_type='gaussian'):
         """
         Convolve a simple averaging window of length num_time_points
         and type window_type ('gaussian, 'rect')
@@ -638,7 +650,7 @@ class FiberAnalyze( object ):
         else:
             window = np.ones(num_times_points)
 
-        smoothed_fluor_data = np.convolve(self.fluor_data, window, mode='same') #returns an array of the original length
+        smoothed_fluor_data = np.convolve(fluor_data, window, mode='same') #returns an array of the original length
         print "done smoothing."
         return smoothed_fluor_data/np.sum(window)
 
@@ -703,7 +715,7 @@ class FiberAnalyze( object ):
         To use the entire epoch as the window, provide end_event_times.
 
         That is, if end_event_times != None, then
-        this function will ignore the provide 'window', instead
+        this function will ignore the provided 'window', instead
         using the entire epoch.
         """
         window_indices = [self.convert_seconds_to_index( window[0]),
@@ -959,7 +971,7 @@ class FiberAnalyze( object ):
         The start ofd a licking epoch is then determined by calculating
         the location of the rising edges of this density plot.
         The end of a licking epoch can be determined by calculating
-        the time at which this density returns to zero minus nseconds
+        the time at which this density returns to zero, minus nseconds.
         """
 
         print "event_spacing", self.event_spacing
@@ -986,13 +998,15 @@ class FiberAnalyze( object ):
 
         start_times = np.zeros(0)
         end_times = np.zeros(0)
+        #Determine start and end times of lick epochs by determining
+        #rising and falling edges of lick density plot.
         for i in range(nindex, len(density)-2):
             if np.round(density[i-1]) == np.round(dmed) and density[i] > dmed:
                 start_times = np.append(start_times, time_vals[i+nindex]) #?Should I subtract -0.013, the length of the lickometer signal
             if np.round(density[i+1]) == np.round(dmed) and density[i] > dmed:
                 end_times = np.append(end_times, time_vals[i])
 
-        #filter out all of the single licks
+        #filter out all of the single licks.
         filt_start_times = np.zeros(0)
         filt_end_times = np.zeros(0)
         for i in range(len(start_times)):
@@ -1761,7 +1775,7 @@ def add_command_line_options():
     parser.add_option("", "--event-spacing", dest="event_spacing", default=0,
                        help="Specify minimum time (in seconds) between the end of one event and the beginning of the next")
     parser.add_option("", "--mouse-type", dest="mouse_type", default="GC5",
-                       help="Specify the type of virus injected in the mouse (GC5, GC3, EYFP)")
+                       help="Specify the type of virus injected in the mouse (GC5, GC5_NAcprojection, GC3, EYFP)")
 
 
     return parser

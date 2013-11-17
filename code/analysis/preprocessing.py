@@ -115,20 +115,21 @@ def add_flattened_files_to_hdf5(flat_directories, out_path):
     """
     Adds debleached files to the hdf5 file specified.
     """
-   # for d in flat_directories:
-    d = flat_directories
-    
-    cmd = 'python add_files_to_hdf5.py -f '
-    cmd += d 
-    cmd += ' -n flat'
-    cmd += ' --hdfpath='
-    cmd += out_path
-    #Note that --add-new flag remains False
-    print cmd
-    
-    result = run_command_wrapper(cmd)
-    print result
-    #os.system(cmd)
+    for d in flat_directories:
+        #d = flat_directories
+        print d
+        
+        cmd = 'python add_files_to_hdf5.py -f '
+        cmd += d 
+        cmd += ' -n flat'
+        cmd += ' --hdfpath='
+        cmd += out_path
+        #Note that --add-new flag remains False
+        print cmd
+        
+        result = run_command_wrapper(cmd)
+        print result
+        #os.system(cmd)
 
 def read_filenames(filenames_file, path_to_filenames=None):
     """
