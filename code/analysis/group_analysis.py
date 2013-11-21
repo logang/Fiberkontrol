@@ -351,9 +351,6 @@ def print_spike_times(all_data,
 
 
 
-
-
-
 def group_bout_heatmaps(all_data, 
                         options, 
                         exp_type, 
@@ -401,10 +398,13 @@ def group_bout_heatmaps(all_data,
         if(success!=-1):
             event_times = FA.get_event_times(edge=event_edge, 
                                              exp_type=exp_type)
+            end_times = FA.get_event_times(edge='falling', 
+                                             exp_type=exp_type)
             print "len(event_times)", len(event_times)
             if len(event_times) > 0:
                 if max_num_epochs > 0:
                     event_times = event_times[0:max_num_epochs]
+                    end_times = end_times[0:max_num_epochs]
 
                 print "baseline_window", baseline_window
                 time_arr = np.asarray( FA.get_time_chunks_around_events(
@@ -413,10 +413,27 @@ def group_bout_heatmaps(all_data,
                                             time_window, 
                                             baseline_window=baseline_window) )
 
+                ## Add an overlay to the heatmap that displays the time of interaction events:
+                # event_matrix = np.zeros(np.shape(time_arr))
+                # sec_to_ind = float(time_arr.shape[1])/(time_window[0] + time_window[1])
+                # print "sec_to_ind", sec_to_ind, np.shape(time_arr)
+                # print "indices", np.shape(event_times), np.shape(end_times), np.shape(time_window[0])
+                # event_start_indices = (time_window[0] + event_times - event_times)*sec_to_ind
+                # event_end_indices = (time_window[0] + end_times - event_times)*sec_to_ind
+                # for i in range(len(event_start_indices)):
+                #     #event_matrix[i, int(event_start_indices[i]):int(event_end_indices[i])] = 255
+                #     event_matrix[i, int(event_end_indices[i]):int(event_end_indices[i])+2] = 255
+
+
                 # Generate a heatmap of activity by bout, with range set between the 5% quantile of
                 # the data and the 'df_max' argument of the function
                 fig = pl.figure()
                 ax = fig.add_subplot(2,1,1)
+
+                # ax.imshow(event_matrix, 
+                #           interpolation="nearest",
+                #           cmap=pl.cm.Blues,
+                #           extent=[-time_window[0], time_window[1], 0, time_arr.shape[0]])
 
                 from scipy.stats.mstats import mquantiles
                 baseline = mquantiles( time_arr.flatten(), prob=[0.05])
@@ -425,7 +442,8 @@ def group_bout_heatmaps(all_data,
                           vmin=baseline,
                           vmax=df_max,
                           cmap=pl.cm.afmhot, 
-                          extent=[-time_window[0], time_window[1], 0, time_arr.shape[0]])
+                          extent=[-time_window[0], time_window[1], 0, time_arr.shape[0]],
+                          alpha=1)
                 ax.set_aspect('auto')
                 pl.title("Animal #: "+animal_id+'   Date: '+date)
                 pl.ylabel('Bout Number')
@@ -442,79 +460,10 @@ def group_bout_heatmaps(all_data,
                     if not os.path.isdir(outdir):
                         os.makedirs(outdir)
                     pl.savefig(outdir+'/'+animal_id+'_'+date+options.plot_format)
+                    pl.savefig(outdir+'/'+animal_id+'_'+date+'.png')
                     print outdir+'/'+animal_id+'_'+date+options.plot_format
                 else:
                     pl.show()
-
-
-
-    # for animal_id in all_data.keys():
-    #     # load data from hdf5 file by animal-date-exp_type
-    #     animal = all_data[animal_id]
-    #     for date in animal.keys():
-    #         if options.exp_date is None or options.exp_date == date:
-
-    #             fig = pl.figure()
-    #             ax = fig.add_subplot(2,1,1)
-                
-    #             FA = FiberAnalyze(options)
-    #             [FA, success] = loadFiberAnalyze(FA,
-    #                                              options, 
-    #                                              animal_id, 
-    #                                              date, 
-    #                                              exp_type)
-    #             [df_max, df_min] = FA.get_plot_ylim(exp_type, 
-    #                                                 FA.fluor_normalization,
-    #                                                 ymax_setting)
-
-    #             if exp_type in animal[date].keys():
-    #                 print "trigger_data", FA.trigger_data
-
-    #                 if(success!=-1):
-    #                     event_times = FA.get_event_times(edge=event_edge, 
-    #                                                      nseconds=float(options.event_spacing), 
-    #                                                      exp_type=exp_type)
-    #                     print "len(event_times)", len(event_times)
-    #                     if len(event_times) > 0:
-    #                         if max_num_epochs > 0:
-    #                             event_times = event_times[0:max_num_epochs]
-
-    #                         print "baseline_window", baseline_window
-    #                         time_arr = np.asarray( FA.get_time_chunks_around_events(
-    #                                                     FA.fluor_data, 
-    #                                                     event_times, 
-    #                                                     time_window, 
-    #                                                     baseline_window=baseline_window) )
-
-    #                         # Generate a heatmap of activity by bout, with range set between the 5% quantile of
-    #                         # the data and the 'df_max' argument of the function
-    #                         from scipy.stats.mstats import mquantiles
-    #                         baseline = mquantiles( time_arr.flatten(), prob=[0.05])
-    #                         ax.imshow(time_arr, 
-    #                                   interpolation="nearest",
-    #                                   vmin=baseline,
-    #                                   vmax=df_max,
-    #                                   cmap=pl.cm.afmhot, 
-    #                                   extent=[-time_window[0], time_window[1], 0, time_arr.shape[0]])
-    #                         ax.set_aspect('auto')
-    #                         pl.title("Animal #: "+animal_id+'   Date: '+date)
-    #                         pl.ylabel('Bout Number')
-    #                         ax.axvline(0,color='white',linewidth=2,linestyle="--")
-    #                         #ax.axvline(np.abs(time_window[0])*time_arr.shape[1]/(time_window[1]-time_window[0]),color='white',linewidth=2,linestyle="--")
-
-    #                         ax = fig.add_subplot(2,1,2)
-    #                         FA.plot_perievent_hist(event_times, time_window, out_path=None, plotit=True, subplot=ax )
-    #                         pl.ylim([0,df_max])
-
-    #                         if options.output_path is not None:
-    #                             import os
-    #                             outdir = os.path.join(options.output_path, options.exp_type)
-    #                             if not os.path.isdir(outdir):
-    #                                 os.makedirs(outdir)
-    #                             pl.savefig(outdir+'/'+animal_id+'_'+date+options.plot_format)
-    #                             print outdir+'/'+animal_id+'_'+date+options.plot_format
-    #                         else:
-    #                             pl.show()
 
 #----------------------------------------------------------------------------------------
 
@@ -1013,8 +962,10 @@ def plotEpochComparison(options,
     f = open(filename+'.txt', 'w')
     f.write(str(exp1) + '\n')
     f.write(str(exp_scores[exp1]) + '\n')
+    f.write('mean: ' + str(np.mean(exp_scores[exp1])) +  ' var: ' + str(np.var(exp_scores[exp1])) + '\n')
     f.write(str(exp2) + '\n')
     f.write(str(exp_scores[exp2]) + '\n')
+    f.write('mean: ' + str(np.mean(exp_scores[exp2])) +  ' var: ' + str(np.var(exp_scores[exp2])) + '\n')
     f.write("animal ordering: " + str(animal_list))
     f.close()
 
@@ -1167,6 +1118,8 @@ def compare_epochs(all_data,
                         options.event_spacing,
                         animal_list)
 
+    print "pair_scores", pair_scores
+    print "pair_avg_scores", pair_avg_scores
     return [pair_scores, pair_avg_scores]
 
 
@@ -1325,7 +1278,7 @@ def plot_decay(options,
         ax.plot(xp, pxp-1, color=colors[0])
         legend0 = bout_avg_dict.keys()[0] + ": decay rate = " + "{0:.2f}".format(k) + ", r^2 = " + "{0:.2f}".format(r2)
         ymin, ymax = ax.get_ylim()
-        ax.set_ylim((0, ymax))
+        #ax.set_ylim((0, ymax))
         print legend0
     except:
         legend0 = bout_avg_dict.keys()[0]

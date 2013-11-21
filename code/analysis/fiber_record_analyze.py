@@ -96,11 +96,14 @@ class FiberAnalyze( object ):
                     ## ADD AVERAGE LISA REACTION TIME
                     ## IN SELECTING START TIME OF 
                     ## BEHAVIORAL SCORING (~400 ms)
-                    rxn_time = 0.37 # in seconds, hardcoded based on lisa's reaction time
+                    ## THIS NEEDS TO BE A COMMAND LINE FLAG!!
+                    rxn_time = 0.0 # in seconds, hardcoded based on lisa's reaction time
                     shift_index = self.convert_seconds_to_index(rxn_time)
-                    self.trigger_data = np.hstack((np.zeros(shift_index), 
-                                                    self.trigger_data[:-shift_index]))
-                    self.time_tuples = (np.array(self.time_tuples) + rxn_time).tolist()
+                    print "shift_index", shift_index
+                    if shift_index != 0:
+                        self.trigger_data = np.hstack((np.zeros(shift_index), 
+                                                        self.trigger_data[:-shift_index]))
+                        self.time_tuples = (np.array(self.time_tuples) + rxn_time).tolist()
                     print "REACTION TIME: ", rxn_time
 
 
@@ -559,7 +562,7 @@ class FiberAnalyze( object ):
                                         end_event_times=end_times)
 
         ##THIS COMMENTED BLOCK SHOWS THAT THE NUMBER OF INDICES
-        ## CORRESPONDING TO A GIVEN WINDOW IS NOT THE CONSTANT
+        ## CORRESPONDING TO A GIVEN WINDOW IS NOT CONSTANT
         ## ACROSS THE WHOLE TIME SERIES
         # print "window[1]", self.convert_seconds_to_index(window[1])
         # print "window[1] 1", self.convert_seconds_to_index(start_times[1] + window[1]) - self.convert_seconds_to_index(start_times[1])
@@ -736,14 +739,14 @@ class FiberAnalyze( object ):
                 full_window = [0, end_event_times[i] - event_times[i]]
                 window_indices = [self.convert_seconds_to_index( full_window[0]),
                           self.convert_seconds_to_index( full_window[1])]
-                print "len(epoch) = ", full_window[1]
+                #print "len(epoch) = ", full_window[1]
 
            # try:
             e_idx = np.where(e<self.time_stamps)[0][0]
             if (e_idx + window_indices[1] < len(data)-1) and (e_idx - window_indices[0] > 0):
                 chunk = data[range(max(0, (e_idx-window_indices[0])),
                                    min(len(data)-1, (e_idx+window_indices[1])))]
-                print "indices", e_idx-window_indices[0], e_idx+window_indices[1]
+                #print "indices", e_idx-window_indices[0], e_idx+window_indices[1]
                 if baseline_window_provided:
                     baseline_chunk = data[range(max(0, (e_idx-baseline_indices[0])), min(len(data)-1, (e_idx+baseline_indices[1])))]
                     baseline = np.min(baseline_chunk)
@@ -1027,10 +1030,10 @@ class FiberAnalyze( object ):
 
     def debleach( self, out_path=None ):
         """
-        Remove trend from data due to photobleaching by fitting the time serie with an exponential curve
+        Remove trend from data due to photobleaching by fitting the time series with an exponential curve
         and then subtracting the difference between the curve and the median value of the time series. 
         """
-        print "--> Debleaching"
+        print "--> Debleaching" 
         
         fluor_data = self.fluor_data
         time_stamps = self.time_stamps[range(len(self.fluor_data))]
