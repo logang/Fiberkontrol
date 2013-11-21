@@ -1,0 +1,3 @@
+--Extract_clips.py uses ffmpeg to overlay onto behavioral videos an animation representing the amplitude of synchronous calcium activity, cut clips these videos at specific times (as provided in a file such as that returned from analysis/group_analysis.print_spike_times() ), and splice together clips from a single trial.
+
+See run_extract_clips.sh for example inputs to extract_clips.sh
