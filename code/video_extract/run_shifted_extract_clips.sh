@@ -5,20 +5,42 @@ time_series_data_path='/Users/isaackauvar/Documents/2012-2013/ZDlab/FiberKontrol
 output_directory='/Users/isaackauvar/Documents/2012-2013/ZDlab/FiberKontrol/Results/Cell/Videos/'
 data_paths=$video_data_path' '$start_times_file' '$time_series_data_path' '$spike_times_path
 
-output_folder='clipwindow_0_1'
+
+output_folder='clipwindow_3_3_norm3'
 output=$output_directory$output_folder
-clip_window='0:1'
+clip_window='3:3'
 peak_thresh='0.00'
-clip_window_origin='peak'
+clip_window_origin='interaction_start'
+exp_type='homecagesocial'
+animal_id='402'
+mouse_type='GC5_NAcprojection'
+python extract_clips.py $data_paths/$mouse_type/list_of_event_times_$mouse_type'_homecagenovel.pkl' -o $output --clip-window=$clip_window --peak-thresh=$peak_thresh --clip-window-origin=$clip_window_origin --mouse-type=$mouse_type --exp-type=$exp_type --animal-id=$animal_id
+python extract_clips.py $data_paths/$mouse_type/list_of_event_times_$mouse_type'_homecagesocial.pkl' -o $output --clip-window=$clip_window --peak-thresh=$peak_thresh --clip-window-origin=$clip_window_origin --mouse-type=$mouse_type --exp-type=$exp_type --animal-id=$animal_id
+mouse_type='GC5'
+python extract_clips.py $data_paths/$mouse_type/list_of_event_times_$mouse_type'_homecagesocial.pkl' -o $output --clip-window=$clip_window --peak-thresh=$peak_thresh --clip-window-origin=$clip_window_origin --mouse-type=$mouse_type --exp-type=$exp_type --animal-id=$animal_id
+python extract_clips.py $data_paths/$mouse_type/list_of_event_times_$mouse_type'_homecagenovel.pkl' -o $output --clip-window=$clip_window --peak-thresh=$peak_thresh --clip-window-origin=$clip_window_origin --mouse-type=$mouse_type --exp-type=$exp_type --animal-id=$animal_id
+
+
+if $(false); then
+
+echo 'for running a single trial'
+output_folder='clipwindow_3_3'
+output=$output_directory$output_folder
+clip_window='3:3'
+peak_thresh='0.00'
+clip_window_origin='interaction_start'
 exp_type='homecagesocial'
 animal_id='421'
 exp_date='20121105'
-python extract_clips.py $data_paths/GC5_NAcprojection/list_of_event_times_GC5_NAcprojection_homecagesocial.pkl -o $output --clip-window=$clip_window --peak-thresh=$peak_thresh --clip-window-origin=$clip_window_origin --exp-type=$exp_type --animal-id=$animal_id --exp-date=$exp_date
-python extract_clips.py $data_paths/GC5_NAcprojection/list_of_event_times_GC5_NAcprojection_homecagenovel.pkl -o $output --clip-window=$clip_window --peak-thresh=$peak_thresh --clip-window-origin=$clip_window_origin --exp-type=$exp_type --animal-id=$animal_id --exp-date=$exp_date
-python extract_clips.py $data_paths/GC5/list_of_event_times_GC5_homecagesocial.pkl -o $output --clip-window=$clip_window --peak-thresh=$peak_thresh --clip-window-origin=$clip_window_origin --exp-type=$exp_type --animal-id=$animal_id --exp-date=$exp_date
-python extract_clips.py $data_paths/GC5/list_of_event_times_GC5_homecagenovel.pkl -o $output --clip-window=$clip_window --peak-thresh=$peak_thresh --clip-window-origin=$clip_window_origin --exp-type=$exp_type --animal-id=$animal_id --exp-date=$exp_date
+mouse_type='GC5_NAcprojection'
+python extract_clips.py $data_paths/$mouse_type/list_of_event_times_$mouse_type'_homecagesocial.pkl' -o $output --clip-window=$clip_window --peak-thresh=$peak_thresh --clip-window-origin=$clip_window_origin --mouse-type=$mouse_type --exp-type=$exp_type --animal-id=$animal_id --exp-date=$exp_date
+python extract_clips.py $data_paths/$mouse_type/list_of_event_times_$mouse_type'_homecagenovel.pkl' -o $output --clip-window=$clip_window --peak-thresh=$peak_thresh --clip-window-origin=$clip_window_origin --mouse-type=$mouse_type --exp-type=$exp_type --animal-id=$animal_id --exp-date=$exp_date
+mouse_type='GC5'
+python extract_clips.py $data_paths/$mouse_type/list_of_event_times_$mouse_type'_homecagesocial.pkl' -o $output --clip-window=$clip_window --peak-thresh=$peak_thresh --clip-window-origin=$clip_window_origin --mouse-type=$mouse_type --exp-type=$exp_type --animal-id=$animal_id --exp-date=$exp_date
+python extract_clips.py $data_paths/$mouse_type/list_of_event_times_$mouse_type'_homecagenovel.pkl' -o $output --clip-window=$clip_window --peak-thresh=$peak_thresh --clip-window-origin=$clip_window_origin --mouse-type=$mouse_type --exp-type=$exp_type --animal-id=$animal_id --exp-date=$exp_date
 
-if $(false); then
+
+
 
 
 output_folder='clipwindow_1_0'

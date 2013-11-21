@@ -216,7 +216,8 @@ def cut_into_clips(movie_info,
                    clip_window, 
                    clip_window_origin, 
                    output_file, 
-                   draw_box=True):
+                   draw_box=True,
+                   include_start_time=False):
     """
     Given movie_info (which contains a 'movie_file', a 
     list of times at which to cut clips ('peak_times'),
@@ -246,13 +247,14 @@ def cut_into_clips(movie_info,
     clip_window_origin and 'b' seconds  after
     clip_window_origin.
     """
-    movie_file = movie_info['movie_file'] + '_tt'
+    movie_file = movie_info['movie_file']
     peak_times = movie_info['peak_times']
     peak_vals = movie_info['peak_vals']
     start_time = movie_info['start_time']
     interaction_start_times = movie_info['interaction_start']
     interaction_end_times = movie_info['interaction_end']
 
+    print "clip_window", clip_window
     if clip_window[0] == 0 and clip_window[1] == 0:
         clip_all_interactions = True
     else:
@@ -267,44 +269,51 @@ def cut_into_clips(movie_info,
     ## Now cut clips (do this the lazy way for now,
     ## saving to individual files, figure out pipes
     ## after you get this working). 
+    duration = 0
+    print "start_clip_times", start_clip_times
     for i in range(len(start_clip_times)):
-        t = start_clip_times[i] + start_time - clip_window[0]
-        v = peak_vals[i]
-        #start = get_time_string(t)
-        start = str(t)
-        if clip_all_interactions:
-            duration = str(interaction_end_times[i] - start_clip_times[i])
-        else:
-            duration = str(clip_window[0] + clip_window[1])
-        print 'start', start, 'duration', duration
+        if i == 0 or (start_clip_times[i] - start_clip_times[i-1] > float(duration)):
+        #if i == 0 or (start_clip_times[i] - start_clip_times[i-1] > 0):
+            if include_start_time:
+                t = start_clip_times[i] + start_time - clip_window[0]
+            else:
+                t = start_clip_times[i] - clip_window[0]
+            v = peak_vals[i]
+            #start = get_time_string(t)
+            start = str(t)
+            if clip_all_interactions:
+                duration = str(interaction_end_times[i] - start_clip_times[i])
+            else:
+                duration = str(clip_window[0] + clip_window[1])
+            print 'start', start, 'duration', duration
 
-        new_file = output_file+'_'+str(int(t*10))+'_clip.mp4'
-        if v<peak_thresh:
-            print "PEAK LESS THAN THRESHOLD: ", v, "thresh: ", peak_thresh
-        if v>=peak_thresh or clip_all_interactions:
-            if len(clip_list_arr) == 0 or clip_list_arr[-1] != new_file:
-                clip_list_arr.append(new_file)
+            new_file = output_file+'_'+str(int(t*100))+'_clip.mp4'
+            if v<peak_thresh:
+                print "PEAK LESS THAN THRESHOLD: ", v, "thresh: ", peak_thresh
+            if v>=peak_thresh or clip_all_interactions:
+                if len(clip_list_arr) == 0 or clip_list_arr[-1] != new_file:
+                    clip_list_arr.append(new_file)
 
-                cmd = ['ffmpeg']
-                cmd += ['-i', movie_file+'.mp4']
-                cmd += ['-ss', start]
-                cmd += ['-t', duration]
-                if draw_box:
-                    cmd += ['-vf']
-                    cmd += ['drawbox=0:0:100:100:red'+':t=1']
-                    cmd += ['-vf']
-                    #cmd += ['drawbox=0:0:100:100:red:t='+str(min(100, int(v*1000)/5.0))]
-                    cmd += ['drawbox=640:0:100:100:red:t='+str(min(100, int(v*1000)/5.0))]
-                cmd += ['-y']
-                cmd += [new_file]
-                #cmd += ['> /dev/null 2>&1 < /dev/null'] #not 100% sure what this does
-                                                        # it is supposed to not send
-                                                        # output to the PIPE buffer
+                    cmd = ['ffmpeg']
+                    cmd += ['-i', movie_file+'.mp4']
+                    cmd += ['-ss', start]
+                    cmd += ['-t', duration]
+                    if draw_box:
+                        cmd += ['-vf']
+                        cmd += ['drawbox=0:0:100:100:red'+':t=1']
+                        cmd += ['-vf']
+                        #cmd += ['drawbox=0:0:100:100:red:t='+str(min(100, int(v*1000)/5.0))]
+                        cmd += ['drawbox=640:0:100:100:red:t='+str(min(100, int(v*1000)/5.0))]
+                    cmd += ['-y']
+                    cmd += [new_file]
+                    #cmd += ['> /dev/null 2>&1 < /dev/null'] #not 100% sure what this does
+                                                            # it is supposed to not send
+                                                            # output to the PIPE buffer
 
-                cmd_string = ''.join(["%s " % el for el in cmd])
-                print '-->Running: ', cmd_string
-                p = subprocess.Popen(cmd, shell=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                p.wait()
+                    cmd_string = ''.join(["%s " % el for el in cmd])
+                    print '-->Running: ', cmd_string
+                    p = subprocess.Popen(cmd, shell=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                    p.wait()
 
     return clip_list_arr
 
@@ -346,16 +355,17 @@ def generate_clips(movie_info, clip_window, clip_window_origin,
     movie_file = movie_info['movie_file']
     output_file = movie_info['output_file']
 
-    if clip_window[0] != 0 and clip_window[1] != 0:
-        before_window = [clip_window[0], 0]
-        before_clip_list_arr = cut_into_clips(movie_info, peak_thresh, before_window, 
-                                            clip_window_origin, output_file, draw_box=False)
-        after_window = [0, clip_window[1]]
-        after_clip_list_arr = cut_into_clips(movie_info, peak_thresh, after_window, 
-                                             clip_window_origin, output_file, draw_box=True)
-        clip_list_arr = interleave_lists(before_clip_list_arr, after_clip_list_arr)
+    print "clip_window", clip_window
+    # if clip_window[0] != 0 and clip_window[1] != 0:
+    #     before_window = [clip_window[0], 0]
+    #     before_clip_list_arr = cut_into_clips(movie_info, peak_thresh, before_window, 
+    #                                         clip_window_origin, output_file, draw_box=False)
+    #     after_window = [0, clip_window[1]]
+    #     after_clip_list_arr = cut_into_clips(movie_info, peak_thresh, after_window, 
+    #                                          clip_window_origin, output_file, draw_box=True)
+    #     clip_list_arr = interleave_lists(before_clip_list_arr, after_clip_list_arr)
 
-    elif clip_window[0] != 0 and clip_window[1] == 0:
+    if clip_window[0] != 0 and clip_window[1] == 0:
         before_window = [clip_window[0], 0]
         before_clip_list_arr = cut_into_clips(movie_info, peak_thresh, before_window, 
                                               clip_window_origin, output_file, draw_box=False)
@@ -367,6 +377,7 @@ def generate_clips(movie_info, clip_window, clip_window_origin,
         clip_list_arr = cut_into_clips(movie_info, peak_thresh, clip_window, 'peak', output_file)
 
     clips_to_delete = clip_list_arr
+    print "clips_to_delete", clips_to_delete
 
     if divider_clip is not None:
         clip_list_arr = interleave_lists(clip_list_arr, 
@@ -391,7 +402,6 @@ def cut_and_splice_clips(movie_info,
     until the end of the behavior interaction period.
     """
 
-    check_video_timestamps(movie_info['movie_file'], desired_format='.mp4', desired_framerate=30)
 
     clip_list_arr, clips_to_delete = generate_clips(movie_info, clip_window, 
                                      clip_window_origin, peak_thresh, divider_clip)
@@ -464,8 +474,8 @@ def overlay_time_series(movie_info, time_series_data_path, output_dir, mouse_typ
 
     #Place animation and overlay in two separate folders
     output_dir = '/'.join(output_dir.split('/')[:-1])
-    overlay_dir = output_dir + '/Overlay/'
-    animation_dir = output_dir + '/Time_Series_Animation/'
+    overlay_dir = output_dir + '/Overlay/Standardized2/'
+    animation_dir = output_dir + '/Time_Series_Animation/Standardized2/'
     check_dir(overlay_dir)
     check_dir(animation_dir)
 
@@ -473,6 +483,7 @@ def overlay_time_series(movie_info, time_series_data_path, output_dir, mouse_typ
     #Generate animation of time series
     format = '.mp4'
     animation_filename = animation_dir + key + format
+    print "animation_filename", animation_filename
     if not os.path.isfile(animation_filename):
         make_time_series_animation(movie_info, animation_dir, 
                                    time_series_data_path,
@@ -481,51 +492,26 @@ def overlay_time_series(movie_info, time_series_data_path, output_dir, mouse_typ
         print "Animation file already exists: ", key
 
     #Overlay animation in corner of behavior video
-    movie_file_tt = check_video_timestamps(movie_info['movie_file'], desired_format='.mp4', desired_framerate=30)
+#    movie_file_tt = check_video_timestamps(movie_info['movie_file'], desired_format='.mp4', desired_framerate=30)
+    movie_file = movie_info['movie_file']
     overlay_filename = overlay_dir + key + format
-    start_time = movie_info['start_time']
-    cmd = ['ffmpeg']
-    cmd += ['-ss', start_time]
-    cmd += ['-i', movie_file_tt]
-    cmd += ['filter_complex']
+    if not os.path.isfile(overlay_filename):
+        start_time = movie_info['start_time']
+        cmd = ['ffmpeg']
+        cmd += ['-ss', start_time]
+        cmd += ['-i', movie_file]
+        cmd += ['filter_complex']
 
-    cmd = 'ffmpeg -ss '+str(start_time)+' -i '+movie_file_tt+' -i '+animation_filename+' -filter_complex \"[0:v] setpts=PTS-STARTPTS, scale=640x480 [background]; [1:v] setpts=PTS-STARTPTS, scale=100x200 [upperleft]; [background][upperleft] overlay=shortest=1\" -c:v libx264 '+overlay_filename
-    args = shlex.split(cmd)
-    print args
-    p = subprocess.Popen(args, shell=False)
-    p.wait()
-
-
-# ## for adding overlay to trimmed video (trim to start time 10.47)
-# ffmpeg -ss 10.47 -i 421_social_tt.mp4 -i 20121105_421_homecagesocial.mp4  -filter_complex "[0:v] setpts=PTS-STARTPTS, scale=640x480 [background]; [1:v] setpts=PTS-STARTPTS, scale=100x200 [upperleft]; [background][upperleft] overlay=shortest=1" -c:v libx264 overlay_output.mp4
-
+        cmd = 'ffmpeg -ss '+str(start_time)+' -i '+movie_file+' -i '+animation_filename+' -filter_complex \"[0:v] setpts=PTS-STARTPTS, scale=640x480 [background]; [1:v] setpts=PTS-STARTPTS, scale=100x200 [upperleft]; [background][upperleft] overlay=shortest=1\" -c:v libx264 -y '+overlay_filename
+        args = shlex.split(cmd)
+        print args
+        p = subprocess.Popen(args, shell=False)
+        p.wait()
+    else:
+        print "Overlay file already exists: ", key
 
 
-
-        # movie_info['movie_file'] = get_movie_file(key, path_to_data)
-        # movie_info['output_file'] = get_output_file(key, path_to_data, output_dir)
-        # movie_info['peak_times'] = all_peak_times_dict[key]
-        # movie_info['peak_vals'] = all_peak_vals_dict[key]
-        # movie_info['local_times'] = all_local_times_dict[key]
-        # movie_info['name'] = key
-        # movie_info['start_time'] = all_start_times_dict[key]
-        # movie_info['interaction_start'] = all_interaction_start_times_dict[key]
-        # movie_info['interaction_end'] = all_interaction_end_times_dict[key]
-
-
-
-
-#     plot_type=time-series-animation
-# exp_type='homecagesocial'
-# animal_id='421'
-# exp_date='20121105'
-# plot_format='.mp4'
-# output_path='/Users/isaackauvar/Documents/2012-2013/ZDlab/FiberKontrol/Results/Cell/Videos'
-# python group_analysis.py --input-path=$data_path --output-path=$output_path --$plot_type --mouse-type='GC5' --plot-format=$plot_format --exp-type=$exp_type --animal-id=$animal_id --exp-date=$exp_date
-
-
-
-
+    return overlay_filename
 
 
 
@@ -603,9 +589,19 @@ if __name__ == '__main__':
     #print "KEYS: ", movie_info_dict.keys()
     for key in movie_info_dict:
         if check_key(key, options):
+            movie_info = movie_info_dict[key]
+            movie_file_tt = check_video_timestamps(movie_info['movie_file'], 
+                                   desired_format='.mp4', 
+                                   desired_framerate=30)
+            
+            movie_info['movie_file'] = movie_file_tt
+            overlay_filename = overlay_time_series(movie_info, 
+                                                   time_series_data_path, 
+                                                   output_dir, mouse_type)
 
-            overlay_time_series(movie_info_dict[key], time_series_data_path, output_dir, mouse_type)
 
+            movie_info['movie_file'] = overlay_filename[:-4]
+            print "movie_info['movie_file']", movie_info['movie_file']
             cut_and_splice_clips(movie_info_dict[key], clip_window=clip_window, 
                                  clip_window_origin = clip_window_origin,
                                  peak_thresh=peak_thresh, divider_clip=divider_clip)
@@ -637,10 +633,10 @@ ffmpeg -i 407_clip.mp4 -vf drawbox=10:10:50:50:red,drawbox=100:100:200:200:green
 ffmpeg -f concat -i <(for f in ./*.wav; do echo "file '$f'"; done) -c copy output.wav
 
 #for adding text - this does not currently work on my installation of ffmpeg
-ffmpeg -i 407_clip.mp4 -vf \
-   drawtext="fontfile=/usr/share/fonts/truetype/ttf-dejavu/DejaVuSerif.ttf: \
-   text='Text to write is this one, overlaid':fontsize=20:fontcolor=red:x=100:y=100" \
-   with_text3.mp4
+ffmpeg -i 408_20130327_homecagenovel_trim.mp4 -vf \
+   drawtext="fontfile=/opt/X11/share/fonts/TTF/VeraMoBd.ttf: \
+   text='\`20\% dF/F':expansion=none:fontsize=15:fontcolor=white:x=100:y=0" \
+   -y 408_20130327_homecagenovel_trim_text.mp4
 
 ffmpeg -i 407_clip.mp4 -vf drawtext="fontfile=/usr/share/fonts/truetype/ttf-dejavu/DejaVuSerif.ttf: text='\%T': fontcolor=white@0.8: x=7: y=460" with_text3.mp4
 
