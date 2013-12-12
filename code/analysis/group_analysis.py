@@ -1612,6 +1612,69 @@ def time_series_animation(  all_data,
                 return ani
 
 
+def get_blind_data(all_data, options, exclude_sucrose):
+    """
+    Creates a file containing all time series
+    (excluding sucrose according to the flag), 
+    but unlabeled. Also create a text file
+    labeling the data.
+    """
+    print "get_blind_data"
+
+    time_series_dict = dict()
+    time_series_labels = np.array([])
+    iter = 0
+
+    for mouse_type in ['GC5', 'GC5_NAcprojection']:
+        [iter_list, animal_id_list, date_list, exp_type_list] = group_iter_list(all_data, options, 
+                                                                            mouse_type=mouse_type)
+        for exp in iter_list:
+            animal_id = exp['animal_id']
+            date = exp['date']
+            exp_type = exp['exp_type']
+
+
+            FA = FiberAnalyze(options)
+            [FA, success] = loadFiberAnalyze(FA,
+                                             options, 
+                                             animal_id, 
+                                             date, 
+                                             exp_type)
+
+            if exp_type != 'sucrose' and exp_type != 'EPM':
+                print 'FA.fluor_data', (FA.fluor_data).shape
+                time_series_dict[iter] = {'fluor_data': FA.fluor_data, 'time_stamps': FA.time_stamps}
+
+                id_string = str(animal_id) + '_' + str(date) + '_' + str(exp_type) + '_' + str(mouse_type)
+                time_series_labels = np.append(id_string, time_series_labels)
+                iter += 1
+
+
+    # Shuffle the dict
+    shuffled_time_series_dict = dict()
+    shuffled_time_series_labels = dict()
+
+    N = len(time_series_labels)
+    indices = np.arange(N)
+    np.random.seed(1)
+    np.random.shuffle(indices)
+
+    for iter in range(N):
+        ind = indices[iter]
+        shuffled_time_series_dict[iter] = time_series_dict[ind]
+        shuffled_time_series_labels[iter] = time_series_labels[ind]
+
+
+    shuffled_time_series_dict['labels'] = shuffled_time_series_labels
+    time_series_dict['labels'] = time_series_labels
+
+    print time_series_dict
+    print shuffled_time_series_dict
+    print np.sum(indices)
+    print np.sum(range(N))
+    filename = options.output_path + 'blind_time_series.pkl'
+    pickle.dump( shuffled_time_series_dict, open( filename, "wb" ) )
+
 
 
 #-------------------------------------------------------------------------------------------
@@ -1727,6 +1790,11 @@ def set_and_read_options_parser():
                       help=("Produce a video of video format: 'plot_format' "
                             "animating the time series trace in real time."))
 
+    parser.add_option("", "--get-blind-data", dest="get_blind_data",
+                      action="store_true", default=False,
+                      help=(" Make a folder containing all time series,"
+                            " excluding sucrose trials, but unlabeled."))
+
 
     
     (options, args) = parser.parse_args()
@@ -1823,7 +1891,10 @@ if __name__ == "__main__":
                                 fps=30,
                                 video_format=options.plot_format,
                                 plot_type='box',
-                                )        
+                                )  
+
+    elif options.get_blind_data:
+        get_blind_data(all_data, options, exclude_sucrose=True)      
 
 
 # EOF
