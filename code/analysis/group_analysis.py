@@ -218,7 +218,7 @@ def group_regression_plot(all_data,
 
 #------------------------------------------------------------------------------
 
-def print_spike_times(all_data,
+def a_times(all_data,
                       options,
                       exp_type,
                       max_num_epochs,
@@ -1622,7 +1622,8 @@ def get_blind_data(all_data, options, exclude_sucrose):
     print "get_blind_data"
 
     time_series_dict = dict()
-    time_series_labels = np.array([])
+#    time_series_labels = np.array([])
+    time_series_labels = dict()
     iter = 0
 
     for mouse_type in ['GC5', 'GC5_NAcprojection']:
@@ -1646,7 +1647,11 @@ def get_blind_data(all_data, options, exclude_sucrose):
                 time_series_dict[iter] = {'fluor_data': FA.fluor_data, 'time_stamps': FA.time_stamps}
 
                 id_string = str(animal_id) + '_' + str(date) + '_' + str(exp_type) + '_' + str(mouse_type)
-                time_series_labels = np.append(id_string, time_series_labels)
+              #  time_series_labels = np.append(id_string, time_series_labels)
+                time_series_labels[iter] = id_string
+                # plt.figure()
+                # plt.plot(FA.time_stamps, FA.fluor_data)
+                # plt.title(id_string)
                 iter += 1
 
 
@@ -1661,6 +1666,8 @@ def get_blind_data(all_data, options, exclude_sucrose):
 
     for iter in range(N):
         ind = indices[iter]
+        print "ind", ind
+        print "iter", iter
         shuffled_time_series_dict[iter] = time_series_dict[ind]
         shuffled_time_series_labels[iter] = time_series_labels[ind]
 
@@ -1669,12 +1676,14 @@ def get_blind_data(all_data, options, exclude_sucrose):
     time_series_dict['labels'] = time_series_labels
 
     print time_series_dict
-    print shuffled_time_series_dict
+    print "shuffled_time_series_dict", shuffled_time_series_dict
+    print "shuffled_time_series_labels", shuffled_time_series_labels
+    print "time_series_labels", time_series_labels
+    print "indices", indices
     print np.sum(indices)
     print np.sum(range(N))
     filename = options.output_path + 'blind_time_series.pkl'
     pickle.dump( shuffled_time_series_dict, open( filename, "wb" ) )
-
 
 
 #-------------------------------------------------------------------------------------------
