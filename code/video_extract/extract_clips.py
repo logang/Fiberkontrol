@@ -75,9 +75,16 @@ def  plotFluorAroundPeaks(fluor_data, time_stamps, peak_inds,
                           clip_window, clip_window_origin,
                           output_dir, name, movie_start_time):
     """
-    Plots the time series that should correspond to each of
+    Plots the short time series that should correspond to each of
     the video clips. Use this to double check that the videos
-    are properly aligned.
+    are properly aligned. 
+
+    In particular, check that the bar animation
+    representing the value of the fluoresence in the video matches
+    the plots produced by this function. Also check that the time
+    on the x-axis of these plots matches the time in the animation.
+    Further, check that the 'Window', written in the title
+    of these plots, matches the timestamp on the video. 
     """
     before_ind = np.where(time_stamps>clip_window[0])[0][0]
     after_ind = np.where(time_stamps>clip_window[1])[0][0]
@@ -211,6 +218,7 @@ def load_clip_times_FPTL_format(clip_list_file,
                                          clip_window, clip_window_origin,
                                          output_dir, name, movie_info['start_time'])
 
+            ## Print for debugging, and to check that labels match up with blind data
             # print 'peak_inds', peak_inds, np.max(peak_inds)
             # print "movie_info['peak_times'] ", movie_info['peak_times'] 
             # print "movie_info['peak_vals']", movie_info['peak_vals']

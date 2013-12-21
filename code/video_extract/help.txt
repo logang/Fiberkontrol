@@ -1,3 +1,57 @@
 --Extract_clips.py uses ffmpeg to overlay onto behavioral videos an animation representing the amplitude of synchronous calcium activity, cut clips these videos at specific times (as provided in a file such as that returned from analysis/group_analysis.print_spike_times() ), and splice together clips from a single trial.
 
 See run_extract_clips.sh for example inputs to extract_clips.sh
+
+
+For checking that the video clips at each peak are correctly timed (in particular, to check whether removing the decimation fixed the time offset problem):
+
+Steps for fixing and testing video peak data:
+
+0) in video_extract/run_extract_clips.sh
+change 'output_folder' to something new, i.e. 'all_peaks_from_logan_peak_finding_test_undecimated'
+
+1) 
+after changing/making sure the directory paths in compare_decimated_with_original.py point to the correct locations:
+run analysis/compare_decimated_with_original.py
+
+-check that the processed data is labeled correctly (should start with 2229_novel, 410_social…)
+       and that it is formatted correctly (there is a 'labels' entry at the end of the dict)
+-check that the two time series are aligned at every peak
+
+1.5) Double check that the plot from processed_data[0], which should be 2229_novel, matches the plot of 2229_novel found in 
+/Users/isaackauvar/Dropbox/Fiberkontrol/Fiberkontrol_plots/Finalz_post_SfN/Finalz_post_SfN_000rxn/group-plot-time-series
+
+2) In extract_clips.py
+In main function, change call to load_clip_times_FPTL_format() so that plot_fluor_around_peaks=True
+
+3) In extract_clips.py
+In overlay_time_series():
+Change directory of overlay_dir and animation_dir (they used to be something like 'Standardized_post_Sfn')
+so that a new folder will be created (with no previous overlay or animation. make_time_series_animation and overlay_time_series will not overwrite the existing files and this will cause problems. 
+
+4) In group_analysis.py
+Ensure that 
+plotAnimation = True 
+
+5) In plotFluorAroundPeaks() in extract_clips.py
+ensure that plot_indiv_peaks = True
+
+6) sh run_extract_clips.sh
+
+7) Ensure that a new animation is being generated (this should pause the command line for a while on a print out that says some thing like 'LEN(frames) 139000'
+
+8) Check the animation movie in the folder specified in (3)
+9) Check the overlay in the nearby folder specified in (3)
+10) Ensure that in the folder specified in (0), there should be folders with the plots surrounding each peak, and there should be folders with video clips surrounding each peak.
+11) Check that the bar animation
+    representing the value of the fluoresence in the video matches
+    the plots produced by this function. Also check that the time
+    on the x-axis of these plots matches the time in the animation.
+    Further, check that the 'Window', written in the title
+    of these plots, matches the timestamp on the video. 
+
+   Finally, double check that the offset between the time on animation (or on the x-axis), and the timestamp (or time in 'Window' in the title), matches the corresponding offset found in
+/Users/isaackauvar/Dropbox/Fiberkontrol/Fiberkontrol_Data/Lisa_Data/video_start_times_precise.txt 
+
+
+12) If this makes sense (in particular, if the animation matches the peak plots, and the offset timing between the video time stamp and animation time stamp match), then this should be correct and ready for lisa. 

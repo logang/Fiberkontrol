@@ -1,3 +1,24 @@
+spike_times_path='/Users/isaackauvar/Dropbox/FiberPhotometry/DATA/processed_fixed_labels.pkl'
+video_data_path='/Users/isaackauvar/Dropbox/Fiberkontrol/Fiberkontrol_Data/Lisa_Data/'
+start_times_file='/Users/isaackauvar/Dropbox/Fiberkontrol/Fiberkontrol_Data/Lisa_Data/video_start_times_precise.txt'
+time_series_data_path='/Users/isaackauvar/Documents/2012-2013/ZDlab/FiberKontrol/Results/Cell/all_data_post_SfN_raw.h5'
+output_directory='/Users/isaackauvar/Documents/2012-2013/ZDlab/FiberKontrol/Results/Cell/Videos/'
+data_paths=$video_data_path' '$start_times_file' '$time_series_data_path' '$spike_times_path
+
+output_folder='all_peaks_from_logan_peak_finding_test_label'
+output=$output_directory$output_folder
+clip_window='3:3'
+clip_window_origin='peak'
+peak_thresh='0.00'
+divider_clip='/Users/isaackauvar/Documents/2012-2013/ZDlab/FiberKontrol/Fiberkontrol/code/video_extract/black_2.mp4'
+python extract_clips.py $data_paths --fluor-time-peak-label-format -o $output --clip-window=$clip_window --peak-thresh=$peak_thresh --clip-window-origin=$clip_window_origin --divider-clip=$divider_clip
+
+
+
+
+if $(false); then
+echo 'Settings for making SfN 2013 presentation videos.'
+
 spike_times_path='/Users/isaackauvar/Documents/2012-2013/ZDlab/FiberKontrol/Results/Cell/Plots/Finalz_post_SfN_000rxn/print-spike-times'
 video_data_path='/Users/isaackauvar/Dropbox/Fiberkontrol/Fiberkontrol_Data/Lisa_Data/'
 start_times_file='/Users/isaackauvar/Dropbox/Fiberkontrol/Fiberkontrol_Data/Lisa_Data/video_start_times_precise.txt'
@@ -19,6 +40,8 @@ python extract_clips.py $data_paths/$mouse_type/list_of_event_times_$mouse_type'
 mouse_type='GC5'
 python extract_clips.py $data_paths/$mouse_type/list_of_event_times_$mouse_type'_homecagesocial.pkl' -o $output --clip-window=$clip_window --peak-thresh=$peak_thresh --clip-window-origin=$clip_window_origin --mouse-type=$mouse_type --exp-type=$exp_type --animal-id=$animal_id
 python extract_clips.py $data_paths/$mouse_type/list_of_event_times_$mouse_type'_homecagenovel.pkl' -o $output --clip-window=$clip_window --peak-thresh=$peak_thresh --clip-window-origin=$clip_window_origin --mouse-type=$mouse_type --exp-type=$exp_type --animal-id=$animal_id
+
+fi
 
 
 if $(false); then
