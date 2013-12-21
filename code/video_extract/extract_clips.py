@@ -1,11 +1,15 @@
+# System imports
 import subprocess
-import numpy as np
-from optparse import OptionParser
-import sys
 import pickle
 import os.path
 import os
+import sys
 import shlex
+
+import numpy as np
+import matplotlib.pyplot as plt
+from optparse import OptionParser
+import pprint
 
 def get_mouse_info(key):
     """
@@ -38,10 +42,9 @@ def get_movie_file(key, path_to_data):
     movie_file = path_to_data+date+'/'+mouse_number+'_'+exp_type
     return movie_file
 
-def get_output_file(key, path_to_data, output_dir):
+def get_output_file(key, output_dir):
     mouse_number, date, exp_type = get_mouse_info(key)
 
-#    output_dir = path_to_data+date+'/'+output_folder
     check_dir(output_dir)
     output_file = output_dir+'/'+mouse_number+'_'+exp_type
     return output_file
@@ -54,10 +57,171 @@ def load_start_times(start_times_file):
         info = line.split(',')
         all_start_times_dict[info[0]] = float(info[1])
     f.close()
+    print all_start_times_dict
     return all_start_times_dict
 
+def timeToMSF(time, fps=30):
+    """
+    Convert time in seconds to time in
+    minutes:seconds:frames
+    """
+    mins = int(np.floor(time/60))
+    seconds = int(np.floor(time - mins*60))
+    ms = time - seconds - mins*60
+    frames = int(np.floor(ms*fps))
+    return mins, seconds, frames, '{0:.0f}:{1:.0f}:{2:.0f}'.format(mins, seconds, frames)
 
-def load_clip_times(clip_list_file, path_to_data, start_times_file, output_dir):
+def  plotFluorAroundPeaks(fluor_data, time_stamps, peak_inds,
+                          clip_window, clip_window_origin,
+                          output_dir, name, movie_start_time):
+    """
+    Plots the time series that should correspond to each of
+    the video clips. Use this to double check that the videos
+    are properly aligned.
+    """
+    before_ind = np.where(time_stamps>clip_window[0])[0][0]
+    after_ind = np.where(time_stamps>clip_window[1])[0][0]
+
+    dir = get_output_file(name, output_dir)
+    dir = dir + '_peakplot/'
+    check_dir(dir)
+  
+    if clip_window_origin == 'peak':
+
+        plot_indiv_peaks = True
+        iter = 0
+        if plot_indiv_peaks:
+            for ind in peak_inds:
+                fluor = fluor_data[ind-before_ind:ind+after_ind]
+                timestamps = time_stamps[ind-before_ind:ind+after_ind]
+
+                plt.figure()
+                plt.plot(timestamps, fluor)
+                plt.axvline(x=time_stamps[ind])
+                plt.xlim(time_stamps[ind] - clip_window[0], time_stamps[ind] + clip_window[1])
+
+                mins, seconds, frames, peak_time_string = timeToMSF(movie_start_time + time_stamps[ind])
+                mins, seconds, frames, start_time_string = timeToMSF(movie_start_time + time_stamps[ind] - clip_window[0])
+                mins, seconds, frames, end_time_string = timeToMSF(movie_start_time + time_stamps[ind] + clip_window[1])
+
+                plt.title('(With start time) Peak- ['+peak_time_string+
+                          '], Window-  ['+start_time_string+', '+end_time_string+']')
+
+                plt.savefig(dir+str(iter))
+                print "plotFluorAroundPeaks: ", dir+str(iter)
+                iter += 1
+        
+        end_time = time_stamps[-1]
+        mins = int(np.floor(time_stamps[-1]/60))
+        seconds = int(np.floor(time_stamps[-1] - mins*60))
+        ms = time_stamps[-1] - seconds - mins*60
+        frames = int(np.floor(ms*30))
+
+        mins, seconds, frames, time_string = timeToMSF(end_time)
+
+        plt.figure()
+        plt.plot(time_stamps, fluor_data)
+        plt.title('Full time series. Time: '+str(end_time)+', '+str(mins)+':'+str(seconds)+':'+str(frames))
+        plt.savefig(dir+'full')
+
+
+
+def load_clip_times_FPTL_format(clip_list_file, 
+                                path_to_data, 
+                                start_times_file, 
+                                output_dir,
+                                clip_window=None, 
+                                clip_window_origin=None,
+                                plot_fluor_around_peaks=False ):
+
+
+    """
+    Loads data formatted as a dict of trials
+    where each entry corresponds to a behavioral trial
+    and is itself a dict with keys 
+     'fluor_data', 'time_stamps', 'peak_indices', and 'labels'
+    where 'labels' is an array with entries such as
+    401_20130108_homecagenovel_GC5 that label each trial in
+    the provided data.
+
+    Returns a new dict with the format:
+    dict{409_20130327_homecagesocial: 
+            dict{movie_file: path to movie file (will check for avi or mp4), 
+                 peak_times: array with times of each peak,
+                 peak_vals: array with vals of each peak,
+                 local_times: array with local times of each peak
+                 name,
+                 start_time: start time of timeseries with respect to video start,
+                 interaction_start: if not provided, set to None
+                 interaction_end: if not provided, set to None
+                }
+        }
+
+    Include clip_window and clip_window_origin to plot the time series
+    surrounding each peak (to check that the peak is where it should be).
+    """
+
+    print "clip_list_file", clip_list_file
+    pkl_file = open(clip_list_file, 'rb')
+    data = pickle.load(pkl_file)
+    print 'data', data
+
+    movie_info_dict = dict()
+    all_start_times_dict = load_start_times(start_times_file)
+
+
+    for key in data:
+        if key != 'labels':
+            movie_info = dict()
+            trial = data[key]
+            print 'data[labels]', data['labels']
+            print 'key', key
+            label = data['labels'][key]
+            print label.split('_', 3)
+            animal_id, date, exp_type, mouse_type = label.split('_', 3)
+            name = animal_id + '_' + date + '_' + exp_type
+            print name
+            print mouse_type
+
+            movie_info['movie_file'] = get_movie_file(name, path_to_data)
+            movie_info['output_file'] = get_output_file(name, output_dir)
+            peak_inds = data[key]['peak_indices']
+            if 'fluor_data' in trial:
+                time_stamps = trial['time_stamps']
+                fluor_data = trial['fluor_data']
+            else:
+                print "using decimated time series"
+                time_stamps = trial['time_stamps_decimated']
+                fluor_data = trial['fluor_data_decimated']
+
+
+            movie_info['peak_times'] = time_stamps[peak_inds]
+            movie_info['peak_vals'] = fluor_data[peak_inds]
+            movie_info['name'] = name
+            movie_info['start_time'] = all_start_times_dict[name]
+            movie_info['mouse_type'] = mouse_type
+            movie_info['interaction_start'] = None
+            movie_info['interaction_end'] = None
+            movie_info['mouse_type'] = mouse_type
+
+            movie_info_dict[name] = movie_info
+
+            if plot_fluor_around_peaks:
+                if clip_window is not None and clip_window_origin is not None:
+                    plotFluorAroundPeaks(fluor_data, time_stamps, peak_inds,
+                                         clip_window, clip_window_origin,
+                                         output_dir, name, movie_info['start_time'])
+
+            # print 'peak_inds', peak_inds, np.max(peak_inds)
+            # print "movie_info['peak_times'] ", movie_info['peak_times'] 
+            # print "movie_info['peak_vals']", movie_info['peak_vals']
+            # pp = pprint.PrettyPrinter(indent=4)
+            # pp.pprint( trial['labels'])
+
+    return movie_info_dict
+
+
+def load_clip_times(clip_list_file, path_to_data, start_times_file, output_dir, mouse_type):
     """
     Loads the three dictionaries all_peak_times_dict, all_peak_vals_dict, 
     and all_local_times_dict from the provided .pkl clip_list_file, which
@@ -70,7 +234,6 @@ def load_clip_times(clip_list_file, path_to_data, start_times_file, output_dir):
             dict{movie_file: path to movie file (will check for avi or mp4), 
                  peak_times: array with times of each peak,
                  peak_vals: array with vals of each peak,
-                 local_times: array with local times of each peak
                 }
         }
     """
@@ -84,19 +247,20 @@ def load_clip_times(clip_list_file, path_to_data, start_times_file, output_dir):
     all_start_times_dict = load_start_times(start_times_file)
 
     movie_info_dict = dict()
-    for key in all_peak_times_dict.keys():
+    for name in all_peak_times_dict.keys():
         movie_info = dict()
-        movie_info['movie_file'] = get_movie_file(key, path_to_data)
-        movie_info['output_file'] = get_output_file(key, path_to_data, output_dir)
-        movie_info['peak_times'] = all_peak_times_dict[key]
-        movie_info['peak_vals'] = all_peak_vals_dict[key]
-        movie_info['local_times'] = all_local_times_dict[key]
-        movie_info['name'] = key
-        movie_info['start_time'] = all_start_times_dict[key]
-        movie_info['interaction_start'] = all_interaction_start_times_dict[key]
-        movie_info['interaction_end'] = all_interaction_end_times_dict[key]
+        movie_info['movie_file'] = get_movie_file(name, path_to_data)
+        movie_info['output_file'] = get_output_file(name, output_dir)
+        movie_info['peak_times'] = all_peak_times_dict[name]
+        movie_info['peak_vals'] = all_peak_vals_dict[name]
+    #    movie_info['local_times'] = all_local_times_dict[name]
+        movie_info['name'] = name
+        movie_info['start_time'] = all_start_times_dict[name]
+        movie_info['interaction_start'] = all_interaction_start_times_dict[name]
+        movie_info['interaction_end'] = all_interaction_end_times_dict[name]
+        movie_info['mouse_type'] = mouse_type
 
-        movie_info_dict[key] = movie_info
+        movie_info_dict[name] = movie_info
     return movie_info_dict
 
 def get_time_string(t):
@@ -123,8 +287,9 @@ def splice_clips(list_file, output_file):
     #cmd += ['> /dev/null 2>&1 < /dev/null'] 
 
     cmd_string = ''.join(["%s " % el for el in cmd])
+    print "Splicing clips: ", cmd_string
     #print '-->Running: ', cmd_string
-    p = subprocess.Popen(cmd, shell=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    p = subprocess.Popen(cmd, shell=False, stdout=subprocess.PIPE)#, stderr=subprocess.PIPE)
     p.wait()
 
 def delete_clips(clip_list_arr):
@@ -261,7 +426,8 @@ def cut_into_clips(movie_info,
         clip_all_interactions = False
 
     if clip_window_origin == 'interaction_start':
-        start_clip_times = interaction_start_times
+        if interaction_start_times is not None:
+            start_clip_times = interaction_start_times
     elif clip_window_origin == 'peak':
         start_clip_times = peak_times
 
@@ -281,7 +447,7 @@ def cut_into_clips(movie_info,
             v = peak_vals[i]
             #start = get_time_string(t)
             start = str(t)
-            if clip_all_interactions:
+            if clip_all_interactions and interaction_end_times is not None:
                 duration = str(interaction_end_times[i] - start_clip_times[i])
             else:
                 duration = str(clip_window[0] + clip_window[1])
@@ -294,25 +460,37 @@ def cut_into_clips(movie_info,
                 if len(clip_list_arr) == 0 or clip_list_arr[-1] != new_file:
                     clip_list_arr.append(new_file)
 
-                    cmd = ['ffmpeg']
-                    cmd += ['-i', movie_file+'.mp4']
-                    cmd += ['-ss', start]
-                    cmd += ['-t', duration]
+                    ## THIS IS REPLACED BY shlex.split
+                    # cmd = ['ffmpeg']
+                    # cmd += ['-i', movie_file+'.mp4']
+                    # cmd += ['-ss', start]
+                    # cmd += ['-t', duration]
+                    # if draw_box:
+                    #     cmd += ['-vf']
+                    #     cmd += ['drawbox=0:0:100:100:red'+':t=1']
+                    #     cmd += ['-vf']
+                    #     #cmd += ['drawbox=0:0:100:100:red:t='+str(min(100, int(v*1000)/5.0))]
+                    #     cmd += ['drawbox=640:0:100:100:red:t='+str(min(100, int(v*1000)/5.0))]
+
+                    #     cmd += [' -vf drawtext=\"fontfile=/opt/X11/share/fonts/TTF/VeraMoBd.ttf: text='+str(i)+': fontcolor=white@0.8: x=610: y=460\"' ]
+                    # cmd += ['-y']
+                    # cmd += [new_file]
+                    # #cmd += ['> /dev/null 2>&1 < /dev/null'] #not 100% sure what this does
+                    #                                         # it is supposed to not send
+                    #                                         # output to the PIPE buffer
+
+
+                    cmd = 'ffmpeg -i '+str(movie_file)+'.mp4 -ss '+str(start)+' -t '+str(duration)
                     if draw_box:
-                        cmd += ['-vf']
-                        cmd += ['drawbox=0:0:100:100:red'+':t=1']
-                        cmd += ['-vf']
-                        #cmd += ['drawbox=0:0:100:100:red:t='+str(min(100, int(v*1000)/5.0))]
-                        cmd += ['drawbox=640:0:100:100:red:t='+str(min(100, int(v*1000)/5.0))]
-                    cmd += ['-y']
-                    cmd += [new_file]
-                    #cmd += ['> /dev/null 2>&1 < /dev/null'] #not 100% sure what this does
-                                                            # it is supposed to not send
-                                                            # output to the PIPE buffer
+                        cmd = cmd+' -vf drawbox=0:0:100:100:red:t=1 -vf drawbox=640:0:100:100:red:t='+str(min(100, int(v*1000)/5.0))+' -vf drawtext=\"fontfile=/opt/X11/share/fonts/TTF/VeraMoBd.ttf: text='+str(i)+': fontcolor=white@0.8: x=610: y=460\"' 
+                    cmd = cmd + ' -y '+new_file
+
+                    
+                    args = shlex.split(cmd)
 
                     cmd_string = ''.join(["%s " % el for el in cmd])
-                    print '-->Running: ', cmd_string
-                    p = subprocess.Popen(cmd, shell=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                    print '-->Running: ', cmd
+                    p = subprocess.Popen(args, shell=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                     p.wait()
 
     return clip_list_arr
@@ -385,6 +563,15 @@ def generate_clips(movie_info, clip_window, clip_window_origin,
 
     return clip_list_arr, clips_to_delete
 
+def move_clips_to_folder(clip_list_arr, output_file):
+    dir = output_file + '/'
+    if not os.path.exists(dir):
+        os.makedirs(dir)
+
+    for clip in clip_list_arr:
+        source = clip
+        destination = dir + clip.split('/')[-1]
+        os.rename(source, destination)
 
 
 def cut_and_splice_clips(movie_info, 
@@ -409,7 +596,8 @@ def cut_and_splice_clips(movie_info,
     output_file = movie_info['output_file']
     list_file = write_list_file(output_file, clip_list_arr)
     splice_clips(list_file, output_file)
-    delete_clips(clips_to_delete)
+    move_clips_to_folder(clips_to_delete, movie_info['output_file'])
+#    delete_clips(clips_to_delete)
 
 
 def check_key(key, options):
@@ -437,6 +625,7 @@ def make_time_series_animation(movie_info,
     corresponding to the trial specified in movie_info.
     """
     animal_id, exp_date, exp_type = movie_info['name'].split('_')
+    print "making time series animation"
 
     cmd = ['python', '../analysis/group_analysis.py']
     cmd += ['--input-path='+str(time_series_data_path)]
@@ -474,8 +663,8 @@ def overlay_time_series(movie_info, time_series_data_path, output_dir, mouse_typ
 
     #Place animation and overlay in two separate folders
     output_dir = '/'.join(output_dir.split('/')[:-1])
-    overlay_dir = output_dir + '/Overlay/Standardized2/'
-    animation_dir = output_dir + '/Time_Series_Animation/Standardized2/'
+    overlay_dir = output_dir + '/Overlay/Standardized_post_SfN_label_test/'
+    animation_dir = output_dir + '/Time_Series_Animation/Standardized_post_Sfn_label_test/'
     check_dir(overlay_dir)
     check_dir(animation_dir)
 
@@ -492,15 +681,14 @@ def overlay_time_series(movie_info, time_series_data_path, output_dir, mouse_typ
         print "Animation file already exists: ", key
 
     #Overlay animation in corner of behavior video
-#    movie_file_tt = check_video_timestamps(movie_info['movie_file'], desired_format='.mp4', desired_framerate=30)
     movie_file = movie_info['movie_file']
     overlay_filename = overlay_dir + key + format
     if not os.path.isfile(overlay_filename):
         start_time = movie_info['start_time']
-        cmd = ['ffmpeg']
-        cmd += ['-ss', start_time]
-        cmd += ['-i', movie_file]
-        cmd += ['filter_complex']
+        # cmd = ['ffmpeg']
+        # cmd += ['-ss', start_time]
+        # cmd += ['-i', movie_file]
+        # cmd += ['filter_complex']
 
         cmd = 'ffmpeg -ss '+str(start_time)+' -i '+movie_file+' -i '+animation_filename+' -filter_complex \"[0:v] setpts=PTS-STARTPTS, scale=640x480 [background]; [1:v] setpts=PTS-STARTPTS, scale=100x200 [upperleft]; [background][upperleft] overlay=shortest=1\" -c:v libx264 -y '+overlay_filename
         args = shlex.split(cmd)
@@ -561,6 +749,17 @@ if __name__ == '__main__':
     parser.add_option("", "--exp-type", dest="exp_type", 
                       default=None,
                       help="Limit group analysis to trials of a specific type.")
+
+    parser.add_option("", "--fluor-time-peak-label-format", dest="fluor_time_peak_label_format",
+                      action="store_true", default=False,
+                      help=" Provide data from which to make video clips as a dict "
+                           " where each entry corresponds to a behavioral trial and is"
+                           " itself a dict with keys: "
+                           " 'fluor_data', 'time_stamps', 'peak_indices', and 'labels'"
+                           " where 'labels' is an array with entries such as "
+                           " 401_20130108_homecagenovel_GC5 that label each trial in"
+                           " the provided data.")
+
     (options, args) = parser.parse_args()
 
     print "options.clip_window", options.clip_window
@@ -569,7 +768,7 @@ if __name__ == '__main__':
     peak_thresh = float(options.peak_thresh)
     divider_clip = options.divider_clip
     clip_window_origin = options.clip_window_origin
-    mouse_type = options.mouse_type
+#    mouse_type = options.mouse_type
 
     # Check for required input path
     if len(args) < 4:
@@ -578,18 +777,34 @@ if __name__ == '__main__':
         print ' contain three dicts:'
         print ' all_peak_times_dict, all_peak_vals_dict, all_local_times_dict,'
         print ' where the key of each dict is a name of the format: 409_20130327_homecagesocial .' 
+        print 'You can also use the format specified by the flag --fluor-time-peak-label-format.'
         sys.exit(1)
     video_data_path = args[0]
     start_times_file = args[1]
     time_series_data_path = args[2]
     clip_list_file = args[3]
 
-    movie_info_dict = load_clip_times(clip_list_file, video_data_path, start_times_file, output_dir)
+    if options.fluor_time_peak_label_format:
+        movie_info_dict = load_clip_times_FPTL_format(clip_list_file, 
+                                                      video_data_path, 
+                                                      start_times_file, 
+                                                      output_dir,
+                                                      clip_window,
+                                                      clip_window_origin,
+                                                      plot_fluor_around_peaks=False)
+    else:
+        movie_info_dict = load_clip_times(clip_list_file, 
+                                          video_data_path, start_times_file, 
+                                          output_dir, options.mouse_type)
 
     #print "KEYS: ", movie_info_dict.keys()
     for key in movie_info_dict:
+        print "movie_info_dict", movie_info_dict.keys()
+        print "key", key
         if check_key(key, options):
             movie_info = movie_info_dict[key]
+            mouse_type = movie_info_dict[key]['mouse_type']
+
             movie_file_tt = check_video_timestamps(movie_info['movie_file'], 
                                    desired_format='.mp4', 
                                    desired_framerate=30)
@@ -606,9 +821,6 @@ if __name__ == '__main__':
                                  clip_window_origin = clip_window_origin,
                                  peak_thresh=peak_thresh, divider_clip=divider_clip)
             
-            #movie_file = movie_info_dict[key]['movie_file']
-            #check_video_timestamps(movie_file)
-            #check_video_format(movie_file)
 
 
 

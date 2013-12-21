@@ -1512,7 +1512,12 @@ def timeToMSF(time, fps=30):
     seconds = int(np.floor(time - mins*60))
     ms = time - seconds - mins*60
     frames = int(np.floor(ms*fps))
-    return mins, seconds, frames
+    return mins, seconds, frames, '{0:.0f}:{1:.0f}:{2:.0f}'.format(mins, seconds, frames)
+
+def frameToMSF(n, fps=30.0):
+    time = n/fps
+    mins, seconds, frames, time_string = timeToMSF(time, fps)
+    return time_string
 
 def time_series_animation(  all_data, 
                             options, 
@@ -1568,9 +1573,15 @@ def time_series_animation(  all_data,
                     frames = FA.fluor_data[frame_indices]
                     frames = FA.smooth(frames, 2, window_type='gaussian')
 
-                    print "frame_times", np.max(np.abs(frame_times - FA.time_stamps[frame_indices]))
+                    print "max diff between frame times and actual times:", np.max(np.abs(frame_times - FA.time_stamps[frame_indices]))
                     print "frame_indices", frame_indices
                     print "frames", frames
+
+                    plt.figure()
+                    plt.plot(frame_times)
+                    plt.plot(FA.time_stamps[frame_indices])
+                    plt.title('Time stamps (should be linear)')
+                    plt.savefig(options.output_path+str(animal_id)+'_'+str(date)+'_'+str(exp_type)+'_timestamps')
 
 
                     maxf = np.max(frames)
@@ -1597,7 +1608,9 @@ def time_series_animation(  all_data,
                         normalize = 0.2
                     else:
                         normalize = 1.0
-                    plt.text(.05, .95, str(normalize)+' dF/F')
+                    txt = plt.text(.01, .9, str(normalize)+' dF/F', fontsize=25)
+                    time_text = ax.text(0.5, 0.9, '', transform=ax.transAxes, fontsize=25)
+                    
 
                     def update_img(n):
                         #h = (frames[n]-minf)/(maxf - minf)
@@ -1610,7 +1623,11 @@ def time_series_animation(  all_data,
                         # rectangle.set_x(0.5 - h/2.0)
                         # rectangle.set_y(0.5 - h/2.0)
                         #rectangle.set_alpha(0.1)
-                        return rectangle
+                        
+                        #m, s, f, time_string = timeToMSF(frame_times[n])
+                        #time_text.set_text(time_string)
+                        time_text.set_text("{0:.2f}".format(frame_times[n]))
+                        return rectangle, time_text
 
                     starttime = time.time()
                     nframes = len(frames) - 1#- 14000
@@ -1625,7 +1642,7 @@ def time_series_animation(  all_data,
 
                 ## PLOT FULL TIME SERIES
                 end_time = FA.time_stamps[-1]
-                mins, seconds, frames = timeToMSF(end_time)
+                mins, seconds, frames, time_string = timeToMSF(end_time)
 
                 # mins = int(np.floor(FA.time_stamps[-1]/60))
                 # seconds = int(np.floor(FA.time_stamps[-1] - mins*60))
@@ -1636,6 +1653,7 @@ def time_series_animation(  all_data,
                 plt.plot(FA.time_stamps, FA.fluor_data)
                 plt.title('Full time series. Time: '+str(end_time)+', '+str(mins)+':'+str(seconds)+':'+str(frames))
                 plt.savefig(options.output_path+str(animal_id)+'_'+str(date)+'_'+str(exp_type)+'_full')
+
                 ## END PLOT FULL TIME SERIES
 
 
