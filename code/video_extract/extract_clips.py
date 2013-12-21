@@ -112,11 +112,10 @@ def  plotFluorAroundPeaks(fluor_data, time_stamps, peak_inds,
                 iter += 1
         
         end_time = time_stamps[-1]
-        mins = int(np.floor(time_stamps[-1]/60))
-        seconds = int(np.floor(time_stamps[-1] - mins*60))
-        ms = time_stamps[-1] - seconds - mins*60
-        frames = int(np.floor(ms*30))
-
+        # mins = int(np.floor(time_stamps[-1]/60))
+        # seconds = int(np.floor(time_stamps[-1] - mins*60))
+        # ms = time_stamps[-1] - seconds - mins*60
+        # frames = int(np.floor(ms*30))
         mins, seconds, frames, time_string = timeToMSF(end_time)
 
         plt.figure()
@@ -685,10 +684,6 @@ def overlay_time_series(movie_info, time_series_data_path, output_dir, mouse_typ
     overlay_filename = overlay_dir + key + format
     if not os.path.isfile(overlay_filename):
         start_time = movie_info['start_time']
-        # cmd = ['ffmpeg']
-        # cmd += ['-ss', start_time]
-        # cmd += ['-i', movie_file]
-        # cmd += ['filter_complex']
 
         cmd = 'ffmpeg -ss '+str(start_time)+' -i '+movie_file+' -i '+animation_filename+' -filter_complex \"[0:v] setpts=PTS-STARTPTS, scale=640x480 [background]; [1:v] setpts=PTS-STARTPTS, scale=100x200 [upperleft]; [background][upperleft] overlay=shortest=1\" -c:v libx264 -y '+overlay_filename
         args = shlex.split(cmd)
