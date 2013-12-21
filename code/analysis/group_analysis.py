@@ -1503,6 +1503,17 @@ def event_length_histogram(all_data,
     else:
         pl.show()
 
+def timeToMSF(time, fps=30):
+    """
+    Convert time in seconds to time in
+    minutes:seconds:frames
+    """
+    mins = int(np.floor(time/60))
+    seconds = int(np.floor(time - mins*60))
+    ms = time - seconds - mins*60
+    frames = int(np.floor(ms*fps))
+    return mins, seconds, frames
+
 def time_series_animation(  all_data, 
                             options, 
                             set_exp_type, 
@@ -1548,68 +1559,84 @@ def time_series_animation(  all_data,
                                              exp_type)
 
             if success != -1:
-                print "success:", animal_id, date, exp_type
-                #make array of frames that match fps
-                frame_times = np.arange(0, np.max(FA.time_stamps), 1.0/fps, dtype=float)
-                frame_indices = np.searchsorted(FA.time_stamps, frame_times)
-                frames = FA.fluor_data[frame_indices]
-                frames = FA.smooth(frames, 2, window_type='gaussian')
+                plotAnimation = True
+                if plotAnimation:
+                    print "success:", animal_id, date, exp_type
+                    #make array of frames that match fps
+                    frame_times = np.arange(0, np.max(FA.time_stamps), 1.0/fps, dtype=float)
+                    frame_indices = np.searchsorted(FA.time_stamps, frame_times)
+                    frames = FA.fluor_data[frame_indices]
+                    frames = FA.smooth(frames, 2, window_type='gaussian')
+
+                    print "frame_times", np.max(np.abs(frame_times - FA.time_stamps[frame_indices]))
+                    print "frame_indices", frame_indices
+                    print "frames", frames
 
 
-                print "frame_times", np.max(np.abs(frame_times - FA.time_stamps[frame_indices]))
-                print "frame_indices", frame_indices
-                print "frames", frames
+                    maxf = np.max(frames)
+                    minf = np.min(frames)
+                    dpi = 100
 
+                    fig = plt.figure()
+                    fig.set_facecolor('w')
+                    ax = plt.axes(frameon=False)
+                    ax.set_aspect('equal')
+                    ax.get_xaxis().set_visible(False)
+                    ax.get_yaxis().set_visible(False)
+                    bg = plt.Rectangle((0, 0), 1, 1, fc='w', ec='w')
+                    plt.gca().add_patch(bg)
+                    h = .5
+                    rectangle = plt.Rectangle((h - h/2.0, h - h/2.0), h, h, fc='r', ec='r')
+                    plt.gca().add_patch(rectangle)
+                    fig.set_size_inches([4,4])
 
-                maxf = np.max(frames)
-                minf = np.min(frames)
-                dpi = 100
+                    plt.tight_layout(pad=0.0, h_pad=0.1, w_pad=0.1)
+    #                plt.tight_layout(rect=(0, 0, 2, 2))
+                    
+                    if options.mouse_type == 'GC5_NAcprojection':
+                        normalize = 0.2
+                    else:
+                        normalize = 1.0
+                    plt.text(.05, .95, str(normalize)+' dF/F')
 
-                fig = plt.figure()
-                fig.set_facecolor('w')
-                ax = plt.axes(frameon=False)
-                ax.set_aspect('equal')
-                ax.get_xaxis().set_visible(False)
-                ax.get_yaxis().set_visible(False)
-                bg = plt.Rectangle((0, 0), 1, 1, fc='w', ec='w')
-                plt.gca().add_patch(bg)
-                h = .5
-                rectangle = plt.Rectangle((h - h/2.0, h - h/2.0), h, h, fc='r', ec='r')
-                plt.gca().add_patch(rectangle)
-                fig.set_size_inches([4,4])
+                    def update_img(n):
+                        #h = (frames[n]-minf)/(maxf - minf)
+                        h = min(1, (frames[n]-minf)/normalize)
+                        rectangle.set_height(h)
+                        rectangle.set_width(1.0)
+                        rectangle.set_x(0.0)
+                        rectangle.set_y(0.0)
+                        # rectangle.set_width(h)
+                        # rectangle.set_x(0.5 - h/2.0)
+                        # rectangle.set_y(0.5 - h/2.0)
+                        #rectangle.set_alpha(0.1)
+                        return rectangle
 
-                plt.tight_layout(pad=0.0, h_pad=0.1, w_pad=0.1)
-#                plt.tight_layout(rect=(0, 0, 2, 2))
-                
-                if options.mouse_type == 'GC5_NAcprojection':
-                    normalize = 0.2
-                else:
-                    normalize = 1.0
+                    starttime = time.time()
+                    nframes = len(frames) - 1#- 14000
+                    print "LEN(FRAMES)", nframes
+                    ani = animation.FuncAnimation(fig,update_img, frames=nframes, interval=30)
+                    writer = animation.writers['ffmpeg'](fps=30)
 
-                def update_img(n):
-                    #h = (frames[n]-minf)/(maxf - minf)
-                    h = min(1, (frames[n]-minf)/normalize)
-                    rectangle.set_height(h)
-                    rectangle.set_width(1.0)
-                    rectangle.set_x(0.0)
-                    rectangle.set_y(0.0)
-                    # rectangle.set_width(h)
-                    # rectangle.set_x(0.5 - h/2.0)
-                    # rectangle.set_y(0.5 - h/2.0)
-                    #rectangle.set_alpha(0.1)
-                    return rectangle
+                    outpath = options.output_path+str(animal_id)+'_'+str(date)+'_'+str(exp_type)+'.mp4'
+                    ani.save(outpath,writer=writer,dpi=dpi)
+                    print "Total time: ", time.time() - starttime
+                    print "saved", outpath
 
-                starttime = time.time()
-                nframes = len(frames) - 1#- 14000
-                print "LEN(FRAMES)", nframes
-                ani = animation.FuncAnimation(fig,update_img, frames=nframes, interval=30)
-                writer = animation.writers['ffmpeg'](fps=30)
+                ## PLOT FULL TIME SERIES
+                end_time = FA.time_stamps[-1]
+                mins, seconds, frames = timeToMSF(end_time)
 
-                outpath = options.output_path+str(animal_id)+'_'+str(date)+'_'+str(exp_type)+'.mp4'
-                ani.save(outpath,writer=writer,dpi=dpi)
-                print "Total time: ", time.time() - starttime
-                print "saved", outpath
-                return ani
+                # mins = int(np.floor(FA.time_stamps[-1]/60))
+                # seconds = int(np.floor(FA.time_stamps[-1] - mins*60))
+                # ms = FA.time_stamps[-1] - seconds - mins*60
+                # frames = int(np.floor(ms*30))
+
+                plt.figure()
+                plt.plot(FA.time_stamps, FA.fluor_data)
+                plt.title('Full time series. Time: '+str(end_time)+', '+str(mins)+':'+str(seconds)+':'+str(frames))
+                plt.savefig(options.output_path+str(animal_id)+'_'+str(date)+'_'+str(exp_type)+'_full')
+                ## END PLOT FULL TIME SERIES
 
 
 def get_blind_data(all_data, options, exclude_sucrose):
