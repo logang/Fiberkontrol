@@ -1,13 +1,13 @@
-spike_times_path='/Users/isaackauvar/Dropbox/FiberPhotometry/DATA/processed_fixed_labels.pkl'
+spike_times_path='/Users/isaackauvar/Dropbox/FiberPhotometry/DATA/processed.pkl'
 video_data_path='/Users/isaackauvar/Dropbox/Fiberkontrol/Fiberkontrol_Data/Lisa_Data/'
 start_times_file='/Users/isaackauvar/Dropbox/Fiberkontrol/Fiberkontrol_Data/Lisa_Data/video_start_times_precise.txt'
 time_series_data_path='/Users/isaackauvar/Documents/2012-2013/ZDlab/FiberKontrol/Results/Cell/all_data_post_SfN_raw.h5'
 output_directory='/Users/isaackauvar/Documents/2012-2013/ZDlab/FiberKontrol/Results/Cell/Videos/'
 data_paths=$video_data_path' '$start_times_file' '$time_series_data_path' '$spike_times_path
 
-output_folder='all_peaks_from_logan_peak_finding_test_label'
+output_folder='all_peaks_from_logan_peak_finding_aligned'
 output=$output_directory$output_folder
-clip_window='3:3'
+clip_window='2:2'
 clip_window_origin='peak'
 peak_thresh='0.00'
 divider_clip='/Users/isaackauvar/Documents/2012-2013/ZDlab/FiberKontrol/Fiberkontrol/code/video_extract/black_2.mp4'

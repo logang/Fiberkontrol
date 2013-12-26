@@ -445,60 +445,65 @@ def cut_into_clips(movie_info,
     duration = 0
     print "start_clip_times", start_clip_times
     for i in range(len(start_clip_times)):
-        if i == 0 or (start_clip_times[i] - start_clip_times[i-1] > float(duration)):
-        #if i == 0 or (start_clip_times[i] - start_clip_times[i-1] > 0):
-            if include_start_time:
-                t = start_clip_times[i] + start_time - clip_window[0]
+        ## If you wanted to make sure that video clips do not overlap, uncomment the below if statement:
+        #if i == 0 or (start_clip_times[i] - start_clip_times[i-1] > float(duration)):
+        if include_start_time:
+            t = start_clip_times[i] + start_time - clip_window[0]
+        else:
+            t = start_clip_times[i] - clip_window[0]
+        v = peak_vals[i]
+        #start = get_time_string(t)
+        start = str(t)
+        if clip_all_interactions and interaction_end_times is not None:
+            duration = str(interaction_end_times[i] - start_clip_times[i])
+        else:
+            duration = str(clip_window[0] + clip_window[1])
+        print 'start', start, 'duration', duration
+
+        new_file = output_file+'_'+str(int(t*100))+'_clip.mp4'
+        if v<peak_thresh:
+            print "PEAK LESS THAN THRESHOLD: ", v, "thresh: ", peak_thresh
+        if v>=peak_thresh or clip_all_interactions:
+            if len(clip_list_arr) == 0 or clip_list_arr[-1] != new_file:
+                print "Clipping: " + str(i)
+                clip_list_arr.append(new_file)
+
+                ## THIS IS REPLACED BY shlex.split
+                # cmd = ['ffmpeg']
+                # cmd += ['-i', movie_file+'.mp4']
+                # cmd += ['-ss', start]
+                # cmd += ['-t', duration]
+                # if draw_box:
+                #     cmd += ['-vf']
+                #     cmd += ['drawbox=0:0:100:100:red'+':t=1']
+                #     cmd += ['-vf']
+                #     #cmd += ['drawbox=0:0:100:100:red:t='+str(min(100, int(v*1000)/5.0))]
+                #     cmd += ['drawbox=640:0:100:100:red:t='+str(min(100, int(v*1000)/5.0))]
+
+                #     cmd += [' -vf drawtext=\"fontfile=/opt/X11/share/fonts/TTF/VeraMoBd.ttf: text='+str(i)+': fontcolor=white@0.8: x=610: y=460\"' ]
+                # cmd += ['-y']
+                # cmd += [new_file]
+                # #cmd += ['> /dev/null 2>&1 < /dev/null'] #not 100% sure what this does
+                #                                         # it is supposed to not send
+                #                                         # output to the PIPE buffer
+
+
+                cmd = 'ffmpeg -i '+str(movie_file)+'.mp4 -ss '+str(start)+' -t '+str(duration)
+                if draw_box:
+                    cmd = cmd+' -vf drawbox=0:0:100:100:red:t=1 -vf drawbox=640:0:100:100:red:t='+str(min(100, int(v*1000)/5.0))+' -vf drawtext=\"fontfile=/opt/X11/share/fonts/TTF/VeraMoBd.ttf: text='+str(i)+': fontcolor=white@0.8: x=610: y=460\"' 
+                cmd = cmd + ' -y '+new_file
+
+                
+                args = shlex.split(cmd)
+
+                cmd_string = ''.join(["%s " % el for el in cmd])
+                print '-->Running: ', cmd
+                p = subprocess.Popen(args, shell=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                p.wait()
             else:
-                t = start_clip_times[i] - clip_window[0]
-            v = peak_vals[i]
-            #start = get_time_string(t)
-            start = str(t)
-            if clip_all_interactions and interaction_end_times is not None:
-                duration = str(interaction_end_times[i] - start_clip_times[i])
-            else:
-                duration = str(clip_window[0] + clip_window[1])
-            print 'start', start, 'duration', duration
-
-            new_file = output_file+'_'+str(int(t*100))+'_clip.mp4'
-            if v<peak_thresh:
-                print "PEAK LESS THAN THRESHOLD: ", v, "thresh: ", peak_thresh
-            if v>=peak_thresh or clip_all_interactions:
-                if len(clip_list_arr) == 0 or clip_list_arr[-1] != new_file:
-                    clip_list_arr.append(new_file)
-
-                    ## THIS IS REPLACED BY shlex.split
-                    # cmd = ['ffmpeg']
-                    # cmd += ['-i', movie_file+'.mp4']
-                    # cmd += ['-ss', start]
-                    # cmd += ['-t', duration]
-                    # if draw_box:
-                    #     cmd += ['-vf']
-                    #     cmd += ['drawbox=0:0:100:100:red'+':t=1']
-                    #     cmd += ['-vf']
-                    #     #cmd += ['drawbox=0:0:100:100:red:t='+str(min(100, int(v*1000)/5.0))]
-                    #     cmd += ['drawbox=640:0:100:100:red:t='+str(min(100, int(v*1000)/5.0))]
-
-                    #     cmd += [' -vf drawtext=\"fontfile=/opt/X11/share/fonts/TTF/VeraMoBd.ttf: text='+str(i)+': fontcolor=white@0.8: x=610: y=460\"' ]
-                    # cmd += ['-y']
-                    # cmd += [new_file]
-                    # #cmd += ['> /dev/null 2>&1 < /dev/null'] #not 100% sure what this does
-                    #                                         # it is supposed to not send
-                    #                                         # output to the PIPE buffer
-
-
-                    cmd = 'ffmpeg -i '+str(movie_file)+'.mp4 -ss '+str(start)+' -t '+str(duration)
-                    if draw_box:
-                        cmd = cmd+' -vf drawbox=0:0:100:100:red:t=1 -vf drawbox=640:0:100:100:red:t='+str(min(100, int(v*1000)/5.0))+' -vf drawtext=\"fontfile=/opt/X11/share/fonts/TTF/VeraMoBd.ttf: text='+str(i)+': fontcolor=white@0.8: x=610: y=460\"' 
-                    cmd = cmd + ' -y '+new_file
-
-                    
-                    args = shlex.split(cmd)
-
-                    cmd_string = ''.join(["%s " % el for el in cmd])
-                    print '-->Running: ', cmd
-                    p = subprocess.Popen(args, shell=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                    p.wait()
+                print "Error, did not clip: " + str(i)
+                print "peak_thresh: " + str(peak_thresh)
+                print "start_clip_times[i] - start_clip_times[i-1]" + str(start_clip_times[i] - start_clip_times[i-1])
 
     return clip_list_arr
 
@@ -670,8 +675,8 @@ def overlay_time_series(movie_info, time_series_data_path, output_dir, mouse_typ
 
     #Place animation and overlay in two separate folders
     output_dir = '/'.join(output_dir.split('/')[:-1])
-    overlay_dir = output_dir + '/Overlay/Standardized_post_SfN_label_test/'
-    animation_dir = output_dir + '/Time_Series_Animation/Standardized_post_Sfn_label_test/'
+    overlay_dir = output_dir + '/Overlay/Standardized_post_SfN_aligned/'
+    animation_dir = output_dir + '/Time_Series_Animation/Standardized_post_Sfn_aligned/'
     check_dir(overlay_dir)
     check_dir(animation_dir)
 

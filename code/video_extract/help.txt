@@ -7,6 +7,10 @@ For checking that the video clips at each peak are correctly timed (in particula
 
 Steps for fixing and testing video peak data:
 
+ENSURE YOU ARE IN THE stdpy VIRTUALENV:
+workon stdpy
+
+
 0) in video_extract/run_extract_clips.sh
 change 'output_folder' to something new, i.e. 'all_peaks_from_logan_peak_finding_test_undecimated'
 
@@ -23,6 +27,8 @@ run analysis/compare_decimated_with_original.py
 
 2) In extract_clips.py
 In main function, change call to load_clip_times_FPTL_format() so that plot_fluor_around_peaks=True
+This plots and saves the time series around each peak before running the video splicing script (thus, this takes a while and is annoying for debugging).
+
 
 3) In extract_clips.py
 In overlay_time_series():
