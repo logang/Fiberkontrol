@@ -487,7 +487,8 @@ def cut_into_clips(movie_info,
             duration = str(clip_window[0] + clip_window[1])
         print 'start', start, 'duration', duration
 
-        new_file = output_file+'_'+str(int(t*100))+'_clip.mp4'
+        #new_file = output_file+'_'+str(int(t*100))+'_clip.mp4'
+        new_file = output_file+'_'+str(int(i))+'_clip.mp4'
         if v<peak_thresh:
             print "PEAK LESS THAN THRESHOLD: ", v, "thresh: ", peak_thresh
         if v>=peak_thresh or clip_all_interactions:

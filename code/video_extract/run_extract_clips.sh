@@ -5,7 +5,7 @@ time_series_data_path='/Users/isaackauvar/Documents/2012-2013/ZDlab/FiberKontrol
 output_directory='/Users/isaackauvar/Documents/2012-2013/ZDlab/FiberKontrol/Results/Cell/Videos/'
 data_paths=$video_data_path' '$start_times_file' '$time_series_data_path' '$spike_times_path
 
-output_folder='all_peaks_from_logan_peak_finding_aligned_1_1_with_delay_peak_vals'
+output_folder='all_peaks_from_logan_peak_finding_aligned_1_1_with_delay_simpler_indexing'
 output=$output_directory$output_folder
 clip_window='1:1'
 clip_window_origin='peak'
