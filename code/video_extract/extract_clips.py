@@ -10,6 +10,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from optparse import OptionParser
 import pprint
+import csv
 
 def get_mouse_info(key):
     """
@@ -139,7 +140,8 @@ def load_clip_times_FPTL_format(clip_list_file,
                                 clip_window=None, 
                                 clip_window_origin=None,
                                 plot_fluor_around_peaks=False,
-                                delay = 0.0933492779732 ):
+                                delay = 0.0933492779732,
+                                print_peak_vals=True ):
 
 
     """
@@ -181,6 +183,7 @@ def load_clip_times_FPTL_format(clip_list_file,
     movie_info_dict = dict()
     all_start_times_dict = load_start_times(start_times_file)
 
+    all_peak_vals = dict()
 
     for key in data:
         if key != 'labels':
@@ -205,8 +208,8 @@ def load_clip_times_FPTL_format(clip_list_file,
                 print "using decimated time series"
                 time_stamps = trial['time_stamps_decimated']
                 fluor_data = trial['fluor_data_decimated']
-                time_stamps = time_stamps + delay
-                print "INCLUDING FIR DELAY: ", delay
+                time_stamps = time_stamps - delay
+                print "INCLUDING DELAY from filter: ", delay
 
 
             movie_info['peak_times'] = time_stamps[peak_inds]
@@ -220,11 +223,27 @@ def load_clip_times_FPTL_format(clip_list_file,
 
             movie_info_dict[name] = movie_info
 
+            all_peak_vals[name] = movie_info['peak_vals']
+
             if plot_fluor_around_peaks:
                 if clip_window is not None and clip_window_origin is not None:
                     plotFluorAroundPeaks(fluor_data, time_stamps, peak_inds,
                                          clip_window, clip_window_origin,
                                          output_dir, name, movie_info['start_time'])
+
+    if print_peak_vals:
+        output_folder = output_dir + '/peak_vals/'
+        if not os.path.exists(output_folder):
+            os.makedirs(output_folder)
+        w = csv.writer(open(output_folder+'peak_vals.csv', "w"), delimiter=',')
+        for key, val in all_peak_vals.items():
+            w.writerow([key] + [', '.join([str(x) for x in val])])
+
+        pickle.dump( all_peak_vals, open( output_folder + 'peak_vals.pkl', "wb" ) )
+
+
+
+
 
             ## Print for debugging, and to check that labels match up with blind data
             # print 'peak_inds', peak_inds, np.max(peak_inds)
@@ -808,7 +827,8 @@ if __name__ == '__main__':
                                                       clip_window,
                                                       clip_window_origin,
                                                       plot_fluor_around_peaks=True,
-                                                      delay = 0.0933492779732)
+                                                      delay = 0.0933492779732,
+                                                      print_peak_vals=True )
     else:
         movie_info_dict = load_clip_times(clip_list_file, 
                                           video_data_path, start_times_file, 
