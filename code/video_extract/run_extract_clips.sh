@@ -5,9 +5,9 @@ time_series_data_path='/Users/isaackauvar/Documents/2012-2013/ZDlab/FiberKontrol
 output_directory='/Users/isaackauvar/Documents/2012-2013/ZDlab/FiberKontrol/Results/Cell/Videos/'
 data_paths=$video_data_path' '$start_times_file' '$time_series_data_path' '$spike_times_path
 
-output_folder='all_peaks_from_logan_peak_finding_aligned'
+output_folder='all_peaks_from_logan_peak_finding_aligned_1_1_with_delay'
 output=$output_directory$output_folder
-clip_window='2:2'
+clip_window='1:1'
 clip_window_origin='peak'
 peak_thresh='0.00'
 divider_clip='/Users/isaackauvar/Documents/2012-2013/ZDlab/FiberKontrol/Fiberkontrol/code/video_extract/black_2.mp4'

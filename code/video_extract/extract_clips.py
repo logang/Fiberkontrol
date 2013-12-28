@@ -138,7 +138,8 @@ def load_clip_times_FPTL_format(clip_list_file,
                                 output_dir,
                                 clip_window=None, 
                                 clip_window_origin=None,
-                                plot_fluor_around_peaks=False ):
+                                plot_fluor_around_peaks=False,
+                                delay = 0.0933492779732 ):
 
 
     """
@@ -165,6 +166,11 @@ def load_clip_times_FPTL_format(clip_list_file,
 
     Include clip_window and clip_window_origin to plot the time series
     surrounding each peak (to check that the peak is where it should be).
+
+    delayaccounts for a delay introduced by the FIR filter to
+    decimate the data in the peak finding algorithm. The delay is N/2 
+    indices where N is the degree of the filter (in the default case,
+    N = 30, and 15 indices corresponds to 0.093349 seconds in time_stamps).
     """
 
     print "clip_list_file", clip_list_file
@@ -199,6 +205,8 @@ def load_clip_times_FPTL_format(clip_list_file,
                 print "using decimated time series"
                 time_stamps = trial['time_stamps_decimated']
                 fluor_data = trial['fluor_data_decimated']
+                time_stamps = time_stamps + delay
+                print "INCLUDING FIR DELAY: ", delay
 
 
             movie_info['peak_times'] = time_stamps[peak_inds]
@@ -799,7 +807,8 @@ if __name__ == '__main__':
                                                       output_dir,
                                                       clip_window,
                                                       clip_window_origin,
-                                                      plot_fluor_around_peaks=False)
+                                                      plot_fluor_around_peaks=True,
+                                                      delay = 0.0933492779732)
     else:
         movie_info_dict = load_clip_times(clip_list_file, 
                                           video_data_path, start_times_file, 
