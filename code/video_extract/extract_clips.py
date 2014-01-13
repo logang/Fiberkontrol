@@ -243,6 +243,7 @@ def load_clip_times_FPTL_format(clip_list_file,
 
 
 
+    print movie_info_dict
 
 
             ## Print for debugging, and to check that labels match up with blind data
