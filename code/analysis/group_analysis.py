@@ -93,6 +93,9 @@ def loadFiberAnalyze(FA, options, animal_id, exp_date, exp_type):
     if(success != -1):
         print "denoise"
         FA.fluor_data = np.asarray(denoise(FA.fluor_data))
+        print 'np.max(FA.fluor_data)', np.max(FA.fluor_data)
+        print 'np.min(FA.fluor_data)', np.min(FA.fluor_data)
+
 
     return [FA, success]
 
@@ -1718,6 +1721,54 @@ def get_blind_data(all_data, options, exclude_sucrose):
     pickle.dump( shuffled_time_series_dict, open( filename, "wb" ) )
 
 
+def get_averages(all_data, options, exclude_sucrose=True):
+    """
+    Calculates the mean, variance, and range
+    of all fluorescence data (with normalization 
+    according to fluor_normalization flag).
+    """
+
+    all_time_series = np.array([]);
+
+    for mouse_type in ['GC5', 'GC5_NAcprojection']:
+        [iter_list, animal_id_list, date_list, exp_type_list] = group_iter_list(all_data, options, 
+                                                                            mouse_type=mouse_type)
+        for exp in iter_list:
+            animal_id = exp['animal_id']
+            date = exp['date']
+            exp_type = exp['exp_type']
+
+
+            FA = FiberAnalyze(options)
+            [FA, success] = loadFiberAnalyze(FA,
+                                             options, 
+                                             animal_id, 
+                                             date, 
+                                             exp_type)
+
+            all_time_series = np.append(all_time_series, FA.fluor_data)
+
+            plt.figure()
+            plt.plot(FA.time_stamps, FA.fluor_data)
+            plt.title('Full time series')
+            plt.savefig(options.output_path+str(animal_id)+'_'+str(date)+'_'+str(exp_type)+'_full')
+
+            print mouse_type, animal_id, date, exp_type,'np.shape(FA.fluor_data)', np.shape(FA.fluor_data)
+            print 'mean: ', np.mean(FA.fluor_data), ', max: ', np.max(FA.fluor_data), ', min:', np.min(FA.fluor_data), ', std: ', np.std(FA.fluor_data)
+
+    print 'ALL: mean: ', np.mean(all_time_series), ', max: ', np.max(all_time_series), ', min:', np.min(all_time_series), ', std: ', np.std(all_time_series)
+
+    f = open(options.output_path + 'averages.txt', 'w')
+    f.write('Normalization: ' + FA.fluor_normalization  + '\n')
+    f.write('Behavior: ' + FA.exp_type + '\n')
+    f.write('Mean: ' + str(np.mean(all_time_series)) + '\n')
+    f.write('Max: ' + str(np.max(all_time_series)) + '\n')
+    f.write('Min: ' + str(np.min(all_time_series)) + '\n')
+    f.write('Stdev: ' + str(np.std(all_time_series)) + '\n')
+    f.close()
+
+
+
 #-------------------------------------------------------------------------------------------
 
 def set_and_read_options_parser():
@@ -1836,6 +1887,11 @@ def set_and_read_options_parser():
                       help=(" Make a folder containing all time series,"
                             " excluding sucrose trials, but unlabeled."))
 
+    parser.add_option("", "--averages", dest="averages",
+                      action="store_true", default=False,
+                      help=(" Calculate the mean, variance, and range,"
+                            " of the fluorescence data (with normalization "
+                            " according to fluor_normalization flag)."))
 
     
     (options, args) = parser.parse_args()
@@ -1935,7 +1991,10 @@ if __name__ == "__main__":
                                 )  
 
     elif options.get_blind_data:
-        get_blind_data(all_data, options, exclude_sucrose=True)      
+        get_blind_data(all_data, options, exclude_sucrose=True)  
+
+    elif options.averages:
+        get_averages(all_data, options, exclude_sucrose=True)          
 
 
 # EOF

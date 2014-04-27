@@ -1,15 +1,20 @@
 #!/bin/bash
 
-data_path='/Users/isaackauvar/Documents/2012-2013/ZDlab/FiberKontrol/Results/Cell/sucrose_200um_data_raw.h5'
-output_path='/Users/isaackauvar/Documents/2012-2013/ZDlab/FiberKontrol/Results/Cell/Plots/Finalz_including_20130920_sucrose200um'
+data_path='/Users/isaackauvar/Documents/2012-2013/ZDlab/FiberKontrol/Results/Cell/all_data_post_SfN_raw.h5'
+output_path='/Users/isaackauvar/Documents/2012-2013/ZDlab/FiberKontrol/Results/Cell/Plots/Finalz_post_SfN_000rxn_raw_averages'
+
+plot_type='averages'
+fluor_normalization='raw'
+exp_type='homecagenovel'
+python group_analysis.py --input-path=$data_path --output-path=$output_path/$plot_type/$exp_type/GC5 --$plot_type --mouse-type='GC5' --exp-type=$exp_type --fluor-normalization=$fluor_normalization 
+
+if $(false); then
 
 plot_type=group-plot-time-series
 python group_analysis.py --input-path=$data_path --output-path=$output_path/$plot_type/GC5 --$plot_type --mouse-type='EYFP' --exp-type='homecagesocial'
 
 plot_type=group-plot-time-series
 python group_analysis.py --input-path=$data_path --output-path=$output_path/$plot_type/GC5 --$plot_type --mouse-type='GC5' --exp-type='sucrose'
-
-if $(false); then
 
 plot_type=time-series-animation
 exp_type='homecagesocial'

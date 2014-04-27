@@ -95,8 +95,9 @@ class FiberAnalyze( object ):
                 if self.exp_type != 'sucrose':
                     ## ADD AVERAGE LISA REACTION TIME
                     ## IN SELECTING START TIME OF 
-                    ## BEHAVIORAL SCORING (~400 ms)
+                    ## BEHAVIORAL SCORING? (~400 ms)
                     ## THIS NEEDS TO BE A COMMAND LINE FLAG!!
+                    ## conclusion: doesn't affect results
                     rxn_time = 0.0 # in seconds, hardcoded based on lisa's reaction time
                     shift_index = self.convert_seconds_to_index(rxn_time)
                     print "shift_index", shift_index
@@ -246,11 +247,10 @@ class FiberAnalyze( object ):
             self.fluor_data /= np.max(self.fluor_data)
             self.fluor_data +=0.0000001 # keep strictly positive
             print "--> Normalization: standardized to between 0 and 1. Max of raw fluorescent data: ", np.max(self.fluor_data), "min: ", np.min(self.fluor_data)
-
-
+        
         elif self.fluor_normalization == "raw":
             print "--> Normalization: raw (no normalization). Max of raw fluorescent data: ", np.max(self.fluor_data)
-            pass
+        
         else:
             raise ValueError( self.fluor_normalization, "is not a valid entry for --fluor-normalization.")
 
