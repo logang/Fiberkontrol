@@ -29,6 +29,7 @@ orig_fluor_data = orig[trial]['fluor_data']
 orig_time_stamps = orig[trial]['time_stamps']
 
 new_time_stamps = new_time_stamps - orig_time_stamps[15] ## account for delay imposed by FIR decimation filter
+print "Delay", orig_time_stamps[15]
 
 # new_time_stamps = new_time_stamps * orig_time_stamps[-1]/new_time_stamps[-1]
 # new_peak_time = new_peak_times * orig_time_stamps[-1]/new_time_stamps[-1]
@@ -40,7 +41,6 @@ new_peak_vals = new_fluor_data[new_peak_indices]
 orig_peak_indices = np.searchsorted(orig_time_stamps, new_peak_times, side='left')
 orig_peak_times = orig_time_stamps[orig_peak_indices]
 orig_peak_vals = orig_fluor_data[orig_peak_indices]
-
 
 
 

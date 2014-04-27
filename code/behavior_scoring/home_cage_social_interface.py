@@ -59,8 +59,10 @@ if __name__=='__main__':
     if video_file == '':
         print "Video_file is None"
         sys.exit(1)
+    #video_file = '/Users/isaackauvar/Documents/2012-2013/ZDlab/FiberKontrol/Fiberkontrol/code/behavior_scoring/with_text_30_social.mp4'
     #p = subprocess.Popen(["open", "-a", "vlc", "-g", video_file])
     #p = subprocess.Popen(["open", "-g", video_file])
+    
     app = QtGui.QApplication(sys.argv)
     vp = Phonon.VideoPlayer()
     print video_file
@@ -76,7 +78,6 @@ if __name__=='__main__':
     press_play_time = time.time()
     print "pre_video", pre_video
     print "play", press_play_time - pre_video
-
 
     start_behavs = {'1':np.zeros(0), 
                         '2': np.zeros(0),

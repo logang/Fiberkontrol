@@ -141,7 +141,8 @@ def load_clip_times_FPTL_format(clip_list_file,
                                 clip_window_origin=None,
                                 plot_fluor_around_peaks=False,
                                 delay = 0.0933492779732,
-                                print_peak_vals=True ):
+                                print_peak_vals=True,
+                                print_peak_times = True ):
 
 
     """
@@ -242,8 +243,21 @@ def load_clip_times_FPTL_format(clip_list_file,
         pickle.dump( all_peak_vals, open( output_folder + 'peak_vals.pkl', "wb" ) )
 
 
-
-    print movie_info_dict
+    if print_peak_times:
+        output_folder = output_dir + '/peak_times/'
+        if not os.path.exists(output_folder):
+            os.makedirs(output_folder)
+        filename = output_folder+'peak_times.txt'
+        f = open(filename, 'w')
+        for trial in movie_info_dict.keys():
+            movie_info = movie_info_dict[trial]
+            peak_times = movie_info['peak_times']
+            name = movie_info['name']
+            f.write("%s\n" % name)
+            for val in peak_times:
+                f.write("%f\n" %val)
+        f.close()
+        print filename
 
 
             ## Print for debugging, and to check that labels match up with blind data
@@ -828,7 +842,7 @@ if __name__ == '__main__':
                                                       output_dir,
                                                       clip_window,
                                                       clip_window_origin,
-                                                      plot_fluor_around_peaks=True,
+                                                      plot_fluor_around_peaks=False,
                                                       delay = 0.0933492779732,
                                                       print_peak_vals=True )
     else:
@@ -837,28 +851,31 @@ if __name__ == '__main__':
                                           output_dir, options.mouse_type)
 
     #print "KEYS: ", movie_info_dict.keys()
-    for key in movie_info_dict:
-        print "movie_info_dict", movie_info_dict.keys()
-        print "key", key
-        if check_key(key, options):
-            movie_info = movie_info_dict[key]
-            mouse_type = movie_info_dict[key]['mouse_type']
 
-            movie_file_tt = check_video_timestamps(movie_info['movie_file'], 
-                                   desired_format='.mp4', 
-                                   desired_framerate=30)
-            
-            movie_info['movie_file'] = movie_file_tt
-            overlay_filename = overlay_time_series(movie_info, 
-                                                   time_series_data_path, 
-                                                   output_dir, mouse_type)
+    make_clips = False
+    if make_clips:
+        for key in movie_info_dict:
+            print "movie_info_dict", movie_info_dict.keys()
+            print "key", key
+            if check_key(key, options):
+                movie_info = movie_info_dict[key]
+                mouse_type = movie_info_dict[key]['mouse_type']
+
+                movie_file_tt = check_video_timestamps(movie_info['movie_file'], 
+                                       desired_format='.mp4', 
+                                       desired_framerate=30)
+                
+                movie_info['movie_file'] = movie_file_tt
+                overlay_filename = overlay_time_series(movie_info, 
+                                                       time_series_data_path, 
+                                                       output_dir, mouse_type)
 
 
-            movie_info['movie_file'] = overlay_filename[:-4]
-            print "movie_info['movie_file']", movie_info['movie_file']
-            cut_and_splice_clips(movie_info_dict[key], clip_window=clip_window, 
-                                 clip_window_origin = clip_window_origin,
-                                 peak_thresh=peak_thresh, divider_clip=divider_clip)
+                movie_info['movie_file'] = overlay_filename[:-4]
+                print "movie_info['movie_file']", movie_info['movie_file']
+                cut_and_splice_clips(movie_info_dict[key], clip_window=clip_window, 
+                                     clip_window_origin = clip_window_origin,
+                                     peak_thresh=peak_thresh, divider_clip=divider_clip)
             
 
 

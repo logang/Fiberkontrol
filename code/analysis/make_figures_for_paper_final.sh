@@ -1,7 +1,10 @@
 #!/bin/bash
 
 data_path='/Users/isaackauvar/Documents/2012-2013/ZDlab/FiberKontrol/Results/Cell/all_data_post_SfN_raw.h5'
-output_path='/Users/isaackauvar/Documents/2012-2013/ZDlab/FiberKontrol/Results/Cell/Plots/Finalz_post_SfN_000rxn_test'
+output_path='/Users/isaackauvar/Documents/2012-2013/ZDlab/FiberKontrol/Results/Cell/Plots/Finalz_post_SfN_000rxn'
+
+plot_type='get-blind-data'
+python group_analysis.py --input-path=$data_path --output-path=$output_path/ --$plot_type
 
 if $(false); then
 
@@ -15,7 +18,7 @@ python group_analysis.py --input-path=$data_path --output-path=$output_path/$plo
 
 fi
 
-if $(true); then
+if $(false); then
 
 plot_type=compare-decay
 max_bout_number=13

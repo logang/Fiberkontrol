@@ -39,9 +39,11 @@ if __name__=='__main__':
 
     start_social = np.zeros(0)
     end_social = np.zeros(0)
+    placed_in_chamber = np.zeros(0)
+
     end_video_time = 0
 
-    print "start_social=j   end_social=k   start_video=a   end_video=f"
+    print "start_social=j   end_social=k   start_video=a   end_video=f   conspecific_placed_in_chamber=p"
 
     while (True):
 #        s = raw_input('-->')
@@ -62,6 +64,9 @@ if __name__=='__main__':
             end_video_time = time.time() - start_video_time
             break
 
+        if s == 'p':
+            placed_in_chamber = np.append(placed_in_chamber, time.time() - start_video_time)
+            
     save_path = '/Users/kellyz/Documents/Data/Fiberkontrol/'
 #    filename = sys.argv[2]
 
@@ -71,8 +76,9 @@ if __name__=='__main__':
 
     np.savez(full_save_path + '_s', start_social)
     np.savez(full_save_path + '_e', end_social)
+    np.savez(full_save_path + '_p', placed_in_chamber)
     print start_social
     print end_social
-
+    print placed_in_chamber
     print "the end"
 

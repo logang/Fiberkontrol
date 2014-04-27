@@ -100,9 +100,12 @@ def plot_histogram(behaviors, data, behav_type, mouse_type,
         else:
             plt.ylabel('Total counts')
 
-    plt.ylim([0, 1])
+    if normalized:
+        plt.ylim([0, 1])
     plt.title(title)
     if outpath is not None:
+        if not os.path.isdir(outpath):
+            os.makedirs(outpath)
         plt.savefig(outpath + title + '.pdf')
 
         f = open(outpath+title+'.txt', 'w')
@@ -136,25 +139,27 @@ if __name__ == "__main__":
                           'mouse_type':mouse_type}
 
         outpath = path + '/plots/'
-        if not os.path.isdir(outpath):
-            os.makedirs(outpath)
         for mouse_type in ['GC5', 'GC5_Nacprojection']:
-            #interaction_behaviors = None
-            #solitary_behaviors = None
+            interaction_behaviors = None
+            solitary_behaviors = None
             weighted = False
            
 
-            plot_histogram(behaviors, data, behav_type, mouse_type, normalized=False)
+            plot_histogram(behaviors, data, behav_type, mouse_type, 
+                           outpath = outpath+'/unnormalized_unweighted/',
+                           normalized=False)
             plot_histogram(behaviors, data, behav_type, mouse_type,  
                             interaction_behaviors=interaction_behaviors, 
                             solitary_behaviors=solitary_behaviors,
-                            weighted=weighted, outpath=outpath)
+                            weighted=weighted, outpath=outpath+'/total/')
             plot_histogram(behaviors, data, behav_type, mouse_type, 
                             interaction_behaviors=interaction_behaviors, 
                             solitary_behaviors=solitary_behaviors,
-                            weighted=weighted, outpath=outpath, before_or_after_conspecific='before')
+                            weighted=weighted, outpath=outpath+'/before/', 
+                            before_or_after_conspecific='before')
             plot_histogram(behaviors, data, behav_type, mouse_type, 
                             interaction_behaviors=interaction_behaviors, 
                             solitary_behaviors=solitary_behaviors,
-                            weighted=weighted, outpath=outpath, before_or_after_conspecific='after')
+                            weighted=weighted, outpath=outpath+'/after/',
+                            before_or_after_conspecific='after')
 
