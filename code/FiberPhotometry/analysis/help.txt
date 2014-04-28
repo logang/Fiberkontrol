@@ -1,0 +1,79 @@
+--------Preprocessing files---------
+**********************************************************************************
+**Steps for converting raw data (in .npz format as output by fiberkontrol_LED.py)*
+**into flattened data in an hdf5 file, ready for analysis.			 *
+**********************************************************************************
+
+TO ADD NEW DATA, START AT (1).
+TO CHANGE WHICH DATA IS INCLUDED, START AT (5).
+
+1) Make sure that data files have the format:
+20121105-GC5-homecagesocial-8497-600patch-2012_11_5_19-6_run_number_0.npz
+
+and complete filenames like:
+'/Users/isaackauvar/Dropbox/Fiberkontrol/Fiberkontrol_Data/Lisa_Data/20121105/20121105-GC5-homecagesocial-8497-600patch-2012_11_5_19-6_run_number_0.npz'
+
+For VTA->NAcc projection, use format:
+20130327-GC5_NAcprojection-homecagenovel-408-2013_3_27_16-54_run_number_0.npz 
+
+and complete filenames like:
+/Users/isaackauvar/Dropbox/Fiberkontrol/Fiberkontrol_Data/Lisa_Data/20130327/20130327-GC5_NAcprojection-homecagenovel-408-2013_3_27_16-54_run_number_0.npz 
+
+Additionally, for behavior scoring files, use format, for example:
+GC5_NAcprojection_407_social_e.npz 
+
+
+2) Add all filenames to the file
+      all_analysis_filenames.txt
+   in the Fiberkontrol/code/analysis directory
+   Also add filenames to correct subset of  analysis_filenames (i.e. analysis_filenames_20130108.npz, which
+   includes the trials on 20130108 as opposed to 20130327).
+   Duplicate file with correct subset and save as analysis_filenames.txt
+
+
+3) To flatten data: 
+Add a folder named 'Debleached' in the same directory as the npz data (i.e. path_to_npz/20130920/)
+Then, run:
+
+python preprocessing.py 'path_to_npz' --save-debleach -f analysis_filenames.txt
+
+Where 'path_to_npz' is the path to the directory which contains folders with the trials for each date (including a backslash at the end).
+
+
+4) Populate a single folder title Flat/ with the flat
+	npz files of all data to be used
+
+5) (Any time you change the mice you are including, and you have already preprocessed them previously, start here)
+Run
+
+python preprocessing.py 'path_to_npz/' --generate-hdf5 -f 'analysis_filenames.txt' -o 'path_to_hdf5.h5'
+
+
+7) Run
+
+python preprocessing.py 'path_to_npz' --add-flattened-files -f analysis_filenames.txt -o 'path_to_hdf5' --path-to-flat-data 'path_to_folder_with_flat_data'
+
+
+8) Now you should have a single hdf5 file that contains both the original
+   raw data stored in 'time_series_arr', which has the fluorescence data,
+   the trigger data, and the time stamps. Additionally in 'flat' data
+   is the flattened data (still in raw normalization format) 
+   You can manually check the hdf5 file in python:
+   import h5py
+   a = h5py.File('path_to_hdf5_file.hdf5')
+   a.keys()
+
+
+------------Analyzing files------------
+**See the script make_figures.sh for examples**
+
+-----------Testing script-------------
+Change the hardcoded paths in tests/test_configuration.json
+
+in the command line type:
+nosetests -v
+
+If you need to generate more test data, see the examples in generate_test_data.sh
+However, be sure not to rerun the script for the already existing data, since 
+mice 0001 through 0004 have a stochastic component and the tests may not pass
+if the data is regenerated.

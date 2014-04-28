@@ -5,10 +5,6 @@ import time
 import sys
 import subprocess
 
-# Imports for playing video
-from PyQt4 import QtCore, QtGui
-from PyQt4.phonon import Phonon
-
 def check_input():
     if len(sys.argv) < 1:
         print "\nUsage: python home_cage_social_interface.py movie_filename save_filename\n"
@@ -59,21 +55,11 @@ if __name__=='__main__':
     if video_file == '':
         print "Video_file is None"
         sys.exit(1)
-    #video_file = '/Users/isaackauvar/Documents/2012-2013/ZDlab/FiberKontrol/Fiberkontrol/code/behavior_scoring/with_text_30_social.mp4'
+
     pre_video = time.time()
     p = subprocess.Popen(["open", "-a", "vlc", "-g", video_file])
     #p = subprocess.Popen(["open", "-g", video_file])
     
-    # app = QtGui.QApplication(sys.argv)
-    # vp = Phonon.VideoPlayer()
-    # print video_file
-    # media = Phonon.MediaSource(video_file)
-    # vp.show()
-    # vp.load(media)
-    # p = subprocess.Popen(["ffplay", "-i", video_file, "-exitonkeydown"], 
-    #                stderr=subprocess.PIPE, stdout=subprocess.PIPE)
-    # # p.wait()
-    # # vp.play()
 
     press_play_time = time.time()
     
@@ -144,8 +130,6 @@ if __name__=='__main__':
     full_save_path = video_file[:-4]
     print full_save_path
 
-#    np.savez(full_save_path + '_s', start_social)
-#    np.savez(full_save_path + '_e', end_social)
     np.savez(full_save_path + '_1s', start_behavs['1'])
     np.savez(full_save_path + '_1e', end_behavs['1'])
     np.savez(full_save_path + '_2s', start_behavs['2'])
