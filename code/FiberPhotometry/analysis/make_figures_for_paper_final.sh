@@ -1,12 +1,13 @@
 #!/bin/bash
 
 data_path='/Users/isaackauvar/Documents/2012-2013/ZDlab/FiberKontrol/Results/Cell/all_data_post_SfN_raw.h5'
-output_path='/Users/isaackauvar/Documents/2012-2013/ZDlab/FiberKontrol/Results/Cell/Plots/Finalz_post_SfN_000rxn'
+# output_path='/Users/isaackauvar/Documents/2012-2013/ZDlab/FiberKontrol/Results/Cell/Plots/Finalz_post_SfN_000rxn'
+output_path='/Users/isaackauvar/Documents/2012-2013/ZDlab/FiberKontrol/Results/Cell/Plots/Finalz_testing_FiberPhotometryFolder'
 
 plot_type='get-blind-data'
 python group_analysis.py --input-path=$data_path --output-path=$output_path/ --$plot_type
 
-if $(false); then
+if $(true); then
 
 plot_type=time-series-animation
 exp_type='homecagesocial'
@@ -18,7 +19,7 @@ python group_analysis.py --input-path=$data_path --output-path=$output_path/$plo
 
 fi
 
-if $(false); then
+if $(true); then
 
 plot_type=compare-decay
 max_bout_number=13
