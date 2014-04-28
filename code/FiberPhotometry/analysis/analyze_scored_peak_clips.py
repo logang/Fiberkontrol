@@ -30,6 +30,13 @@ def plot_histogram(behaviors, data, behav_type, mouse_type,
                    interaction_behaviors=None, solitary_behaviors=None,
                    weighted=False, outpath = None,
                    before_or_after_conspecific=None, normalized=True):
+    """
+    Given a behavioral label for each fluorescence peak (this was determined
+    by observing the behavior occuring at each timestamp corresponding
+    to a peak in the fluorescence time series), plot a (weighted) histogram 
+    of the behavior during fluorescence peaks.
+    """
+
     behavior_tally = dict()
     for key in behaviors: #Initialize behaviors you want to be sure to plot
         behavior_tally[key] = 0

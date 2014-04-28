@@ -5,6 +5,8 @@ This file loads hardcoded filepaths
 from a json (such as 'tests/test_configuration.json')
 into a python dict such that they can be accessed in
 various modules.
+
+This is used for setting up unit-testing environment.
 """
 
 import json
