@@ -60,24 +60,25 @@ if __name__=='__main__':
         print "Video_file is None"
         sys.exit(1)
     #video_file = '/Users/isaackauvar/Documents/2012-2013/ZDlab/FiberKontrol/Fiberkontrol/code/behavior_scoring/with_text_30_social.mp4'
-    #p = subprocess.Popen(["open", "-a", "vlc", "-g", video_file])
+    pre_video = time.time()
+    p = subprocess.Popen(["open", "-a", "vlc", "-g", video_file])
     #p = subprocess.Popen(["open", "-g", video_file])
     
-    app = QtGui.QApplication(sys.argv)
-    vp = Phonon.VideoPlayer()
-    print video_file
-    media = Phonon.MediaSource(video_file)
-    vp.show()
-    vp.load(media)
-    pre_video = time.time()
-    #p = subprocess.Popen(["ffplay", "-i", video_file, "-exitonkeydown"], 
-     #               stderr=subprocess.PIPE, stdout=subprocess.PIPE)
-    #p.wait()
-    vp.play()
+    # app = QtGui.QApplication(sys.argv)
+    # vp = Phonon.VideoPlayer()
+    # print video_file
+    # media = Phonon.MediaSource(video_file)
+    # vp.show()
+    # vp.load(media)
+    # p = subprocess.Popen(["ffplay", "-i", video_file, "-exitonkeydown"], 
+    #                stderr=subprocess.PIPE, stdout=subprocess.PIPE)
+    # # p.wait()
+    # # vp.play()
 
     press_play_time = time.time()
-    print "pre_video", pre_video
-    print "play", press_play_time - pre_video
+    
+    # print "pre_video", pre_video
+    # print "play", press_play_time - pre_video
 
     start_behavs = {'1':np.zeros(0), 
                         '2': np.zeros(0),

@@ -1757,6 +1757,10 @@ def get_averages(all_data, options, exclude_sucrose=True):
             print 'mean: ', np.mean(FA.fluor_data), ', max: ', np.max(FA.fluor_data), ', min:', np.min(FA.fluor_data), ', std: ', np.std(FA.fluor_data)
 
     print 'ALL: mean: ', np.mean(all_time_series), ', max: ', np.max(all_time_series), ', min:', np.min(all_time_series), ', std: ', np.std(all_time_series)
+    plt.figure()
+    plt.plot(all_time_series)
+    plt.title('All time series')
+    plt.savefig(options.output_path+'_all')
 
     f = open(options.output_path + 'averages.txt', 'w')
     f.write('Normalization: ' + FA.fluor_normalization  + '\n')
