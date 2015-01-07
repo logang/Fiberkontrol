@@ -57,7 +57,7 @@ def generate_hdf5_file(analysis_filenames,out_path):
                 cmd += '--exp-type=EPM'
 
             elif info[2] == 'sucrose':
-                cmd += ' --exp-type=sucrose '
+                cmd += '--exp-type=sucrose '
 
             else:
                 print info[3], "is not a recognized experiment type. Check filenames."
@@ -68,10 +68,7 @@ def generate_hdf5_file(analysis_filenames,out_path):
             cmd += ' --smoothness=0 '
             cmd += ' --mouse-type=' + info[1]
             result = run_command_wrapper(cmd)
-            print ""
-            if result[0] == False:
-                print cmd
-                print result
+            print result
 
 #------------------------------------------------------------------------------
 
@@ -100,6 +97,7 @@ def debleach_files(analysis_filenames):
         # instead of after the command has finished running
         os.system(cmd) 
 
+
     print "Now make a folder Flat/ for each day of trials, and place in this folder "
     print "the 'flat' time series for a each trial. Determine which is the 'flat' "
     print "time series by using the plots comparing original and debleached "
@@ -116,9 +114,6 @@ def add_flattened_files_to_hdf5(flat_directories, out_path):
     Adds debleached files to the hdf5 file specified.
     """
     for d in flat_directories:
-        #d = flat_directories
-        print d
-        
         cmd = 'python add_files_to_hdf5.py -f '
         cmd += d 
         cmd += ' -n flat'
@@ -127,9 +122,10 @@ def add_flattened_files_to_hdf5(flat_directories, out_path):
         #Note that --add-new flag remains False
         print cmd
         
-        result = run_command_wrapper(cmd)
-        print result
-        #os.system(cmd)
+        #result = run_command_wrapper(cmd)
+        #print result
+        os.system(cmd)
+
 
 def read_filenames(filenames_file, path_to_filenames=None):
     """
@@ -155,9 +151,6 @@ def get_flat_directories(experiment_dates, path_to_npz_data):
     listed in the experiment_dates file
     These dates should correspond to all files
     to be analyzed in analysis_files
-
-    This should be deprecated. Use a single Flat/ directory to hold
-    all flat files
     """
 
     flat_dirs = []
@@ -174,8 +167,7 @@ if __name__ == '__main__':
     parser = OptionParser()
 
     parser.add_option("-o", "--out-path", dest="out_path", default=None, 
-                      help="Specify the path to the output HDF5 file. This also"
-                            " specifies which HDF5 file to change.")
+                      help="Specify the path to the output HDF5 file.")
 
     parser.add_option("", "--save-debleach", action="store_true", default=False, 
                       dest="save_debleach", 
@@ -191,10 +183,6 @@ if __name__ == '__main__':
                       default=False, dest="add_flattened_files", 
                       help=("Add flattened files to hdf5 for each "
                             "trial, as dataset labeled 'flat' "))
-
-    parser.add_option("", "--path-to-flat-data", default=None, 
-                       dest="path_to_flat_data", 
-                      help=("Add path to folder containing all flattened data"))
 
     parser.add_option("-f", "--analysis-filenames-file", 
                       dest="analysis_filenames_file", 
@@ -240,13 +228,7 @@ if __name__ == '__main__':
         generate_hdf5_file(analysis_filenames, out_path)
 
     if options.add_flattened_files:
-        if options.path_to_flat_data is None:
-            print "NEED TO SPECIFY location of Flat files. The attempted method is deprecated."
-            flat_directories = get_flat_directories(experiment_dates, path_to_npz_data)
-            #Change this so that flat_directories are loaded from a single directory 'Flat'
-        else:
-            flat_directories = [str(options.path_to_flat_data)]
-
+        flat_directories = get_flat_directories(experiment_dates, path_to_npz_data)
         add_flattened_files_to_hdf5(flat_directories, out_path)
     
     if options.save_debleach:
