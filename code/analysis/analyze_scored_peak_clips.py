@@ -113,8 +113,6 @@ def plot_histogram(behaviors, data, behav_type, mouse_type,
         f.write(str(behavior_labels) + '\n')
         f.close()
 
-
-
 if __name__ == "__main__":
     behaviors = ['ambulation', 'groom', 'sniff', 'rest', 'withdraw', 'burrow', 'rear', 'approach', 'head extension']
     interaction_behaviors = ['sniff', 'approach', 'withdraw']
